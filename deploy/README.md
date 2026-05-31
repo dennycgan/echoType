@@ -86,9 +86,38 @@ curl http://<EC2_PUBLIC_IP>/courses | jq
 
 ## Notes / gotchas
 
-- **Security group**: ports 22 and 80 are open to your home IP only
-  (`my_ip_cidr`). If your home IP changes, update `my_ip_cidr` in
-  `infra/terraform.tfvars` and `terraform apply` again.
+- **Security group**: SSH (22) is open to your home IP only (`my_ip_cidr`); HTTP
+  (80) is open to the world (`0.0.0.0/0`) so the public backend is reachable.
+  If your home IP changes, update `my_ip_cidr` in `infra/terraform.tfvars` and
+  re-apply (SSH only).
 - **RDS is private**: no public access. Only the EC2 SG can reach 5432.
 - **ARM image**: EC2 is Graviton (arm64); Docker pulls arm64 images automatically.
+- **Elastic IP**: the instance has a stable EIP, so its public address survives
+  rebuilds / re-applies. Use `terraform output ec2_public_ip` as `EC2_HOST`.
 - **Tear down** to avoid charges: `cd infra && terraform destroy`.
+
+## CI/CD (GitHub Actions)
+
+`.github/workflows/deploy.yml` deploys the backend on **manual trigger only**
+(`workflow_dispatch`). It SSHes into EC2, checks out the pushed commit, writes
+`deploy/.env` from repo secrets, and runs `docker compose ... up -d --build`
+(**build on EC2**), then health-checks `/health`. Terraform is **never** run in
+CI — infra is applied locally by the maintainer.
+
+Required GitHub config (Settings → Secrets and variables → Actions):
+
+| Kind | Name | Source |
+|---|---|---|
+| Variable | `EC2_HOST` | `terraform output -raw ec2_public_ip` (the Elastic IP) |
+| Secret | `EC2_SSH_KEY` | full contents of `~/.ssh/echotype_ec2` (private key) |
+| Secret | `DATABASE_URL` | `terraform output -raw database_url` |
+
+## Future upgrades (TODO, not in MVP)
+
+- **Migrate to GHCR push/pull images**: build the API image on the GitHub runner,
+  push to GitHub Container Registry (GHCR), and have EC2 pull the prebuilt image
+  instead of building on the t4g.micro. Removes build load from the instance.
+- **Replace SSH-key-in-Secrets with OIDC**: use GitHub Actions OIDC + an AWS IAM
+  Role + SSM Session Manager (`aws ssm send-command` / Session Manager) to deploy,
+  so no long-lived SSH private key is stored in GitHub Secrets and port 22 can be
+  closed entirely.

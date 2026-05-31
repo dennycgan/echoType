@@ -1,15 +1,15 @@
 output "ec2_public_ip" {
-  value       = aws_instance.app.public_ip
-  description = "Public IPv4 of the EC2 instance."
+  value       = aws_eip.app.public_ip
+  description = "Stable Elastic IP of the EC2 instance (use this as EC2_HOST)."
 }
 
 output "ec2_public_dns" {
-  value       = aws_instance.app.public_dns
-  description = "Public DNS of the EC2 instance."
+  value       = aws_eip.app.public_dns
+  description = "Public DNS of the Elastic IP."
 }
 
 output "ssh_command" {
-  value       = "ssh -i ~/.ssh/echotype_ec2 ec2-user@${aws_instance.app.public_ip}"
+  value       = "ssh -i ~/.ssh/echotype_ec2 ec2-user@${aws_eip.app.public_ip}"
   description = "Ready-to-use SSH command."
 }
 
