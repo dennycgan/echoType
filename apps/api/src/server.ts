@@ -41,10 +41,18 @@ app.setErrorHandler((error: Error, _req, reply) => {
 
 await app.register(cors, { origin: WEB_ORIGIN, credentials: true });
 
-app.get('/health', async () => ({ ok: true, demoUser: DEMO_USER_ID }));
-
-await registerCourseRoutes(app);
-await registerSessionRoutes(app);
+// All application routes live under /api so a single CloudFront behavior
+// (/api/*) can route here while everything else serves the static SPA.
+//   - Public (through CloudFront): https://<dist>.cloudfront.net/api/health
+//   - Direct on the instance (via SSM session): curl http://localhost/api/health
+await app.register(
+  async (api) => {
+    api.get('/health', async () => ({ ok: true, demoUser: DEMO_USER_ID }));
+    await registerCourseRoutes(api);
+    await registerSessionRoutes(api);
+  },
+  { prefix: '/api' },
+);
 
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, 'shutting down');

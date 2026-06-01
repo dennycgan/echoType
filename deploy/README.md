@@ -15,11 +15,14 @@ terraform apply        # creates VPC, subnets, SGs, EC2 (t4g.micro), RDS (db.t4g
 Grab the outputs:
 
 ```bash
-terraform output ec2_public_ip            # the stable Elastic IP
-terraform output instance_id              # SSM target
-terraform output github_actions_role_arn  # -> GitHub repo variable AWS_ROLE_ARN
-terraform output ssm_session_command      # break-glass shell (no SSH)
-terraform output -raw database_url        # sensitive; also stored in SSM Parameter Store
+terraform output ec2_public_ip             # the stable Elastic IP
+terraform output instance_id               # SSM target
+terraform output github_actions_role_arn   # -> GitHub repo variable AWS_ROLE_ARN
+terraform output cloudfront_url            # public site URL (frontend + /api)
+terraform output web_bucket_name           # -> GitHub repo variable WEB_BUCKET
+terraform output cloudfront_distribution_id # -> GitHub repo variable CF_DISTRIBUTION_ID
+terraform output ssm_session_command       # break-glass shell (no SSH)
+terraform output -raw database_url         # sensitive; also stored in SSM Parameter Store
 ```
 
 > RDS takes ~5–10 min to become available. EC2 `user_data` also needs ~1–2 min
@@ -66,8 +69,11 @@ which is what CI reads automatically), e.g.:
 DATABASE_URL=postgresql://echotype:<password>@echotype-db.xxxx.ap-southeast-2.rds.amazonaws.com:5432/echotype
 DEMO_USER_ID=demo-user
 API_PORT=3001
-WEB_ORIGIN=http://<EC2_PUBLIC_IP>
+WEB_ORIGIN=https://<CLOUDFRONT_DOMAIN>
 ```
+
+> CI reads `WEB_ORIGIN` automatically from SSM parameter `/echotype/WEB_ORIGIN`
+> (set by Terraform to the CloudFront URL); you only set it by hand for a manual run.
 
 ## 4. Build and run the backend
 
@@ -84,56 +90,109 @@ Watch logs:
 docker compose -f deploy/docker-compose.cloud.yml logs -f api
 ```
 
-## 5. Verify from your laptop (public IP)
+## 5. Verify
+
+The backend's port 80 is locked to CloudFront, so you do **not** curl the EC2 IP
+from your laptop. Two valid ways to test:
+
+- **Public (through CloudFront)** — the real path browsers use:
 
 ```bash
-curl http://<EC2_PUBLIC_IP>/health
-curl http://<EC2_PUBLIC_IP>/courses | jq
+curl https://<CLOUDFRONT_DOMAIN>/api/health      # {"ok":true,...}
+curl https://<CLOUDFRONT_DOMAIN>/api/courses | jq # seeded courses
 ```
 
-`/courses` should return the two seeded courses (Stray Birds 49, What I Have Lived For).
+- **Direct on the instance (debugging)** — open an SSM session, then hit the
+  container locally:
+
+```bash
+aws ssm start-session --target <INSTANCE_ID> --region ap-southeast-2
+# inside the instance:
+curl http://localhost/api/health
+curl http://localhost/api/courses
+```
+
+`/api/courses` should return the two seeded courses (Stray Birds 49, What I Have
+Lived For).
 
 ## Notes / gotchas
 
-- **Security group**: there is **no port 22 ingress** at all. HTTP (80) is open
-  to the world (`0.0.0.0/0`) so the public backend is reachable. Shell access is
-  via SSM Session Manager (agent-initiated outbound 443), so nothing inbound is
-  exposed besides 80.
+- **Security group**: there is **no port 22 ingress** at all, and **port 80 is
+  restricted to CloudFront's origin-facing ranges** (AWS managed prefix list
+  `com.amazonaws.global.cloudfront.origin-facing`). The backend is therefore only
+  reachable *through* CloudFront, never via plain public HTTP. Shell access is via
+  SSM Session Manager (agent-initiated outbound 443).
+- **API path prefix**: all backend routes are under `/api` (`/api/health`,
+  `/api/courses`, `/api/sessions`) so a single CloudFront behavior `/api/*` routes
+  to EC2 while everything else serves the SPA from S3.
+- **No CORS / no mixed content**: the browser only talks HTTPS to the one
+  CloudFront domain (frontend and `/api` are same-origin). CloudFront → EC2 is
+  server-to-server over HTTP. `WEB_ORIGIN` is set to the CloudFront URL (via SSM
+  parameter `/echotype/WEB_ORIGIN`) as a CORS safety net for POSTs.
+- **Frontend bucket is private**: S3 has Block Public Access on; only CloudFront
+  reads it via Origin Access Control (OAC).
 - **RDS is private**: no public access. Only the EC2 SG can reach 5432.
 - **ARM image**: EC2 is Graviton (arm64); Docker pulls arm64 images automatically.
-- **Elastic IP**: the instance has a stable EIP, so its public address survives
-  rebuilds / re-applies. Use `terraform output ec2_public_ip` as `EC2_HOST`.
+- **Elastic IP**: the instance has a stable EIP; CloudFront uses its public DNS
+  name as the API origin.
 - **Tear down** to avoid charges: `cd infra && terraform destroy`.
 
-## CI/CD (GitHub Actions, OIDC + SSM — no SSH)
+## CI/CD (GitHub Actions, OIDC — no SSH)
 
-`.github/workflows/deploy.yml` deploys on **manual trigger only**
-(`workflow_dispatch`). Flow:
+Two **manual-trigger** (`workflow_dispatch`) workflows, both assuming the same
+OIDC role (`echotype-github-deploy`); no stored keys, no DB credentials in GitHub.
 
-1. **OIDC**: the runner assumes `${var.project}-github-deploy` via
-   `aws-actions/configure-aws-credentials` — short-lived creds, no stored keys.
-2. **Resolve**: `ec2:DescribeInstances` finds the running `echotype-app`
-   instance and its public IP.
+**`deploy.yml` — backend (EC2 via SSM):**
+1. **OIDC**: assume the role via `aws-actions/configure-aws-credentials`.
+2. **Resolve**: `ec2:DescribeInstances` finds the running `echotype-app` instance.
 3. **Deploy**: `ssm:SendCommand` (`AWS-RunShellScript`) tells the instance to
-   `git checkout` the pushed commit and run `deploy/remote-deploy.sh`, which
-   reads `DATABASE_URL` from SSM Parameter Store, writes `deploy/.env`, and runs
-   `docker compose ... up -d --build` (**build on EC2**). The job polls the
-   command to completion and prints its stdout/stderr.
-4. **Health check**: polls `http://<public-ip>/health`. Fail = fail, no rollback.
+   `git checkout` the pushed commit and run `deploy/remote-deploy.sh`, which reads
+   `DATABASE_URL` + `WEB_ORIGIN` from SSM Parameter Store, writes `deploy/.env`,
+   and runs `docker compose ... up -d --build` (**build on EC2**).
+4. **Health check**: polls `https://<cloudfront>/api/health` (read from the
+   `/echotype/WEB_ORIGIN` parameter). Fail = fail, no rollback.
+
+**`deploy-web.yml` — frontend (S3 + CloudFront):**
+1. `pnpm install` + `pnpm --filter @echotype/web build` (output `apps/web/dist`).
+2. **OIDC**: assume the role.
+3. `aws s3 sync apps/web/dist s3://<bucket> --delete`.
+4. `aws cloudfront create-invalidation --paths "/*"`.
 
 Terraform is **never** run in CI — infra is applied locally by the maintainer.
 
-**No SSH key and no DB credentials are stored in GitHub.** Required config
-(Settings → Secrets and variables → Actions):
+Required config (Settings → Secrets and variables → Actions → **Variables**):
 
-| Kind | Name | Source |
-|---|---|---|
-| Variable | `AWS_ROLE_ARN` | `terraform output -raw github_actions_role_arn` |
+| Name | Source |
+|---|---|
+| `AWS_ROLE_ARN` | `terraform output -raw github_actions_role_arn` |
+| `WEB_BUCKET` | `terraform output -raw web_bucket_name` |
+| `CF_DISTRIBUTION_ID` | `terraform output -raw cloudfront_distribution_id` |
 
-The IAM deploy role is least-privilege: `ec2:DescribeInstances`,
-`ssm:SendCommand` (only to `Project=echotype` instances + the
-`AWS-RunShellScript` document), and reading command results. The EC2 instance
-profile grants only SSM managed access + reading `/echotype/*` parameters.
+The deploy role is least-privilege: `ec2:DescribeInstances`; `ssm:SendCommand`
+(only `Project=echotype` instances + `AWS-RunShellScript`); read command results;
+read the `WEB_ORIGIN` param; `s3:PutObject/DeleteObject/ListBucket` on the web
+bucket; `cloudfront:CreateInvalidation` on the distribution.
+
+## First-time deploy order (frontend + backend)
+
+Run these **in order** the first time (and any time CloudFront/S3 are recreated):
+
+1. **`terraform apply`** (local) — creates S3 + CloudFront + the `WEB_ORIGIN`
+   parameter + IAM/SG changes.
+2. **Wait for CloudFront** to finish deploying: status `Deployed` (~10–15 min;
+   check AWS Console → CloudFront, or
+   `aws cloudfront get-distribution --id <ID> --query 'Distribution.Status'`).
+   Until then the public URL (and the backend health check through it) will fail.
+3. **Set GitHub Variables**: `AWS_ROLE_ARN`, `WEB_BUCKET`, `CF_DISTRIBUTION_ID`
+   (from the matching `terraform output`s).
+4. **Run `deploy.yml`** (backend) — so the API picks up the updated `WEB_ORIGIN`
+   (the CloudFront URL) and is reachable via `/api/*`.
+5. **Run `deploy-web.yml`** (frontend) — uploads the SPA and invalidates the cache.
+6. **Verify on phone (4G)**: open `https://<CLOUDFRONT_DOMAIN>` — UI loads, list
+   courses, type, and a session persists (all HTTPS, same-origin).
+
+> Steps 4 and 5 are independent afterwards: a frontend-only change just needs
+> `deploy-web.yml`; a backend-only change just needs `deploy.yml`.
 
 ## Future upgrades (TODO, not in MVP)
 

@@ -98,16 +98,21 @@ jobs:
 
           test "$STATUS" = "Success"
 
-      - name: Health check (fail = fail, no rollback)
+      - name: Health check via CloudFront (fail = fail, no rollback)
         run: |
-          IP="${{ steps.ec2.outputs.public_ip }}"
-          for i in $(seq 1 20); do
-            if curl -fsS --max-time 5 "http://$IP/health" | grep -q '"ok":true'; then
+          set -euo pipefail
+          # Port 80 is locked to CloudFront, so we verify through the public HTTPS
+          # URL (the CloudFront domain), not by hitting the instance directly.
+          BASE=$(aws ssm get-parameter --name "/echotype/WEB_ORIGIN" \
+            --region "${{ env.AWS_REGION }}" --query 'Parameter.Value' --output text)
+          echo "Health base: $BASE"
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 5 "$BASE/api/health" | grep -q '"ok":true'; then
               echo "Health OK"
-              curl -fsS "http://$IP/courses" || true
+              curl -fsS "$BASE/api/courses" || true
               exit 0
             fi
-            echo "waiting for backend... attempt $i"
+            echo "waiting for backend via CloudFront... attempt $i"
             sleep 6
           done
           echo "Health check failed"

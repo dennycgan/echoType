@@ -11,3 +11,17 @@ resource "aws_ssm_parameter" "database_url" {
     Name = "${var.project}-database-url"
   }
 }
+
+# Public origin (the CloudFront HTTPS URL) used as the API's CORS WEB_ORIGIN.
+# Not secret -- plain String. Read by the instance at deploy time and by the
+# backend workflow's health check.
+resource "aws_ssm_parameter" "web_origin" {
+  name        = "/${var.project}/WEB_ORIGIN"
+  description = "CloudFront HTTPS URL; API CORS allow-origin and CI health-check base."
+  type        = "String"
+  value       = "https://${aws_cloudfront_distribution.web.domain_name}"
+
+  tags = {
+    Name = "${var.project}-web-origin"
+  }
+}

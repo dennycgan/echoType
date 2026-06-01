@@ -81,6 +81,36 @@ data "aws_iam_policy_document" "github_deploy" {
     actions   = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations", "ssm:ListCommands"]
     resources = ["*"]
   }
+
+  # Backend health check reads the CloudFront URL from this one parameter.
+  statement {
+    sid       = "ReadWebOriginParameter"
+    effect    = "Allow"
+    actions   = ["ssm:GetParameter"]
+    resources = ["arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/WEB_ORIGIN"]
+  }
+
+  # Frontend deploy: sync the built SPA to S3 and invalidate the CDN cache.
+  statement {
+    sid       = "SyncWebBucketObjects"
+    effect    = "Allow"
+    actions   = ["s3:PutObject", "s3:DeleteObject"]
+    resources = ["${aws_s3_bucket.web.arn}/*"]
+  }
+
+  statement {
+    sid       = "ListWebBucket"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.web.arn]
+  }
+
+  statement {
+    sid       = "InvalidateCdn"
+    effect    = "Allow"
+    actions   = ["cloudfront:CreateInvalidation"]
+    resources = [aws_cloudfront_distribution.web.arn]
+  }
 }
 
 resource "aws_iam_role_policy" "github_deploy" {

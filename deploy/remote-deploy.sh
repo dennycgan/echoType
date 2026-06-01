@@ -23,11 +23,19 @@ DB_URL="$(aws ssm get-parameter \
   --query 'Parameter.Value' \
   --output text)"
 
+# WEB_ORIGIN = the CloudFront HTTPS URL (set by Terraform). Fall back to the
+# instance IP only if the parameter is missing (e.g. before CloudFront exists).
+WEB_ORIGIN="$(aws ssm get-parameter \
+  --name "/echotype/WEB_ORIGIN" \
+  --region "$REGION" \
+  --query 'Parameter.Value' \
+  --output text 2>/dev/null || echo "http://${PUBLIC_IP}")"
+
 cat > deploy/.env <<ENV
 DATABASE_URL=${DB_URL}
 DEMO_USER_ID=demo-user
 API_PORT=3001
-WEB_ORIGIN=http://${PUBLIC_IP}
+WEB_ORIGIN=${WEB_ORIGIN}
 ENV
 
 docker compose -f deploy/docker-compose.cloud.yml --env-file deploy/.env up -d --build

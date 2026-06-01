@@ -23,6 +23,26 @@ output "ssm_session_command" {
   description = "Break-glass shell access via SSM Session Manager (no SSH, no port 22)."
 }
 
+output "cloudfront_url" {
+  value       = "https://${aws_cloudfront_distribution.web.domain_name}"
+  description = "Public site URL (frontend + /api). Open this in the browser."
+}
+
+output "cloudfront_domain_name" {
+  value       = aws_cloudfront_distribution.web.domain_name
+  description = "CloudFront distribution domain name."
+}
+
+output "cloudfront_distribution_id" {
+  value       = aws_cloudfront_distribution.web.id
+  description = "Set as GitHub repo variable CF_DISTRIBUTION_ID."
+}
+
+output "web_bucket_name" {
+  value       = aws_s3_bucket.web.bucket
+  description = "Set as GitHub repo variable WEB_BUCKET."
+}
+
 output "rds_endpoint" {
   value       = aws_db_instance.main.endpoint
   description = "RDS endpoint (host:port)."

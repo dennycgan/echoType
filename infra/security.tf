@@ -16,10 +16,17 @@ resource "aws_security_group" "ec2" {
 # Manager (Session Manager + Run Command), which is initiated outbound by the
 # SSM agent over 443 -- so port 22 is never exposed.
 
+# AWS-managed list of CloudFront's origin-facing IP ranges. Locking port 80 to
+# this means the backend can ONLY be reached through our CloudFront distribution,
+# not directly over public HTTP.
+data "aws_ec2_managed_prefix_list" "cloudfront" {
+  name = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
 resource "aws_vpc_security_group_ingress_rule" "ec2_http" {
   security_group_id = aws_security_group.ec2.id
-  description       = "HTTP open to the world (public backend on port 80)"
-  cidr_ipv4         = "0.0.0.0/0"
+  description       = "HTTP from CloudFront origin-facing ranges only"
+  prefix_list_id    = data.aws_ec2_managed_prefix_list.cloudfront.id
   ip_protocol       = "tcp"
   from_port         = 80
   to_port           = 80
