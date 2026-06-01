@@ -19,11 +19,11 @@ jobs:
           mkdir -p ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ vars.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H "${{ vars.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy over SSH (build on EC2)
         run: |
-          ssh -i ~/.ssh/id_ed25519 ec2-user@${{ vars.EC2_HOST }} bash -s <<'EOF'
+          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519 ec2-user@${{ vars.EC2_HOST }} bash -s <<'EOF'
           set -euo pipefail
 
           # 1) Ensure the repo exists on the instance and matches this commit.

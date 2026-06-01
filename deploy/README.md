@@ -121,3 +121,9 @@ Required GitHub config (Settings → Secrets and variables → Actions):
   Role + SSM Session Manager (`aws ssm send-command` / Session Manager) to deploy,
   so no long-lived SSH private key is stored in GitHub Secrets and port 22 can be
   closed entirely.
+- **Replace SSH-based deployment with AWS SSM Session Manager**:
+  - Configure EC2 instance profile + SSM agent
+  - Configure GitHub Actions OIDC + IAM role
+  - Remove EC2_SSH_KEY secret
+  - Close port 22 entirely (SG: no 22 ingress rules)
+  - This eliminates the need to ever expose port 22 publicly.
