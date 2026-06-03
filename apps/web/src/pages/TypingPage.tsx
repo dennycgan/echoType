@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import type { AnnotationDTO } from '@echotype/shared';
 import { api } from '../lib/api';
+import { AnnotatedText } from '../components/AnnotatedText';
 
 export function TypingPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,17 +17,27 @@ export function TypingPage() {
     return <p className="text-slate-500">Loading…</p>;
   }
 
-  return <TypingSession key={course.id} courseId={course.id} target={course.content} title={course.title} />;
+  return (
+    <TypingSession
+      key={course.id}
+      courseId={course.id}
+      target={course.content}
+      title={course.title}
+      annotations={course.annotations}
+    />
+  );
 }
 
 function TypingSession({
   courseId,
   target,
   title,
+  annotations,
 }: {
   courseId: string;
   target: string;
   title: string;
+  annotations: AnnotationDTO[];
 }) {
   const [typed, setTyped] = useState('');
   const [startedAt, setStartedAt] = useState<Date | null>(null);
@@ -110,7 +122,7 @@ function TypingSession({
         </Link>
       </div>
 
-      <TextHighlight target={target} typed={typed} />
+      <AnnotatedText content={target} annotations={annotations} typed={typed} />
 
       <input
         ref={inputRef}
@@ -161,26 +173,6 @@ function TypingSession({
         <p className="text-sm text-red-600">Failed to save: {(submitMutation.error as Error).message}</p>
       )}
     </div>
-  );
-}
-
-function TextHighlight({ target, typed }: { target: string; typed: string }) {
-  return (
-    <pre className="whitespace-pre-wrap break-words rounded-md border bg-white p-4 font-mono text-base leading-relaxed">
-      {Array.from(target).map((ch, i) => {
-        let cls = 'text-slate-400';
-        if (i < typed.length) {
-          cls = typed[i] === ch ? 'text-emerald-600' : 'bg-red-200 text-red-800';
-        } else if (i === typed.length) {
-          cls = 'underline text-slate-700';
-        }
-        return (
-          <span key={i} className={cls}>
-            {ch}
-          </span>
-        );
-      })}
-    </pre>
   );
 }
 
