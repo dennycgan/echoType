@@ -3,9 +3,13 @@ import { z } from 'zod';
 export const CourseMode = z.enum(['SHORT', 'ARTICLE']);
 export type CourseMode = z.infer<typeof CourseMode>;
 
-export const SHORT_MIN = 20;
+// Short and Article ranges intentionally OVERLAP (200-500). Mode is the user's
+// own classification of "is this a self-contained piece?", not a hard size cut,
+// so a 350-char text can legitimately be either. Each mode is validated only
+// against its own [min, max]; the two are NOT mutually exclusive.
+export const SHORT_MIN = 5;
 export const SHORT_MAX = 500;
-export const ARTICLE_MIN = 501;
+export const ARTICLE_MIN = 200;
 export const ARTICLE_MAX = 5000;
 
 export const MAX_ANNOTATIONS = 200;
@@ -33,38 +37,24 @@ export type AnnotationDTO = z.infer<typeof AnnotationDTO>;
 
 // Shared shape for create + edit. Both go through the same multi-step editor,
 // so they accept the same payload; the route decides create vs atomic replace.
+// NOTE: content length is intentionally NOT constrained here. Mode-length is a
+// business rule (does this text fit the chosen mode?), not a payload-shape rule,
+// so it lives in validateMode() and is rejected with 422 — the same class as
+// annotation rules — instead of Zod's 400. Zod here only guards the *shape*.
 const courseFields = {
   title: z.string().trim().min(1, 'title is required').max(200),
-  content: z.string().min(SHORT_MIN).max(ARTICLE_MAX),
+  content: z.string(),
   mode: CourseMode,
   categoryId: z.string().cuid().nullish(),
   annotations: z.array(AnnotationInput).max(MAX_ANNOTATIONS).default([]),
 };
 
-const refineModeLength = (val: { mode: CourseMode; content: string }, ctx: z.RefinementCtx) => {
-  const len = val.content.length;
-  if (val.mode === 'SHORT' && (len < SHORT_MIN || len > SHORT_MAX)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['content'],
-      message: `SHORT mode requires ${SHORT_MIN}-${SHORT_MAX} characters, got ${len}.`,
-    });
-  }
-  if (val.mode === 'ARTICLE' && (len < ARTICLE_MIN || len > ARTICLE_MAX)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['content'],
-      message: `ARTICLE mode requires ${ARTICLE_MIN}-${ARTICLE_MAX} characters, got ${len}.`,
-    });
-  }
-};
-
-export const CreateCourseInput = z.object(courseFields).superRefine(refineModeLength);
+export const CreateCourseInput = z.object(courseFields);
 // Request-payload type (z.input): annotations/categoryId are optional for callers
 // because of .default()/.nullish(); .parse() still yields them fully populated.
 export type CreateCourseInput = z.input<typeof CreateCourseInput>;
 
-export const UpdateCourseInput = z.object(courseFields).superRefine(refineModeLength);
+export const UpdateCourseInput = z.object(courseFields);
 export type UpdateCourseInput = z.input<typeof UpdateCourseInput>;
 
 export const CourseDTO = z.object({
@@ -83,6 +73,57 @@ export const ListCoursesQuery = z.object({
   mode: CourseMode.optional(),
 });
 export type ListCoursesQuery = z.infer<typeof ListCoursesQuery>;
+
+// --- Mode-length business rule ------------------------------------------------
+// Same class as annotation rules: the payload shape is valid, but the content
+// length violates the chosen mode's range. Server returns 422; the editor reuses
+// it for pre-submit checks. Ranges overlap on purpose (see SHORT_*/ARTICLE_*).
+
+export type ModeIssueCode =
+  | 'short_too_short'
+  | 'short_too_long'
+  | 'article_too_short'
+  | 'article_too_long';
+
+export type ModeIssue = {
+  code: ModeIssueCode;
+  message: string;
+};
+
+// Returns null when the content length fits the chosen mode, otherwise a single
+// structured issue. Each mode is checked only against its own [min, max]; the
+// 200-500 overlap means a 350-char text passes as either SHORT or ARTICLE.
+export function validateMode(content: string, mode: CourseMode): ModeIssue | null {
+  const len = content.length;
+  if (mode === 'SHORT') {
+    if (len < SHORT_MIN) {
+      return {
+        code: 'short_too_short',
+        message: `Short mode requires ${SHORT_MIN}-${SHORT_MAX} characters, got ${len}.`,
+      };
+    }
+    if (len > SHORT_MAX) {
+      return {
+        code: 'short_too_long',
+        message: `Short mode requires ${SHORT_MIN}-${SHORT_MAX} characters, got ${len}.`,
+      };
+    }
+    return null;
+  }
+  if (len < ARTICLE_MIN) {
+    return {
+      code: 'article_too_short',
+      message: `Article mode requires ${ARTICLE_MIN}-${ARTICLE_MAX} characters, got ${len}.`,
+    };
+  }
+  if (len > ARTICLE_MAX) {
+    return {
+      code: 'article_too_long',
+      message: `Article mode requires ${ARTICLE_MIN}-${ARTICLE_MAX} characters, got ${len}.`,
+    };
+  }
+  return null;
+}
 
 // --- Annotation business rules (content-aware) --------------------------------
 // Shape is validated by Zod; these rules depend on `content` and are shared by

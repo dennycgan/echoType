@@ -6,8 +6,10 @@ import {
   ListCoursesQuery,
   CourseMode,
   type AnnotationInput,
+  type CourseMode as CourseModeType,
   deriveAnchoredText,
   validateAnnotations,
+  validateMode,
 } from '@echotype/shared';
 import { prisma } from '../prisma.js';
 
@@ -33,6 +35,22 @@ function serializeCourse(course: CourseWithAnnotations) {
     createdAt: course.createdAt.toISOString(),
     updatedAt: course.updatedAt.toISOString(),
   };
+}
+
+// Mode-length business rule. Shape was already validated by Zod; this rejects a
+// well-formed payload whose content length violates the chosen mode with 422,
+// the same class as annotation rules. Returns true if it replied 422.
+function rejectInvalidMode(
+  reply: FastifyReply,
+  content: string,
+  mode: CourseModeType,
+): boolean {
+  const issue = validateMode(content, mode);
+  if (issue) {
+    reply.status(422).send({ error: 'mode_length_violation', issues: [issue] });
+    return true;
+  }
+  return false;
 }
 
 // Business-rule check that depends on content (overlap, bounds, whitespace
@@ -89,6 +107,7 @@ export async function registerCourseRoutes(app: FastifyInstance) {
 
   app.post('/courses', async (req, reply) => {
     const body = CreateCourseInput.parse(req.body);
+    if (rejectInvalidMode(reply, body.content, body.mode as CourseModeType)) return;
     if (rejectInvalidAnnotations(reply, body.content, body.annotations)) return;
 
     const created = await prisma.course.create({
@@ -107,6 +126,7 @@ export async function registerCourseRoutes(app: FastifyInstance) {
 
   app.put<{ Params: { id: string } }>('/courses/:id', async (req, reply) => {
     const body = UpdateCourseInput.parse(req.body);
+    if (rejectInvalidMode(reply, body.content, body.mode as CourseModeType)) return;
     if (rejectInvalidAnnotations(reply, body.content, body.annotations)) return;
 
     const existing = await prisma.course.findFirst({

@@ -1,0 +1,261 @@
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ARTICLE_MAX, ARTICLE_MIN, SHORT_MAX, SHORT_MIN, type CourseDTO } from '@echotype/shared';
+import { api } from '../../lib/api';
+import { AnnotatedText } from '../AnnotatedText';
+import { useCourseEditor, type EditorMode } from './useCourseEditor';
+
+interface CourseEditorModalProps {
+  mode: EditorMode;
+  course?: CourseDTO; // present when editing
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEditorModalProps) {
+  const ed = useCourseEditor(mode, course);
+  const qc = useQueryClient();
+  const [toast, setToast] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const save = useMutation({
+    mutationFn: () =>
+      mode === 'create'
+        ? api.createCourse(ed.buildPayload())
+        : api.updateCourse(course!.id, ed.buildPayload()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['courses'] });
+      onSaved();
+    },
+    onError: (e: Error) => setSubmitError(e.message),
+  });
+
+  function handleNext() {
+    const effect = ed.goNext();
+    if (effect && effect.clearedAnnotations > 0) {
+      const n = effect.clearedAnnotations;
+      setToast(`Editing the text cleared the ${n} existing annotation${n > 1 ? 's' : ''}.`);
+    }
+  }
+
+  function requestClose() {
+    if (ed.isDirty && !window.confirm('You have unsaved changes. Close anyway?')) return;
+    onClose();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onMouseDown={requestClose}
+    >
+      <div
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b px-5 py-3">
+          <h2 className="text-lg font-semibold">
+            {mode === 'create' ? 'New course' : 'Edit course'}
+          </h2>
+          <span className="text-xs text-slate-400">Step {ed.step} / 4</span>
+        </header>
+
+        {toast && (
+          <div className="border-b border-amber-200 bg-amber-50 px-5 py-2 text-sm text-amber-800">
+            {toast}
+            <button className="ml-2 underline" onClick={() => setToast(null)}>
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {ed.step === 1 && <Step1 ed={ed} />}
+          {ed.step === 2 && <Step2 ed={ed} />}
+          {ed.step === 3 && <Step3Placeholder />}
+          {ed.step === 4 && <Step4Placeholder ed={ed} />}
+          {submitError && <p className="mt-3 text-sm text-red-600">Save failed: {submitError}</p>}
+        </div>
+
+        <footer className="flex items-center justify-between border-t px-5 py-3">
+          <button
+            onClick={ed.step === 1 ? requestClose : ed.goBack}
+            className="rounded-md border bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            {ed.step === 1 ? 'Cancel' : 'Back'}
+          </button>
+
+          {ed.step === 4 ? (
+            <button
+              onClick={() => {
+                setSubmitError(null);
+                save.mutate();
+              }}
+              disabled={save.isPending}
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
+            >
+              {save.isPending ? 'Saving…' : 'Confirm & save'}
+            </button>
+          ) : (
+            <button
+              onClick={handleNext}
+              disabled={!ed.canProceed}
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          )}
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function Step1({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
+  const len = ed.content.length;
+  return (
+    <div className="space-y-4">
+      <label className="block">
+        <span className="text-sm text-slate-600">Course title</span>
+        <input
+          className="mt-1 w-full rounded border px-3 py-2"
+          value={ed.title}
+          onChange={(e) => ed.setTitle(e.target.value)}
+          placeholder="e.g. Stray Birds - 49"
+        />
+      </label>
+
+      {/*
+        TEMP (Phase 3.0 stopgap): mode selector should not be here.
+        Per user flow in docs/project-kickoff.md, mode is preselected
+        on the "模式界面" (mode-specific list page) before opening
+        this modal. To be removed when 模式界面 is implemented:
+        - CoursesPage will split into short/article routes
+        - Modal will receive mode as prop, displaying it read-only
+          in edit mode (since changing mode mid-edit is meaningless)
+      */}
+      <fieldset className="space-y-2">
+        <legend className="text-sm text-slate-600">Mode</legend>
+        <label className="flex cursor-pointer items-start gap-2 rounded border px-3 py-2 hover:bg-slate-50">
+          <input
+            type="radio"
+            name="course-mode"
+            className="mt-1"
+            checked={ed.courseMode === 'SHORT'}
+            onChange={() => ed.setCourseMode('SHORT')}
+          />
+          <span>
+            <span className="text-sm font-medium">Short mode</span>
+            <span className="block text-xs text-slate-400">
+              Best for quotes, short poems, a single sentence or paragraph ({SHORT_MIN}-{SHORT_MAX}{' '}
+              characters)
+            </span>
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-2 rounded border px-3 py-2 hover:bg-slate-50">
+          <input
+            type="radio"
+            name="course-mode"
+            className="mt-1"
+            checked={ed.courseMode === 'ARTICLE'}
+            onChange={() => ed.setCourseMode('ARTICLE')}
+          />
+          <span>
+            <span className="text-sm font-medium">Article mode</span>
+            <span className="block text-xs text-slate-400">
+              Best for full speeches, poems, essays, self-contained passages ({ARTICLE_MIN}-
+              {ARTICLE_MAX} characters)
+            </span>
+          </span>
+        </label>
+        <span className="block text-xs text-slate-400">
+          A character = each keystroke (letters, punctuation, spaces, and line breaks each count as
+          one).
+        </span>
+      </fieldset>
+
+      <label className="block">
+        <span className="text-sm text-slate-600">
+          Text content ({len} characters, incl. spaces and line breaks)
+        </span>
+        <textarea
+          className="mt-1 h-44 w-full rounded border px-3 py-2 font-mono text-sm"
+          value={ed.content}
+          onChange={(e) => ed.setContent(e.target.value)}
+          placeholder="Enter the English text to practice…"
+        />
+      </label>
+
+      {ed.showContentWarning && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Editing the text will clear the {ed.originalAnnotationCount} existing annotation
+          {ed.originalAnnotationCount > 1 ? 's' : ''}. (Revert the text to keep them.)
+        </p>
+      )}
+      {ed.step1Error && <p className="text-sm text-amber-600">{ed.step1Error}</p>}
+    </div>
+  );
+}
+
+function Step2({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="mb-2 text-sm text-slate-600">Text preview (how the typing page will show it):</p>
+        <AnnotatedText content={ed.content} annotations={[]} />
+      </div>
+
+      <fieldset className="space-y-2">
+        <legend className="text-sm text-slate-600">Do you want to add annotations?</legend>
+        <div className="flex gap-3">
+          <button
+            onClick={() => ed.setNeedAnnotation(true)}
+            className={`rounded-md border px-4 py-2 text-sm ${
+              ed.needAnnotation === true
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Yes
+          </button>
+          <button
+            onClick={() => ed.setNeedAnnotation(false)}
+            className={`rounded-md border px-4 py-2 text-sm ${
+              ed.needAnnotation === false
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            No
+          </button>
+        </div>
+      </fieldset>
+    </div>
+  );
+}
+
+// Phase 3.1 will replace this with the AnnotatedTextEditor (anchor selection +
+// note entry). For 3.0 it is only reachable by choosing "需要" and is a stub.
+function Step3Placeholder() {
+  return (
+    <div className="rounded-md border border-dashed bg-slate-50 p-6 text-center text-sm text-slate-500">
+      Annotation editor coming in Phase 3.1.
+    </div>
+  );
+}
+
+// Phase 3.2 will render the full read-only review here. For 3.0 it only confirms
+// the no-annotation path end to end.
+function Step4Placeholder({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-slate-600">About to save this course:</p>
+      <ul className="rounded-md border bg-slate-50 p-3 text-sm text-slate-700">
+        <li>Title: {ed.title.trim()}</li>
+        <li>Mode: {ed.courseMode}</li>
+        <li>Characters: {ed.content.length}</li>
+        <li>Annotations: {ed.annotations.length}</li>
+      </ul>
+      <p className="text-xs text-slate-400">(Full preview coming in Phase 3.2.)</p>
+    </div>
+  );
+}
