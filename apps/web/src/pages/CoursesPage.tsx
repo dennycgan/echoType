@@ -70,6 +70,7 @@ export function CoursesPage() {
 
       {editor && (
         <CourseEditorModal
+          key={editor.mode === 'edit' ? `edit-${editor.course.id}` : 'create'}
           mode={editor.mode}
           course={editor.mode === 'edit' ? editor.course : undefined}
           onClose={() => setEditor(null)}

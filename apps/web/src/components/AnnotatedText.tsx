@@ -1,4 +1,15 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useMemo, type Ref } from 'react';
+import {
+  NOTE_FONT_PX,
+  NOTE_LINE_PX,
+  NOTE_MAX_LINES,
+  NOTE_SLOT_PX,
+  buildLineData,
+  type Band,
+  type LineDatum,
+  type Note,
+} from './annotated-text/layoutUtils';
+import { useTextMeasurement } from './annotated-text/useTextMeasurement';
 
 // Read-only annotated text renderer (Phase 2.0).
 //
@@ -32,111 +43,7 @@ interface AnnotatedTextProps {
   className?: string;
 }
 
-const RESIZE_DEBOUNCE_MS = 100;
-// NOTE_FONT_PX is fixed at 12px (instead of dynamic shrinking from
-// default down to 11px as originally specified in kickoff doc).
-// Rationale: per-note measurement overhead during resize would scale
-// with annotation count (80x cost for 20 annotations) for a visual
-// difference that users do not notice. Falls back to ellipsis +
-// hover tooltip when content exceeds 2 lines.
-const NOTE_FONT_PX = 12;
-const NOTE_LINE_PX = 15;
-const NOTE_MAX_LINES = 2;
-const NOTE_SLOT_PX = NOTE_LINE_PX * NOTE_MAX_LINES + 2;
-
-type VisualLine = [start: number, end: number]; // inclusive char indices
-
-type MeasuredLayout = {
-  lines: VisualLine[];
-  charWidth: number;
-  charHeight: number;
-};
-
-type Band = { id: string; left: number; width: number };
-type Note = { id: string; left: number; width: number; text: string };
-type LineDatum = { start: number; end: number; bands: Band[]; notes: Note[] };
-
-// Split by UTF-16 code unit so indices line up 1:1 with the annotation index
-// semantics locked in the spec.
-function toChars(content: string): string[] {
-  return content.split('');
-}
-
-function measureVisualLines(charEls: HTMLElement[]): VisualLine[] {
-  const first = charEls[0];
-  if (!first) return [];
-  const lines: VisualLine[] = [];
-  let start = 0;
-  let top = first.offsetTop;
-  for (let i = 1; i < charEls.length; i++) {
-    const t = charEls[i]!.offsetTop;
-    if (t !== top) {
-      lines.push([start, i - 1]);
-      start = i;
-      top = t;
-    }
-  }
-  lines.push([start, charEls.length - 1]);
-  return lines;
-}
-
-function sameLines(a: VisualLine[], b: VisualLine[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    const ai = a[i]!;
-    const bi = b[i]!;
-    if (ai[0] !== bi[0] || ai[1] !== bi[1]) return false;
-  }
-  return true;
-}
-
-// Map measured lines + annotations to per-line highlight bands and note boxes.
-//
-// Note-text placement (revised spec):
-//   1. default  -> the note hosts on rects[0] (the first visual fragment).
-//   2. fallback -> if rects[0] is badly clipped (its char count < 50% of the
-//      full anchor), host the note on the WIDEST fragment instead, so the text
-//      gets the most room rather than being stuck on a tiny sliver.
-//   3. final fallback (handled in <NoteBox>) -> if even the host fragment can't
-//      fit the note (still truncated after 2 lines), show a "…" badge at the
-//      fragment's top-right; the full note stays available via hover tooltip.
-// Every fragment still gets a highlight band; only the host fragment gets text.
-function buildLineData(
-  lines: VisualLine[],
-  annotations: AnnotationView[],
-  charWidth: number,
-  charHeight: number,
-): LineDatum[] {
-  void charHeight;
-  const data: LineDatum[] = lines.map(([start, end]) => ({ start, end, bands: [], notes: [] }));
-
-  for (const a of annotations) {
-    const fullCount = a.endIndex - a.startIndex + 1;
-    const frags: { lineIdx: number; left: number; width: number; charCount: number }[] = [];
-    for (let li = 0; li < lines.length; li++) {
-      const [ls, le] = lines[li]!;
-      if (a.endIndex < ls || a.startIndex > le) continue;
-      const cs = Math.max(a.startIndex, ls);
-      const ce = Math.min(a.endIndex, le);
-      const charCount = ce - cs + 1;
-      frags.push({ lineIdx: li, left: (cs - ls) * charWidth, width: charCount * charWidth, charCount });
-    }
-    if (frags.length === 0) continue;
-
-    for (const f of frags) data[f.lineIdx]!.bands.push({ id: a.id, left: f.left, width: f.width });
-
-    let host = frags[0]!;
-    if (host.charCount < 0.5 * fullCount) {
-      host = frags.reduce((best, f) => (f.charCount > best.charCount ? f : best), frags[0]!);
-    }
-    data[host.lineIdx]!.notes.push({ id: a.id, left: host.left, width: host.width, text: a.noteText });
-  }
-
-  return data;
-}
-
 function charClassName(ch: string, typedCh: string | undefined, isCursor: boolean): string {
-  // This is the exact red/green rule from the original TextHighlight, preserved.
   if (typedCh !== undefined) {
     return typedCh === ch ? 'text-emerald-600' : 'rounded-sm bg-red-200 text-red-800';
   }
@@ -160,10 +67,6 @@ const Char = memo(function Char({
   );
 });
 
-// A single note preview, clamped to NOTE_MAX_LINES. When the text overflows the
-// clamp, CSS shows its own ellipsis; hovering anywhere on the note area surfaces
-// the full noteText via the native title tooltip (no separate "…" badge — the
-// CSS ellipsis already signals "more on hover", the web's standard pattern).
 const NoteBox = memo(function NoteBox({ note }: { note: Note }) {
   return (
     <span
@@ -184,11 +87,8 @@ const NoteBox = memo(function NoteBox({ note }: { note: Note }) {
   );
 });
 
-// Bands + note slot for one visual line. Depends only on layout/annotations
-// (stable refs while content + width are unchanged), so memoization keeps it
-// out of the per-keystroke render path entirely.
 const LineDecorations = memo(function LineDecorations({ notes }: { notes: Note[] }) {
-  if (notes.length === 0) return null; // collapse: no vertical space reserved
+  if (notes.length === 0) return null;
   return (
     <div className="relative" style={{ height: NOTE_SLOT_PX }}>
       {notes.map((n) => (
@@ -253,124 +153,22 @@ const LineRow = memo(function LineRow({
   );
 });
 
-function logMeasure(
-  prev: { content: string; width: number; fontReady: boolean } | null,
-  next: { content: string; width: number; fontReady: boolean },
-  lineCount: number,
-) {
-  let reason: 'mount' | 'content' | 'font' | 'resize' | 'strict-remount' | '???' = 'mount';
-  if (prev) {
-    if (prev.content !== next.content) reason = 'content';
-    else if (prev.fontReady !== next.fontReady) reason = 'font';
-    else if (prev.width !== next.width) reason = 'resize';
-    // Identical deps re-run only happens via React 18 StrictMode's dev-only
-    // mount double-invoke (no StrictMode in prod). Anything else reaching here
-    // with unchanged deps would be a genuine anomaly -> '???'.
-    else reason = 'strict-remount';
-  }
-  const w = window as unknown as { __atMeasureLog?: unknown[] };
-  (w.__atMeasureLog ||= []).push({ t: Math.round(performance.now()), reason, lines: lineCount });
-  // eslint-disable-next-line no-console
-  console.log(`[AnnotatedText] measure reason=${reason} lines=${lineCount}`);
-}
-
 export function AnnotatedText({ content, annotations, typed = '', className }: AnnotatedTextProps) {
-  const boxRef = useRef<HTMLDivElement>(null);
-  const mirrorRef = useRef<HTMLDivElement>(null);
-  const prevDepsRef = useRef<{ content: string; width: number; fontReady: boolean } | null>(null);
-
-  const [width, setWidth] = useState(0);
-  const [fontReady, setFontReady] = useState(false);
-  const [layout, setLayout] = useState<MeasuredLayout>({ lines: [], charWidth: 0, charHeight: 0 });
-
-  const chars = useMemo(() => toChars(content), [content]);
-
-  // Wait for web fonts so metrics are final before we trust measurements. This
-  // project falls back to system monospace (no @font-face), so it resolves
-  // immediately, but the guard keeps us correct if a font is added later.
-  useEffect(() => {
-    let alive = true;
-    const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
-    if (fonts?.ready) {
-      fonts.ready.then(() => {
-        if (alive) setFontReady(true);
-      });
-    } else {
-      setFontReady(true);
-    }
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  // Debounced width tracking. Width is a re-measure trigger; the actual width is
-  // read live in the layout effect. Resize is off the typing path entirely.
-  useEffect(() => {
-    const box = boxRef.current;
-    if (!box) return;
-    setWidth(box.clientWidth);
-    let t: ReturnType<typeof setTimeout> | undefined;
-    const ro = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const w = Math.round(entry.contentRect.width);
-      if (t) clearTimeout(t);
-      t = setTimeout(() => setWidth(w), RESIZE_DEBOUNCE_MS);
-    });
-    ro.observe(box);
-    return () => {
-      ro.disconnect();
-      if (t) clearTimeout(t);
-    };
-  }, []);
-
-  // Synchronous (pre-paint) measurement. Depends ONLY on content/width/fontReady
-  // -> never runs for a keystroke. A dev probe logs every run with its reason so
-  // we can prove the "typing does not trigger layout" invariant (stop-loss b-1).
-  useLayoutEffect(() => {
-    const box = boxRef.current;
-    const mirror = mirrorRef.current;
-    if (!box || !mirror) return;
-    const liveWidth = box.clientWidth;
-    if (liveWidth === 0) return;
-
-    const charEls = Array.from(mirror.querySelectorAll<HTMLElement>('[data-idx]'));
-    const lines = measureVisualLines(charEls);
-    const first = charEls[0];
-    const rect = first ? first.getBoundingClientRect() : null;
-    const charWidth = rect ? rect.width : 0;
-    const charHeight = rect ? rect.height : 0;
-
-    if (import.meta.env.DEV) {
-      logMeasure(prevDepsRef.current, { content, width, fontReady }, lines.length);
-    }
-    prevDepsRef.current = { content, width, fontReady };
-
-    setLayout((prev) =>
-      sameLines(prev.lines, lines) && prev.charWidth === charWidth && prev.charHeight === charHeight
-        ? prev
-        : { lines, charWidth, charHeight },
-    );
-  }, [content, width, fontReady]);
-
-  // Dev-only hook so the Playwright harness can re-run measurement N times and
-  // assert byte-identical results (stop-loss c: getClientRects stability).
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    const w = window as unknown as { __atMeasureNow?: () => VisualLine[] | null };
-    w.__atMeasureNow = () => {
-      const mirror = mirrorRef.current;
-      if (!mirror) return null;
-      const els = Array.from(mirror.querySelectorAll<HTMLElement>('[data-idx]'));
-      return measureVisualLines(els);
-    };
-    return () => {
-      delete w.__atMeasureNow;
-    };
-  }, []);
+  const { refs, layout, chars } = useTextMeasurement(content);
 
   const lineData = useMemo(
-    () => buildLineData(layout.lines, annotations, layout.charWidth, layout.charHeight),
+    () =>
+      buildLineData(
+        layout.lines,
+        annotations.map((a) => ({
+          id: a.id,
+          startIndex: a.startIndex,
+          endIndex: a.endIndex,
+          noteText: a.noteText,
+        })),
+        layout.charWidth,
+        layout.charHeight,
+      ),
     [layout, annotations],
   );
 
@@ -379,10 +177,9 @@ export function AnnotatedText({ content, annotations, typed = '', className }: A
       className={`rounded-md border bg-white p-4 font-mono text-base leading-relaxed ${className ?? ''}`}
       data-testid="annotated-text"
     >
-      <div ref={boxRef} style={{ position: 'relative' }}>
-        {/* Hidden measurement mirror: full content in normal flow. */}
+      <div ref={refs.boxRef as Ref<HTMLDivElement>} style={{ position: 'relative' }}>
         <div
-          ref={mirrorRef}
+          ref={refs.mirrorRef as Ref<HTMLDivElement>}
           aria-hidden
           data-testid="annotated-mirror"
           style={{
@@ -403,7 +200,6 @@ export function AnnotatedText({ content, annotations, typed = '', className }: A
           ))}
         </div>
 
-        {/* Visible per-line layer. */}
         <div data-testid="annotated-visible">
           {lineData.map((datum) => (
             <LineRow

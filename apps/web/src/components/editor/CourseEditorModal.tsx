@@ -3,6 +3,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ARTICLE_MAX, ARTICLE_MIN, SHORT_MAX, SHORT_MIN, type CourseDTO } from '@echotype/shared';
 import { api } from '../../lib/api';
 import { AnnotatedText } from '../AnnotatedText';
+import { AnnotatedTextEditor, confirmAbandonPick } from './AnnotatedTextEditor';
+import {
+  MSG_DISCARD_ALL_CHANGES,
+  MSG_SERIAL_BLOCK,
+  STEP3_NO_ANNOTATION_MESSAGE,
+} from './annotationMessages';
 import { useCourseEditor, type EditorMode } from './useCourseEditor';
 
 interface CourseEditorModalProps {
@@ -17,6 +23,8 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
   const qc = useQueryClient();
   const [toast, setToast] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [footerHint, setFooterHint] = useState<string | null>(null);
+  const [pickState, setPickState] = useState({ active: false, hasUnsavedNote: false });
 
   const save = useMutation({
     mutationFn: () =>
@@ -31,6 +39,18 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
   });
 
   function handleNext() {
+    setFooterHint(null);
+    if (ed.step === 3) {
+      if (pickState.active) {
+        setFooterHint(MSG_SERIAL_BLOCK);
+        return;
+      }
+      if (ed.needAnnotation && ed.annotations.length === 0) {
+        setFooterHint(STEP3_NO_ANNOTATION_MESSAGE);
+        return;
+      }
+    }
+    if (!ed.canProceed) return;
     const effect = ed.goNext();
     if (effect && effect.clearedAnnotations > 0) {
       const n = effect.clearedAnnotations;
@@ -38,25 +58,48 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
     }
   }
 
-  function requestClose() {
-    if (ed.isDirty && !window.confirm('You have unsaved changes. Close anyway?')) return;
+  function handleBack() {
+    setFooterHint(null);
+    if (ed.step === 3 && !confirmAbandonPick(pickState.active, pickState.hasUnsavedNote)) return;
+    ed.goBack();
+  }
+
+  /** Dismiss the entire editor (X button or backdrop). Back is a separate, narrower action. */
+  function handleDismiss() {
+    const needsConfirm = ed.isDirty || pickState.active;
+    if (needsConfirm && !window.confirm(MSG_DISCARD_ALL_CHANGES)) return;
     onClose();
   }
 
+  const nextPrimaryEnabled = ed.step === 4 ? !save.isPending : ed.canProceed && !pickState.active;
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onMouseDown={requestClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-6"
+      onMouseDown={handleDismiss}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+        className="flex max-h-[96vh] w-[min(98vw,1280px)] flex-col overflow-hidden rounded-lg bg-white shadow-xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between border-b px-5 py-3">
           <h2 className="text-lg font-semibold">
             {mode === 'create' ? 'New course' : 'Edit course'}
           </h2>
-          <span className="text-xs text-slate-400">Step {ed.step} / 4</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400">Step {ed.step} / 4</span>
+            <button
+              type="button"
+              aria-label="Close editor"
+              onClick={handleDismiss}
+              className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+              data-testid="editor-close"
+            >
+              <span className="block text-xl leading-none" aria-hidden>
+                ×
+              </span>
+            </button>
+          </div>
         </header>
 
         {toast && (
@@ -71,39 +114,54 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {ed.step === 1 && <Step1 ed={ed} />}
           {ed.step === 2 && <Step2 ed={ed} />}
-          {ed.step === 3 && <Step3Placeholder />}
+          {ed.step === 3 && <Step3 ed={ed} onPickStateChange={setPickState} />}
           {ed.step === 4 && <Step4Placeholder ed={ed} />}
           {submitError && <p className="mt-3 text-sm text-red-600">Save failed: {submitError}</p>}
         </div>
 
-        <footer className="flex items-center justify-between border-t px-5 py-3">
-          <button
-            onClick={ed.step === 1 ? requestClose : ed.goBack}
-            className="rounded-md border bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            {ed.step === 1 ? 'Cancel' : 'Back'}
-          </button>
-
-          {ed.step === 4 ? (
-            <button
-              onClick={() => {
-                setSubmitError(null);
-                save.mutate();
-              }}
-              disabled={save.isPending}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
-            >
-              {save.isPending ? 'Saving…' : 'Confirm & save'}
-            </button>
-          ) : (
-            <button
-              onClick={handleNext}
-              disabled={!ed.canProceed}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Next
-            </button>
+        <footer className="border-t px-5 py-3">
+          {footerHint && (
+            <p className="mb-2 text-sm text-amber-700" data-testid="editor-footer-hint">
+              {footerHint}
+            </p>
           )}
+          <div className="flex items-center justify-between">
+            {ed.step > 1 ? (
+              <button
+                onClick={handleBack}
+                className="rounded-md border bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Back
+              </button>
+            ) : (
+              <div />
+            )}
+
+            {ed.step === 4 ? (
+              <button
+                onClick={() => {
+                  setSubmitError(null);
+                  save.mutate();
+                }}
+                disabled={save.isPending}
+                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
+              >
+                {save.isPending ? 'Saving…' : 'Confirm & save'}
+              </button>
+            ) : (
+              <button
+                onClick={handleNext}
+                disabled={ed.step === 3 ? false : !ed.canProceed}
+                className={`rounded-md px-4 py-2 text-sm font-medium text-white ${
+                  nextPrimaryEnabled
+                    ? 'bg-slate-900 hover:bg-slate-800'
+                    : 'cursor-not-allowed bg-slate-400 opacity-80'
+                }`}
+              >
+                Next
+              </button>
+            )}
+          </div>
         </footer>
       </div>
     </div>
@@ -204,42 +262,53 @@ function Step2({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
         <AnnotatedText content={ed.content} annotations={[]} />
       </div>
 
-      <fieldset className="space-y-2">
-        <legend className="text-sm text-slate-600">Do you want to add annotations?</legend>
-        <div className="flex gap-3">
-          <button
-            onClick={() => ed.setNeedAnnotation(true)}
-            className={`rounded-md border px-4 py-2 text-sm ${
-              ed.needAnnotation === true
-                ? 'border-slate-900 bg-slate-900 text-white'
-                : 'bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            Yes
-          </button>
-          <button
-            onClick={() => ed.setNeedAnnotation(false)}
-            className={`rounded-md border px-4 py-2 text-sm ${
-              ed.needAnnotation === false
-                ? 'border-slate-900 bg-slate-900 text-white'
-                : 'bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            No
-          </button>
-        </div>
-      </fieldset>
+      {!ed.skipAnnotationChoice && (
+        <fieldset className="space-y-2">
+          <legend className="text-sm text-slate-600">Do you want to add annotations?</legend>
+          <div className="flex gap-3">
+            <button
+              onClick={() => ed.setNeedAnnotation(true)}
+              className={`rounded-md border px-4 py-2 text-sm ${
+                ed.needAnnotation === true
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => ed.setNeedAnnotation(false)}
+              className={`rounded-md border px-4 py-2 text-sm ${
+                ed.needAnnotation === false
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              No
+            </button>
+          </div>
+        </fieldset>
+      )}
     </div>
   );
 }
 
-// Phase 3.1 will replace this with the AnnotatedTextEditor (anchor selection +
-// note entry). For 3.0 it is only reachable by choosing "需要" and is a stub.
-function Step3Placeholder() {
+function Step3({
+  ed,
+  onPickStateChange,
+}: {
+  ed: ReturnType<typeof useCourseEditor>;
+  onPickStateChange: (s: { active: boolean; hasUnsavedNote: boolean }) => void;
+}) {
   return (
-    <div className="rounded-md border border-dashed bg-slate-50 p-6 text-center text-sm text-slate-500">
-      Annotation editor coming in Phase 3.1.
-    </div>
+    <AnnotatedTextEditor
+      content={ed.content}
+      annotations={ed.annotations}
+      onCreate={ed.addAnnotation}
+      onUpdate={ed.updateAnnotation}
+      onDelete={ed.deleteAnnotation}
+      onPickStateChange={onPickStateChange}
+    />
   );
 }
 

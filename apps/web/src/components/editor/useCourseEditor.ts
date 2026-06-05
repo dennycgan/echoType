@@ -4,7 +4,6 @@ import {
   ARTICLE_MIN,
   SHORT_MAX,
   SHORT_MIN,
-  validateAnnotations,
   type CourseDTO,
   type CourseMode,
   type CreateCourseInput,
@@ -23,10 +22,7 @@ export interface DraftAnnotation {
 export type EditorStep = 1 | 2 | 3 | 4;
 export type EditorMode = 'create' | 'edit';
 
-// Friendly, user-facing copy. Kept here so step 3 (Phase 3.1) and step 4 reuse
-// the exact same wording.
-export const STEP3_NO_ANNOTATION_MESSAGE =
-  'You chose to add annotations but have not entered any. If you do not need annotations, go back and choose "No".';
+export { STEP3_NO_ANNOTATION_MESSAGE } from './annotationMessages';
 
 function lengthOk(mode: CourseMode, len: number): boolean {
   return mode === 'SHORT' ? len >= SHORT_MIN && len <= SHORT_MAX : len >= ARTICLE_MIN && len <= ARTICLE_MAX;
@@ -45,14 +41,13 @@ export interface UseCourseEditor {
 
   needAnnotation: boolean | null;
   setNeedAnnotation: (v: boolean) => void;
+  /** Edit flow: course already has annotations — skip Step 2 Yes/No. */
+  skipAnnotationChoice: boolean;
 
   annotations: DraftAnnotation[];
   addAnnotation: (a: Omit<DraftAnnotation, 'localId'>) => void;
   updateAnnotation: (localId: number, patch: Partial<Omit<DraftAnnotation, 'localId'>>) => void;
   deleteAnnotation: (localId: number) => void;
-  // Returns null when the candidate range is valid, otherwise a Chinese message.
-  validateDraft: (startIndex: number, endIndex: number, excludeLocalId?: number) => string | null;
-
   // Step 1 validation
   step1Error: string | null;
   canProceed: boolean;
@@ -76,7 +71,11 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
   const [title, setTitle] = useState(initial?.title ?? '');
   const [content, setContent] = useState(initial?.content ?? '');
   const [courseMode, setCourseMode] = useState<CourseMode>(initial?.mode ?? 'SHORT');
-  const [needAnnotation, setNeedAnnotationState] = useState<boolean | null>(null);
+  const originalAnnotationCount = initial?.annotations?.length ?? 0;
+
+  const [needAnnotation, setNeedAnnotationState] = useState<boolean | null>(() =>
+    editorMode === 'edit' && originalAnnotationCount > 0 ? true : null,
+  );
 
   const [annotations, setAnnotations] = useState<DraftAnnotation[]>(() =>
     (initial?.annotations ?? []).map((a, i) => ({
@@ -89,10 +88,14 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
   const nextLocalId = useRef<number>((initial?.annotations?.length ?? 0) + 1);
 
   const originalContent = useRef(initial?.content ?? '');
-  const originalAnnotationCount = initial?.annotations?.length ?? 0;
-
   const contentChanged = editorMode === 'edit' && content !== originalContent.current;
   const showContentWarning = contentChanged && originalAnnotationCount > 0;
+
+  // Edit + still has staged annotations: skip Step 2 Yes/No and go straight to Step 3.
+  const skipAnnotationChoice = useMemo(
+    () => editorMode === 'edit' && annotations.length > 0,
+    [editorMode, annotations.length],
+  );
 
   const addAnnotation = useCallback((a: Omit<DraftAnnotation, 'localId'>) => {
     setAnnotations((prev) => [...prev, { ...a, localId: nextLocalId.current++ }]);
@@ -108,34 +111,6 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
   const deleteAnnotation = useCallback((localId: number) => {
     setAnnotations((prev) => prev.filter((x) => x.localId !== localId));
   }, []);
-
-  // Reuse the shared, server-authoritative rules so step 3 and the pre-submit
-  // check in step 4 never disagree with the backend's 422.
-  const validateDraft = useCallback(
-    (startIndex: number, endIndex: number, excludeLocalId?: number): string | null => {
-      const others = annotations
-        .filter((a) => a.localId !== excludeLocalId)
-        .map((a) => ({ startIndex: a.startIndex, endIndex: a.endIndex, noteText: a.noteText }));
-      const candidate = { startIndex, endIndex, noteText: 'x' };
-      const issues = validateAnnotations(content, [...others, candidate]);
-      // Only surface issues that concern the candidate (the last entry).
-      const candidateIdx = others.length;
-      const mine = issues.find((it) => it.index === candidateIdx);
-      if (!mine) return null;
-      switch (mine.code) {
-        case 'overlap':
-          return 'Overlaps an existing annotation. Pick different anchors.';
-        case 'anchor_start_whitespace':
-        case 'anchor_end_whitespace':
-          return 'An anchor cannot be a space or line break.';
-        case 'order':
-        case 'bounds':
-        default:
-          return 'Invalid annotation position. Pick again.';
-      }
-    },
-    [annotations, content],
-  );
 
   const setNeedAnnotation = useCallback((v: boolean) => {
     setNeedAnnotationState(v);
@@ -156,9 +131,10 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
 
   const canProceed = useMemo(() => {
     if (step === 1) return step1Error === null;
-    if (step === 2) return needAnnotation !== null;
+    if (step === 2) return skipAnnotationChoice || needAnnotation !== null;
+    if (step === 3) return needAnnotation === true ? annotations.length > 0 : true;
     return true;
-  }, [step, step1Error, needAnnotation]);
+  }, [step, step1Error, needAnnotation, annotations.length, skipAnnotationChoice]);
 
   const goNext = useCallback((): { clearedAnnotations: number } | void => {
     if (step === 1) {
@@ -167,10 +143,10 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
         const cleared = annotations.length;
         setAnnotations([]);
         originalContent.current = content; // re-baseline so the warning clears
-        setStep(2);
+        setStep(skipAnnotationChoice ? 3 : 2);
         return { clearedAnnotations: cleared };
       }
-      setStep(2);
+      setStep(skipAnnotationChoice ? 3 : 2);
       return;
     }
     if (step === 2) {
@@ -181,13 +157,13 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
       setStep(4);
       return;
     }
-  }, [step, contentChanged, annotations.length, content, needAnnotation]);
+  }, [step, contentChanged, annotations.length, content, needAnnotation, skipAnnotationChoice]);
 
   const goBack = useCallback(() => {
     if (step === 2) setStep(1);
-    else if (step === 3) setStep(2);
-    else if (step === 4) setStep(needAnnotation ? 3 : 2);
-  }, [step, needAnnotation]);
+    else if (step === 3) setStep(skipAnnotationChoice ? 1 : 2);
+    else if (step === 4) setStep(needAnnotation ? 3 : skipAnnotationChoice ? 1 : 2);
+  }, [step, needAnnotation, skipAnnotationChoice]);
 
   const isDirty = useMemo(() => {
     if (editorMode === 'create') {
@@ -226,11 +202,11 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
     setCourseMode,
     needAnnotation,
     setNeedAnnotation,
+    skipAnnotationChoice,
     annotations,
     addAnnotation,
     updateAnnotation,
     deleteAnnotation,
-    validateDraft,
     step1Error,
     canProceed,
     contentChanged,
