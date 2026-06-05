@@ -1,5 +1,8 @@
 // User-facing validation copy for the annotation editor.
 
+import type { AnnotationIssue, AnnotationIssueCode, ModeIssue } from '@echotype/shared';
+import type { DraftAnnotation } from './useCourseEditor';
+
 export const STEP3_NO_ANNOTATION_MESSAGE =
   'You chose to add annotations but have not added any yet. If you do not need annotations, go back and choose "No".';
 
@@ -8,11 +11,17 @@ export const MSG_ANCHOR_START_WHITESPACE =
 export const MSG_ANCHOR_END_WHITESPACE =
   'The end anchor cannot be a space or line break. Pick again.';
 export const MSG_ORDER_INVALID = 'Invalid anchor order. Pick again.';
+export const MSG_BOUNDS_INVALID = 'Anchor range is outside the text. Reselect anchors.';
 export const MSG_NOTE_EMPTY = 'Annotation text cannot be empty.';
 export const MSG_SERIAL_BLOCK = 'Finish or cancel the current annotation first.';
 export const MSG_ESC_DISCARD = 'Discard the current annotation text?';
 export const MSG_ABANDON_PICK = 'You have an unfinished annotation. Discard it?';
 export const MSG_DISCARD_ALL_CHANGES = 'Discard all changes?';
+
+export const MSG_INVALID_REQUEST =
+  'Invalid request. Check your input and try again.';
+export const MSG_SERVER_ERROR = 'Server error. Please try again.';
+export const MSG_NETWORK_ERROR = 'Network error. Check your connection and try again.';
 
 export function formatNotePreview(noteText: string, fallbackIndex: number): string {
   const t = noteText.trim();
@@ -22,4 +31,40 @@ export function formatNotePreview(noteText: string, fallbackIndex: number): stri
 
 export function formatOverlapMessage(noteText: string, fallbackIndex: number): string {
   return `Overlaps existing annotation "${formatNotePreview(noteText, fallbackIndex)}". Pick different anchors.`;
+}
+
+export function mapModeIssueMessage(issue: ModeIssue): string {
+  return issue.message;
+}
+
+export function mapAnnotationIssueMessage(
+  issue: AnnotationIssue,
+  staged: DraftAnnotation[],
+  payloadAnnotations: { startIndex: number; endIndex: number; noteText: string }[],
+): string {
+  const code = issue.code as AnnotationIssueCode;
+  const idx = issue.index;
+  const ann = staged[idx];
+  const label = ann ? formatNotePreview(ann.noteText, idx + 1) : `annotation #${idx + 1}`;
+
+  switch (code) {
+    case 'anchor_start_whitespace':
+      return `Annotation "${label}": ${MSG_ANCHOR_START_WHITESPACE}`;
+    case 'anchor_end_whitespace':
+      return `Annotation "${label}": ${MSG_ANCHOR_END_WHITESPACE}`;
+    case 'order':
+      return `Annotation "${label}": ${MSG_ORDER_INVALID}`;
+    case 'bounds':
+      return `Annotation "${label}": ${MSG_BOUNDS_INVALID}`;
+    case 'overlap': {
+      const overlapMsg = issue.message.match(/annotation #(\d+)/);
+      const otherIdx = overlapMsg ? Number(overlapMsg[1]) : -1;
+      const otherNote =
+        otherIdx >= 0 ? payloadAnnotations[otherIdx]?.noteText ?? staged[otherIdx]?.noteText : '';
+      const otherLabel = formatNotePreview(otherNote ?? '', otherIdx + 1);
+      return `Annotation "${label}": overlaps "${otherLabel}". Pick different anchors.`;
+    }
+    default:
+      return `Annotation "${label}": ${MSG_ORDER_INVALID}`;
+  }
 }

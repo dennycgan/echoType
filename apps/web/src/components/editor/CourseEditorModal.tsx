@@ -1,21 +1,26 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ARTICLE_MAX, ARTICLE_MIN, SHORT_MAX, SHORT_MIN, type CourseDTO } from '@echotype/shared';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { AnnotatedText } from '../AnnotatedText';
 import { AnnotatedTextEditor, confirmAbandonPick } from './AnnotatedTextEditor';
 import {
   MSG_DISCARD_ALL_CHANGES,
+  MSG_INVALID_REQUEST,
+  MSG_NETWORK_ERROR,
   MSG_SERIAL_BLOCK,
+  MSG_SERVER_ERROR,
   STEP3_NO_ANNOTATION_MESSAGE,
+  mapModeIssueMessage,
 } from './annotationMessages';
+import type { AnnotationIssue, ModeIssue } from '@echotype/shared';
 import { useCourseEditor, type EditorMode } from './useCourseEditor';
 
 interface CourseEditorModalProps {
   mode: EditorMode;
   course?: CourseDTO; // present when editing
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (courseId: string) => void;
 }
 
 export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEditorModalProps) {
@@ -31,12 +36,68 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
       mode === 'create'
         ? api.createCourse(ed.buildPayload())
         : api.updateCourse(course!.id, ed.buildPayload()),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       qc.invalidateQueries({ queryKey: ['courses'] });
-      onSaved();
+      onSaved(saved.id);
     },
-    onError: (e: Error) => setSubmitError(e.message),
+    onError: (e: unknown) => {
+      if (e instanceof ApiError) {
+        handleApiError(e);
+        return;
+      }
+      setSubmitError(MSG_NETWORK_ERROR);
+    },
   });
+
+  function handleApiError(e: ApiError) {
+    if (e.status === 422) {
+      const body = e.courseBody;
+      if (body?.error === 'annotation_validation_error' && body.issues) {
+        ed.applyServerAnnotationIssues(body.issues as AnnotationIssue[]);
+        return;
+      }
+      if (body?.error === 'mode_length_violation' && body.issues?.[0]) {
+        setSubmitError(mapModeIssueMessage(body.issues[0] as ModeIssue));
+        return;
+      }
+    }
+    if (e.status === 400) {
+      setSubmitError(MSG_INVALID_REQUEST);
+      return;
+    }
+    if (e.status === 0) {
+      setSubmitError(MSG_NETWORK_ERROR);
+      return;
+    }
+    if (e.status >= 500) {
+      setSubmitError(MSG_SERVER_ERROR);
+      return;
+    }
+    setSubmitError(MSG_SERVER_ERROR);
+  }
+
+  function handleSave() {
+    setSubmitError(null);
+    setFooterHint(null);
+
+    const pre = ed.validateBeforeSave();
+    if (!pre.ok) {
+      if (pre.kind === 'd5') {
+        setSubmitError(STEP3_NO_ANNOTATION_MESSAGE);
+        return;
+      }
+      if (pre.kind === 'mode') {
+        setSubmitError(pre.message);
+        return;
+      }
+      if (pre.kind === 'annotation') {
+        ed.applyAnnotationValidationFeedback(pre.issues, pre.messages, pre.highlightLocalId);
+        return;
+      }
+    }
+
+    save.mutate();
+  }
 
   function handleNext() {
     setFooterHint(null);
@@ -49,6 +110,7 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
         setFooterHint(STEP3_NO_ANNOTATION_MESSAGE);
         return;
       }
+      ed.clearSubmitFeedback();
     }
     if (!ed.canProceed) return;
     const effect = ed.goNext();
@@ -60,6 +122,7 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
 
   function handleBack() {
     setFooterHint(null);
+    setSubmitError(null);
     if (ed.step === 3 && !confirmAbandonPick(pickState.active, pickState.hasUnsavedNote)) return;
     ed.goBack();
   }
@@ -115,14 +178,21 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
           {ed.step === 1 && <Step1 ed={ed} />}
           {ed.step === 2 && <Step2 ed={ed} />}
           {ed.step === 3 && <Step3 ed={ed} onPickStateChange={setPickState} />}
-          {ed.step === 4 && <Step4Placeholder ed={ed} />}
-          {submitError && <p className="mt-3 text-sm text-red-600">Save failed: {submitError}</p>}
+          {ed.step === 4 && <Step4Review ed={ed} />}
         </div>
 
         <footer className="border-t px-5 py-3">
           {footerHint && (
             <p className="mb-2 text-sm text-amber-700" data-testid="editor-footer-hint">
               {footerHint}
+            </p>
+          )}
+          {ed.step === 4 && submitError && (
+            <p
+              className="mb-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+              data-testid="editor-submit-error"
+            >
+              {submitError}
             </p>
           )}
           <div className="flex items-center justify-between">
@@ -139,14 +209,11 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
 
             {ed.step === 4 ? (
               <button
-                onClick={() => {
-                  setSubmitError(null);
-                  save.mutate();
-                }}
+                onClick={handleSave}
                 disabled={save.isPending}
                 className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
               >
-                {save.isPending ? 'Saving…' : 'Confirm & save'}
+                {save.isPending ? 'Saving…' : 'Save course'}
               </button>
             ) : (
               <button
@@ -308,23 +375,35 @@ function Step3({
       onUpdate={ed.updateAnnotation}
       onDelete={ed.deleteAnnotation}
       onPickStateChange={onPickStateChange}
+      highlightLocalId={ed.highlightLocalId}
+      submitIssueMessages={ed.submitIssueMessages}
     />
   );
 }
 
-// Phase 3.2 will render the full read-only review here. For 3.0 it only confirms
-// the no-annotation path end to end.
-function Step4Placeholder({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
+function Step4Review({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
+  const previewAnnotations = ed.annotations.map((a) => ({
+    id: String(a.localId),
+    startIndex: a.startIndex,
+    endIndex: a.endIndex,
+    noteText: a.noteText,
+  }));
+
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-slate-600">About to save this course:</p>
-      <ul className="rounded-md border bg-slate-50 p-3 text-sm text-slate-700">
-        <li>Title: {ed.title.trim()}</li>
-        <li>Mode: {ed.courseMode}</li>
-        <li>Characters: {ed.content.length}</li>
-        <li>Annotations: {ed.annotations.length}</li>
-      </ul>
-      <p className="text-xs text-slate-400">(Full preview coming in Phase 3.2.)</p>
+    <div className="space-y-4" data-testid="step4-review">
+      <div>
+        <h3 className="text-lg font-semibold text-slate-900">{ed.title.trim()}</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          {ed.courseMode} · {ed.content.length} characters · {ed.annotations.length} annotation
+          {ed.annotations.length === 1 ? '' : 's'}
+        </p>
+      </div>
+
+      <p className="text-sm text-slate-600">
+        Check annotation placement before saving. This preview matches the typing page layout.
+      </p>
+
+      <AnnotatedText content={ed.content} annotations={previewAnnotations} />
     </div>
   );
 }

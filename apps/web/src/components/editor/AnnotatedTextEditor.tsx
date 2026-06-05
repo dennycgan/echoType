@@ -1,4 +1,4 @@
-import { memo, useMemo, type Ref } from 'react';
+import { memo, useEffect, useMemo, type Ref } from 'react';
 import { NOTE_TEXT_MAX, validateAnnotations } from '@echotype/shared';
 import {
   NOTE_FONT_PX,
@@ -29,10 +29,17 @@ export type AnnotatedTextEditorProps = {
   className?: string;
   disabled?: boolean;
   onPickStateChange?: (s: { active: boolean; hasUnsavedNote: boolean }) => void;
+  highlightLocalId?: number | null;
+  submitIssueMessages?: string[];
 };
 
-function bandClass(variant: BandVariant | undefined, flashing: boolean): string {
+function bandClass(
+  variant: BandVariant | undefined,
+  flashing: boolean,
+  highlighted: boolean,
+): string {
   if (flashing) return 'rounded-sm bg-red-200 ring-2 ring-red-500 animate-pulse';
+  if (highlighted) return 'rounded-sm bg-amber-100 ring-2 ring-red-500';
   if (variant === 'draft') return 'rounded-sm bg-indigo-100 ring-1 ring-indigo-300';
   return 'rounded-sm bg-amber-100';
 }
@@ -41,22 +48,28 @@ const EditorBandLayer = memo(function EditorBandLayer({
   bands,
   charHeight,
   conflictFlashIds,
+  highlightLocalId,
 }: {
   bands: Band[];
   charHeight: number;
   conflictFlashIds: string[];
+  highlightLocalId: number | null;
 }) {
   if (bands.length === 0) return null;
   return (
     <>
-      {bands.map((b, i) => (
-        <span
-          key={`${b.id}-${i}`}
-          aria-hidden
-          className={`absolute left-0 top-0 z-0 ${bandClass(b.variant, conflictFlashIds.includes(b.id))}`}
-          style={{ left: b.left, width: b.width, height: charHeight || '1.6em' }}
-        />
-      ))}
+      {bands.map((b, i) => {
+        const highlighted = highlightLocalId != null && b.id === String(highlightLocalId);
+        return (
+          <span
+            key={`${b.id}-${i}`}
+            data-annotation-id={b.id}
+            aria-hidden
+            className={`absolute left-0 top-0 z-0 ${bandClass(b.variant, conflictFlashIds.includes(b.id), highlighted)}`}
+            style={{ left: b.left, width: b.width, height: charHeight || '1.6em' }}
+          />
+        );
+      })}
     </>
   );
 });
@@ -171,6 +184,7 @@ const EditorLineRow = memo(function EditorLineRow({
   onCharClick,
   onNoteClick,
   hiddenNoteIds,
+  highlightLocalId,
 }: {
   datum: LineDatum;
   chars: string[];
@@ -179,13 +193,14 @@ const EditorLineRow = memo(function EditorLineRow({
   onCharClick: (i: number) => void;
   onNoteClick: (localId: number) => void;
   hiddenNoteIds: Set<string>;
+  highlightLocalId: number | null;
 }) {
   const indices: number[] = [];
   for (let i = datum.start; i <= datum.end; i++) indices.push(i);
 
   const visibleNotes = datum.notes.filter((n) => !hiddenNoteIds.has(n.id));
   return (
-    <div>
+    <div className="mb-2.5 last:mb-0">
       {visibleNotes.length > 0 && (
         <div className="relative" style={{ height: NOTE_SLOT_PX }}>
           {visibleNotes.map((n) => (
@@ -202,7 +217,12 @@ const EditorLineRow = memo(function EditorLineRow({
         </div>
       )}
       <div className="relative" style={{ whiteSpace: 'pre' }}>
-        <EditorBandLayer bands={datum.bands} charHeight={charHeight} conflictFlashIds={conflictFlashIds} />
+        <EditorBandLayer
+          bands={datum.bands}
+          charHeight={charHeight}
+          conflictFlashIds={conflictFlashIds}
+          highlightLocalId={highlightLocalId}
+        />
         <span className="relative z-[1]">
           {indices.map((i) => (
             <span
@@ -240,6 +260,8 @@ export function AnnotatedTextEditor({
   className,
   disabled,
   onPickStateChange,
+  highlightLocalId = null,
+  submitIssueMessages = [],
 }: AnnotatedTextEditorProps) {
   const { refs, layout, chars } = useTextMeasurement(content);
   const validateDraft = useMemo(
@@ -326,6 +348,12 @@ export function AnnotatedTextEditor({
     pick.notePanel.mode !== undefined &&
     !pick.isReanchorPicking;
 
+  useEffect(() => {
+    if (highlightLocalId == null) return;
+    const el = document.querySelector(`[data-annotation-id="${highlightLocalId}"]`);
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [highlightLocalId]);
+
   const composeDockProps = showComposeDock
     ? {
         noteText: pick.notePanel!.noteText,
@@ -343,6 +371,20 @@ export function AnnotatedTextEditor({
 
   return (
     <div className={className} data-testid="annotation-editor">
+      {submitIssueMessages.length > 0 && (
+        <div
+          className="mb-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+          data-testid="annotation-submit-issues"
+        >
+          <p className="font-medium">Fix these issues before saving:</p>
+          <ul className="mt-1 list-inside list-disc space-y-0.5">
+            {submitIssueMessages.map((msg, i) => (
+              <li key={i}>{msg}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {pick.error && (
         <p
           className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
@@ -417,6 +459,7 @@ export function AnnotatedTextEditor({
                 onCharClick={pick.handleCharClick}
                 onNoteClick={pick.handleBandClick}
                 hiddenNoteIds={hiddenNoteIds}
+                highlightLocalId={highlightLocalId}
               />
             ))}
           </div>

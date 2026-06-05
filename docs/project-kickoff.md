@@ -166,6 +166,9 @@ EchoType — Repeat, type, and remember meaningful English texts（主slogan）/
 9. 用户操作完成后，点击，”练习文本（课程）编辑界面“最下面的“确认”按钮后， 系统再次检测输入完整性
 10. 检测不通过，让用户修正，还是用“确认”按钮retry， 直到检测通过， 这个“练习文本（课程）” 完整存储到数据库（新建或刷新）。
 
+> **Phase 3.2 实现备注**: 保存成功后关闭弹窗并刷新课程列表;已保存的 card 短暂高亮 2 秒。
+> 保存后**不**自动跳转打字页;用户手动点 card 上的「Type this」。
+> **未来可选 UX**(未做): Save & type 按钮(create 模式);Saved toast + Go to typing 跳转。
 
 ---
 ### 「简短模式」和「文章模式」的界定
@@ -822,6 +825,27 @@ Do NOT deploy ECS Fargate in the first cloud MVP.
 Do NOT add Kubernetes, NAT Gateway, queues, or microservices.
 Do NOT enforce strict English-only content validation.
 
+
+
+---
+### LineRow vertical spacing (margin-bottom: 10px)
+在 可见层 每个 LineRow 外层加 margin-bottom: 10px（Tailwind mb-2.5 last:mb-0）：
+"未完全消除歧义(fallback 仍在第二行顶部),但明显改善"。
+
+LineRow 之间统一 10px margin-bottom,引入于 Phase 3.2(2026-06-05)。
+
+设计理由:
+1. 提供基础段间呼吸感,所有渲染场景(打字界面、Step 2/3/4 预览、编辑器)一致
+2. 解决跨行注释 fallback 场景下,注释紧贴上一行造成的视觉锚定混淆
+3. 加在 margin 而非 line-height,避免影响 mirror 测量一致性
+
+为什么不动态调整(有注释行 vs 无注释行不同间距):
+- 实测 10px 统一间距在长文(5000 字符)上密度损失可忽略
+- 动态间距需要 LineRow 知道"自己/邻居是否有注释",实现复杂度 5x,
+  换取的密度收益约 5%——不符合 MVP 工程取舍
+- 若未来真实用户反馈"长文太松"或"短文太紧",可升级为动态方案
+
+修订自 Phase 3.2 实测,2026-06-XX
 
 
 ---

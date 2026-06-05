@@ -134,7 +134,7 @@ const LineRow = memo(function LineRow({
   const indices: number[] = [];
   for (let i = datum.start; i <= datum.end; i++) indices.push(i);
   return (
-    <div>
+    <div className="mb-2.5 last:mb-0">
       <LineDecorations notes={datum.notes} />
       <div className="relative" style={{ whiteSpace: 'pre' }}>
         <BandLayer bands={datum.bands} charHeight={charHeight} />

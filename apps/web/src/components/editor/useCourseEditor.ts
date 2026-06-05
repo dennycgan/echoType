@@ -4,10 +4,12 @@ import {
   ARTICLE_MIN,
   SHORT_MAX,
   SHORT_MIN,
+  type AnnotationIssue,
   type CourseDTO,
   type CourseMode,
   type CreateCourseInput,
 } from '@echotype/shared';
+import { annotationIssuesFromApi, runPreSubmitValidation, type PreSubmitResult } from './submitValidation';
 
 // Short-lived front-end id for a staged annotation. It only exists while the
 // editor modal is open and is never sent to the backend (the server derives its
@@ -64,6 +66,17 @@ export interface UseCourseEditor {
   isDirty: boolean;
 
   buildPayload: () => CreateCourseInput;
+
+  submitIssueMessages: string[];
+  highlightLocalId: number | null;
+  validateBeforeSave: () => PreSubmitResult;
+  applyAnnotationValidationFeedback: (
+    issues: AnnotationIssue[],
+    messages: string[],
+    highlightLocalId: number | null,
+  ) => void;
+  applyServerAnnotationIssues: (issues: AnnotationIssue[]) => void;
+  clearSubmitFeedback: () => void;
 }
 
 export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): UseCourseEditor {
@@ -87,7 +100,15 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
   );
   const nextLocalId = useRef<number>((initial?.annotations?.length ?? 0) + 1);
 
+  const [submitIssueMessages, setSubmitIssueMessages] = useState<string[]>([]);
+  const [highlightLocalId, setHighlightLocalId] = useState<number | null>(null);
+
   const originalContent = useRef(initial?.content ?? '');
+
+  const clearSubmitFeedback = useCallback(() => {
+    setSubmitIssueMessages([]);
+    setHighlightLocalId(null);
+  }, []);
   const contentChanged = editorMode === 'edit' && content !== originalContent.current;
   const showContentWarning = contentChanged && originalAnnotationCount > 0;
 
@@ -97,20 +118,29 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
     [editorMode, annotations.length],
   );
 
-  const addAnnotation = useCallback((a: Omit<DraftAnnotation, 'localId'>) => {
-    setAnnotations((prev) => [...prev, { ...a, localId: nextLocalId.current++ }]);
-  }, []);
+  const addAnnotation = useCallback(
+    (a: Omit<DraftAnnotation, 'localId'>) => {
+      clearSubmitFeedback();
+      setAnnotations((prev) => [...prev, { ...a, localId: nextLocalId.current++ }]);
+    },
+    [clearSubmitFeedback],
+  );
 
   const updateAnnotation = useCallback(
     (localId: number, patch: Partial<Omit<DraftAnnotation, 'localId'>>) => {
+      clearSubmitFeedback();
       setAnnotations((prev) => prev.map((x) => (x.localId === localId ? { ...x, ...patch } : x)));
     },
-    [],
+    [clearSubmitFeedback],
   );
 
-  const deleteAnnotation = useCallback((localId: number) => {
-    setAnnotations((prev) => prev.filter((x) => x.localId !== localId));
-  }, []);
+  const deleteAnnotation = useCallback(
+    (localId: number) => {
+      clearSubmitFeedback();
+      setAnnotations((prev) => prev.filter((x) => x.localId !== localId));
+    },
+    [clearSubmitFeedback],
+  );
 
   const setNeedAnnotation = useCallback((v: boolean) => {
     setNeedAnnotationState(v);
@@ -191,6 +221,32 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
     [title, content, courseMode, annotations],
   );
 
+  const validateBeforeSave = useCallback((): PreSubmitResult => {
+    return runPreSubmitValidation(buildPayload(), annotations, needAnnotation);
+  }, [buildPayload, annotations, needAnnotation]);
+
+  const applyAnnotationValidationFeedback = useCallback(
+    (issues: AnnotationIssue[], messages: string[], localId: number | null) => {
+      setSubmitIssueMessages(messages);
+      setHighlightLocalId(localId);
+      setStep(3);
+    },
+    [],
+  );
+
+  const applyServerAnnotationIssues = useCallback(
+    (issues: AnnotationIssue[]) => {
+      const payload = buildPayload();
+      const { messages, highlightLocalId: localId } = annotationIssuesFromApi(
+        issues,
+        annotations,
+        payload.annotations,
+      );
+      applyAnnotationValidationFeedback(issues, messages, localId);
+    },
+    [annotations, buildPayload, applyAnnotationValidationFeedback],
+  );
+
   return {
     editorMode,
     step,
@@ -216,5 +272,11 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
     goBack,
     isDirty,
     buildPayload,
+    submitIssueMessages,
+    highlightLocalId,
+    validateBeforeSave,
+    applyAnnotationValidationFeedback,
+    applyServerAnnotationIssues,
+    clearSubmitFeedback,
   };
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import type { CourseDTO } from '@echotype/shared';
@@ -7,6 +7,8 @@ import { CourseEditorModal } from '../components/editor/CourseEditorModal';
 
 type EditorTarget = { mode: 'create' } | { mode: 'edit'; course: CourseDTO } | null;
 
+const HIGHLIGHT_MS = 2000;
+
 export function CoursesPage() {
   const { data: courses, isLoading } = useQuery({
     queryKey: ['courses'],
@@ -14,6 +16,13 @@ export function CoursesPage() {
   });
 
   const [editor, setEditor] = useState<EditorTarget>(null);
+  const [highlightCourseId, setHighlightCourseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!highlightCourseId) return;
+    const t = setTimeout(() => setHighlightCourseId(null), HIGHLIGHT_MS);
+    return () => clearTimeout(t);
+  }, [highlightCourseId]);
 
   return (
     <div className="space-y-6">
@@ -35,7 +44,12 @@ export function CoursesPage() {
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">
             {courses.map((c) => (
-              <li key={c.id} className="rounded-md border bg-white p-4">
+              <li
+                key={c.id}
+                className={`rounded-md border bg-white p-4 transition-shadow ${
+                  highlightCourseId === c.id ? 'ring-2 ring-emerald-400' : ''
+                }`}
+              >
                 <div className="mb-1 flex items-center justify-between">
                   <h3 className="font-medium">{c.title}</h3>
                   <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
@@ -74,7 +88,10 @@ export function CoursesPage() {
           mode={editor.mode}
           course={editor.mode === 'edit' ? editor.course : undefined}
           onClose={() => setEditor(null)}
-          onSaved={() => setEditor(null)}
+          onSaved={(courseId) => {
+            setEditor(null);
+            setHighlightCourseId(courseId);
+          }}
         />
       )}
     </div>
