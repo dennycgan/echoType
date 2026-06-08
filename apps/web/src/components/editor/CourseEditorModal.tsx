@@ -13,9 +13,10 @@ import {
   MSG_SERVER_ERROR,
   STEP3_NO_ANNOTATION_MESSAGE,
   formatPurgedAnnotationsMessage,
-  formatReviewBanner,
+  MSG_REVIEW_BLOCK,
   mapModeIssueMessage,
 } from './annotationMessages';
+import { ReviewPanel } from './ReviewPanel';
 import type { AnnotationIssue, ModeIssue } from '@echotype/shared';
 import { useCourseEditor, type EditorMode } from './useCourseEditor';
 
@@ -83,6 +84,11 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
     setSubmitError(null);
     setFooterHint(null);
 
+    if (ed.reviewActive && ed.pendingReviewCount > 0) {
+      setSubmitError(MSG_REVIEW_BLOCK);
+      return;
+    }
+
     const pre = ed.validateBeforeSave();
     if (!pre.ok) {
       if (pre.kind === 'd5') {
@@ -113,6 +119,10 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
         setFooterHint(STEP3_NO_ANNOTATION_MESSAGE);
         return;
       }
+      if (ed.reviewActive && ed.pendingReviewCount > 0) {
+        setFooterHint(MSG_REVIEW_BLOCK);
+        return;
+      }
       ed.clearSubmitFeedback();
     }
     if (!ed.canProceed) return;
@@ -136,7 +146,11 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
     onClose();
   }
 
-  const nextPrimaryEnabled = ed.step === 4 ? !save.isPending : ed.canProceed && !pickState.active;
+  const reviewBlocked = ed.reviewActive && ed.pendingReviewCount > 0;
+  const nextPrimaryEnabled =
+    ed.step === 4
+      ? !save.isPending && !reviewBlocked
+      : ed.canProceed && !pickState.active;
 
   return (
     <div
@@ -212,15 +226,19 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
             {ed.step === 4 ? (
               <button
                 onClick={handleSave}
-                disabled={save.isPending}
-                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-40"
+                disabled={!nextPrimaryEnabled}
+                className={`rounded-md px-4 py-2 text-sm font-medium text-white ${
+                  nextPrimaryEnabled
+                    ? 'bg-slate-900 hover:bg-slate-800'
+                    : 'cursor-not-allowed bg-slate-400 opacity-80'
+                }`}
               >
                 {save.isPending ? 'Saving…' : 'Save course'}
               </button>
             ) : (
               <button
                 onClick={handleNext}
-                disabled={ed.step === 3 ? false : !ed.canProceed}
+                disabled={!nextPrimaryEnabled}
                 className={`rounded-md px-4 py-2 text-sm font-medium text-white ${
                   nextPrimaryEnabled
                     ? 'bg-slate-900 hover:bg-slate-800'
@@ -368,15 +386,26 @@ function Step3({
   ed: ReturnType<typeof useCourseEditor>;
   onPickStateChange: (s: { active: boolean; hasUnsavedNote: boolean }) => void;
 }) {
+  const [reviewCommand, setReviewCommand] = useState<{
+    type: 'reanchor';
+    localId: number;
+    nonce: number;
+  } | null>(null);
+
+  function handleReselect(localId: number) {
+    ed.focusAnnotation(localId);
+    setReviewCommand({ type: 'reanchor', localId, nonce: Date.now() });
+  }
+
   return (
     <div className="space-y-0">
       {ed.reviewActive && ed.pendingReviewCount > 0 && (
-        <p
-          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
-          data-testid="review-banner"
-        >
-          {formatReviewBanner(ed.pendingReviewCount)}
-        </p>
+        <ReviewPanel
+          items={ed.pendingReviewAnnotations}
+          onFocus={ed.focusAnnotation}
+          onReselect={handleReselect}
+          onDelete={ed.deleteAnnotation}
+        />
       )}
       <AnnotatedTextEditor
         content={ed.content}
@@ -388,6 +417,7 @@ function Step3({
         highlightLocalId={ed.highlightLocalId}
         submitIssueMessages={ed.submitIssueMessages}
         reviewActive={ed.reviewActive}
+        reviewCommand={reviewCommand}
       />
     </div>
   );

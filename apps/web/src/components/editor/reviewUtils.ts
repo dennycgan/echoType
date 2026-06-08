@@ -45,5 +45,14 @@ export function pendingReviewCount(
   reviewActive: boolean,
 ): number {
   if (!reviewActive) return 0;
-  return annotations.filter((a) => computeReviewStatus(content, a, true) === 'yellow').length;
+  return listPendingReviewAnnotations(content, annotations, reviewActive).length;
+}
+
+export function listPendingReviewAnnotations<T extends ReviewableAnnotation>(
+  content: string,
+  annotations: T[],
+  reviewActive: boolean,
+): T[] {
+  if (!reviewActive) return [];
+  return annotations.filter((a) => computeReviewStatus(content, a, true) === 'yellow');
 }

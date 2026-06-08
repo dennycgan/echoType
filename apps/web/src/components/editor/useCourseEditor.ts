@@ -13,7 +13,7 @@ import { annotationIssuesFromApi, runPreSubmitValidation, type PreSubmitResult }
 import {
   computeReviewStatus,
   dropFullyUnreachableAnnotations,
-  pendingReviewCount,
+  listPendingReviewAnnotations,
   sliceAt,
   type ReviewStatus,
 } from './reviewUtils';
@@ -70,7 +70,9 @@ export interface UseCourseEditor {
 
   reviewActive: boolean;
   pendingReviewCount: number;
+  pendingReviewAnnotations: DraftAnnotation[];
   getReviewStatus: (localId: number) => ReviewStatus;
+  focusAnnotation: (localId: number) => void;
 
   goNext: () => { purgedAnnotations: number } | void;
   goBack: () => void;
@@ -124,14 +126,20 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
     setHighlightLocalId(null);
   }, []);
 
+  const focusAnnotation = useCallback((localId: number) => {
+    setHighlightLocalId(localId);
+  }, []);
+
   const contentPendingReview =
     editorMode === 'edit' && content !== contentBaseline.current && originalAnnotationCount > 0;
   const showContentWarning = contentPendingReview;
 
-  const yellowCount = useMemo(
-    () => pendingReviewCount(content, annotations, reviewActive),
+  const pendingReviewAnnotations = useMemo(
+    () => listPendingReviewAnnotations(content, annotations, reviewActive),
     [content, annotations, reviewActive],
   );
+
+  const yellowCount = pendingReviewAnnotations.length;
 
   const getReviewStatus = useCallback(
     (localId: number): ReviewStatus => {
@@ -203,9 +211,13 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
   const canProceed = useMemo(() => {
     if (step === 1) return step1Error === null;
     if (step === 2) return skipAnnotationChoice || needAnnotation !== null;
-    if (step === 3) return needAnnotation === true ? annotations.length > 0 : true;
+    if (step === 3) {
+      if (needAnnotation === true && annotations.length === 0) return false;
+      if (reviewActive && yellowCount > 0) return false;
+      return true;
+    }
     return true;
-  }, [step, step1Error, needAnnotation, annotations.length, skipAnnotationChoice]);
+  }, [step, step1Error, needAnnotation, annotations.length, skipAnnotationChoice, reviewActive, yellowCount]);
 
   const goNext = useCallback((): { purgedAnnotations: number } | void => {
     if (step === 1) {
@@ -317,7 +329,9 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
     showContentWarning,
     reviewActive,
     pendingReviewCount: yellowCount,
+    pendingReviewAnnotations,
     getReviewStatus,
+    focusAnnotation,
     goNext,
     goBack,
     isDirty,

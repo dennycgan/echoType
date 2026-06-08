@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, type Ref } from 'react';
+import { memo, useEffect, useMemo, useRef, type Ref } from 'react';
 import { NOTE_TEXT_MAX, validateAnnotations } from '@echotype/shared';
 import {
   NOTE_FONT_PX,
@@ -33,6 +33,8 @@ export type AnnotatedTextEditorProps = {
   highlightLocalId?: number | null;
   submitIssueMessages?: string[];
   reviewActive?: boolean;
+  /** Fired from review panel Reselect; nonce changes each request. */
+  reviewCommand?: { type: 'reanchor'; localId: number; nonce: number } | null;
 };
 
 function bandClass(
@@ -267,6 +269,7 @@ export function AnnotatedTextEditor({
   highlightLocalId = null,
   submitIssueMessages = [],
   reviewActive = false,
+  reviewCommand = null,
 }: AnnotatedTextEditorProps) {
   const { refs, layout, chars } = useTextMeasurement(content);
   const validateDraft = useMemo(
@@ -284,6 +287,14 @@ export function AnnotatedTextEditor({
     disabled,
     onPickStateChange,
   });
+
+  const consumedReviewNonceRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!reviewCommand || reviewCommand.type !== 'reanchor') return;
+    if (consumedReviewNonceRef.current === reviewCommand.nonce) return;
+    consumedReviewNonceRef.current = reviewCommand.nonce;
+    pick.beginReanchorFromIdle(reviewCommand.localId);
+  }, [reviewCommand, pick.beginReanchorFromIdle]);
 
   const layoutAnnotations = useMemo(() => {
     const list = annotations.map((a) => ({

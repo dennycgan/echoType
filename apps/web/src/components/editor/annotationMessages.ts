@@ -31,6 +31,15 @@ export function formatPurgedAnnotationsMessage(count: number): string {
   return `${count} ${noun} no longer fit the shortened text and were removed.`;
 }
 
+export const MSG_REVIEW_BLOCK =
+  'Resolve all notes that need review before continuing.';
+
+export function truncateForDisplay(text: string, maxLen: number): string {
+  const t = text.trim();
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, maxLen)}…`;
+}
+
 export const MSG_INVALID_REQUEST =
   'Invalid request. Check your input and try again.';
 export const MSG_SERVER_ERROR = 'Server error. Please try again.';

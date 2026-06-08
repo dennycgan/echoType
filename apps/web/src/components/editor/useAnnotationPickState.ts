@@ -21,7 +21,14 @@ type PickState =
   | { kind: 'pickingEnd'; start: number }
   | { kind: 'enteringNote'; start: number; end: number; noteText: string }
   | { kind: 'editingNote'; localId: number; noteText: string; originalNoteText: string }
-  | { kind: 'reanchor'; localId: number; phase: 'start' | 'end'; tempStart?: number }
+  | {
+      kind: 'reanchor';
+      localId: number;
+      phase: 'start' | 'end';
+      tempStart?: number;
+      /** idle = started from review banner; edit = started from note compose dock. */
+      origin: 'idle' | 'edit';
+    }
   | {
       kind: 'reanchorReview';
       localId: number;
@@ -29,6 +36,7 @@ type PickState =
       pendingEnd: number;
       noteText: string;
       originalNoteText: string;
+      origin: 'idle' | 'edit';
     };
 
 export type ValidateDraftFn = (
@@ -152,18 +160,28 @@ export function useAnnotationPickState({
             setError(err);
             return;
           }
-          setState({ kind: 'reanchor', localId: state.localId, phase: 'end', tempStart: index });
+          setState({
+            kind: 'reanchor',
+            localId: state.localId,
+            phase: 'end',
+            tempStart: index,
+            origin: state.origin,
+          });
           setError(null);
           return;
         }
         const tempStart = state.tempStart!;
         if (index === tempStart) {
-          setState({
-            kind: 'editingNote',
-            localId: state.localId,
-            noteText: annotations.find((a) => a.localId === state.localId)?.noteText ?? '',
-            originalNoteText: annotations.find((a) => a.localId === state.localId)?.noteText ?? '',
-          });
+          if (state.origin === 'idle') {
+            clearEphemeral();
+          } else {
+            setState({
+              kind: 'editingNote',
+              localId: state.localId,
+              noteText: annotations.find((a) => a.localId === state.localId)?.noteText ?? '',
+              originalNoteText: annotations.find((a) => a.localId === state.localId)?.noteText ?? '',
+            });
+          }
           setError(null);
           return;
         }
@@ -176,6 +194,7 @@ export function useAnnotationPickState({
             pendingEnd: end,
             noteText: ann?.noteText ?? '',
             originalNoteText: ann?.noteText ?? '',
+            origin: state.origin,
           });
         });
         return;
@@ -294,12 +313,31 @@ export function useAnnotationPickState({
 
   const startReanchor = useCallback(() => {
     if (state.kind !== 'editingNote') return;
-    setState({ kind: 'reanchor', localId: state.localId, phase: 'start' });
+    setState({ kind: 'reanchor', localId: state.localId, phase: 'start', origin: 'edit' });
     setError(null);
   }, [state]);
 
+  const beginReanchorFromIdle = useCallback(
+    (localId: number) => {
+      if (disabled) return;
+      if (state.kind !== 'idle') {
+        setError(MSG_SERIAL_BLOCK);
+        return;
+      }
+      const ann = annotations.find((a) => a.localId === localId);
+      if (!ann) return;
+      setState({ kind: 'reanchor', localId, phase: 'start', origin: 'idle' });
+      setError(null);
+    },
+    [disabled, state.kind, annotations],
+  );
+
   const cancelReanchor = useCallback(() => {
     if (state.kind !== 'reanchor' && state.kind !== 'reanchorReview') return;
+    if (state.origin === 'idle') {
+      clearEphemeral();
+      return;
+    }
     const ann = annotations.find((a) => a.localId === state.localId);
     if (!ann) {
       clearEphemeral();
@@ -396,6 +434,7 @@ export function useAnnotationPickState({
     confirmNote,
     cancelNote,
     startReanchor,
+    beginReanchorFromIdle,
     cancelReanchor,
     deleteExisting,
     clearEphemeral,
