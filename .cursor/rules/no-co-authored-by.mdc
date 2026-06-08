@@ -12,7 +12,7 @@ The user does not want `Co-authored-by: Cursor` (or any Co-authored-by line) in 
 **Do** create commits with `git commit-tree`, not plain `git commit` or `git commit --amend`.
 
 After staging (or when the tree is ready):
-1. `TREE=$(git write-tree)` — or `git rev-parse HEAD^{tree}` when amending content already staged
+1. `TREE=$(git write-tree)` — write the index tree (assumes files are staged)
 2. `PARENT=$(git rev-parse HEAD)` — omit `-p` for root; use correct parent(s) for normal commits
 3. Write the intended message to a temp file (HEREDOC), **without** any Co-authored-by line
 4. `NEW=$(git commit-tree "$TREE" -p "$PARENT" -F /tmp/msg.txt)`

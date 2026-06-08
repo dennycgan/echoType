@@ -25,11 +25,11 @@ EchoType uses a deliberate split: product-facing engineering artifacts in Englis
 
 ## docs/project-kickoff.md
 
-**Do** write and edit `docs/project-kickoff.md` in Chinese, matching the existing spec voice.
+**Do** write and edit `docs/project-kickoff.md` in Chinese prose, matching the existing spec voice. Code identifiers, field names, API paths, and English technical terms within Chinese text stay as-is (e.g. "`startIndex` 是字符位置").
 
-**Don't** translate kickoff sections to English or rewrite Chinese spec prose into English without user approval.
+**Don't** translate kickoff sections to English or rewrite Chinese spec prose into English without user approval. Also don't sinify English technical terms inside Chinese prose.
 
-**Why:** Kickoff is the Chinese product/spec source of truth; English code implements it, not replaces it.
+**Why:** Kickoff is the Chinese product/spec source of truth; English code implements it, not replaces it. Real kickoff style is Chinese prose plus English engineering terms.
 
 ## Seed and demo annotation text
 
