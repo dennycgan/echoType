@@ -5,12 +5,15 @@ import { api, ApiError } from '../../lib/api';
 import { AnnotatedText } from '../AnnotatedText';
 import { AnnotatedTextEditor, confirmAbandonPick } from './AnnotatedTextEditor';
 import {
+  MSG_CONTENT_REVIEW_WARNING,
   MSG_DISCARD_ALL_CHANGES,
   MSG_INVALID_REQUEST,
   MSG_NETWORK_ERROR,
   MSG_SERIAL_BLOCK,
   MSG_SERVER_ERROR,
   STEP3_NO_ANNOTATION_MESSAGE,
+  formatPurgedAnnotationsMessage,
+  formatReviewBanner,
   mapModeIssueMessage,
 } from './annotationMessages';
 import type { AnnotationIssue, ModeIssue } from '@echotype/shared';
@@ -114,9 +117,8 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
     }
     if (!ed.canProceed) return;
     const effect = ed.goNext();
-    if (effect && effect.clearedAnnotations > 0) {
-      const n = effect.clearedAnnotations;
-      setToast(`Editing the text cleared the ${n} existing annotation${n > 1 ? 's' : ''}.`);
+    if (effect && effect.purgedAnnotations > 0) {
+      setToast(formatPurgedAnnotationsMessage(effect.purgedAnnotations));
     }
   }
 
@@ -168,7 +170,7 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
         {toast && (
           <div className="border-b border-amber-200 bg-amber-50 px-5 py-2 text-sm text-amber-800">
             {toast}
-            <button className="ml-2 underline" onClick={() => setToast(null)}>
+            <button type="button" className="ml-2 underline" onClick={() => setToast(null)}>
               Dismiss
             </button>
           </div>
@@ -312,8 +314,7 @@ function Step1({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
 
       {ed.showContentWarning && (
         <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Editing the text will clear the {ed.originalAnnotationCount} existing annotation
-          {ed.originalAnnotationCount > 1 ? 's' : ''}. (Revert the text to keep them.)
+          {MSG_CONTENT_REVIEW_WARNING}
         </p>
       )}
       {ed.step1Error && <p className="text-sm text-amber-600">{ed.step1Error}</p>}
@@ -368,16 +369,27 @@ function Step3({
   onPickStateChange: (s: { active: boolean; hasUnsavedNote: boolean }) => void;
 }) {
   return (
-    <AnnotatedTextEditor
-      content={ed.content}
-      annotations={ed.annotations}
-      onCreate={ed.addAnnotation}
-      onUpdate={ed.updateAnnotation}
-      onDelete={ed.deleteAnnotation}
-      onPickStateChange={onPickStateChange}
-      highlightLocalId={ed.highlightLocalId}
-      submitIssueMessages={ed.submitIssueMessages}
-    />
+    <div className="space-y-0">
+      {ed.reviewActive && ed.pendingReviewCount > 0 && (
+        <p
+          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          data-testid="review-banner"
+        >
+          {formatReviewBanner(ed.pendingReviewCount)}
+        </p>
+      )}
+      <AnnotatedTextEditor
+        content={ed.content}
+        annotations={ed.annotations}
+        onCreate={ed.addAnnotation}
+        onUpdate={ed.updateAnnotation}
+        onDelete={ed.deleteAnnotation}
+        onPickStateChange={onPickStateChange}
+        highlightLocalId={ed.highlightLocalId}
+        submitIssueMessages={ed.submitIssueMessages}
+        reviewActive={ed.reviewActive}
+      />
+    </div>
   );
 }
 

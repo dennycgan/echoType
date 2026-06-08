@@ -10,6 +10,13 @@ import {
   type CreateCourseInput,
 } from '@echotype/shared';
 import { annotationIssuesFromApi, runPreSubmitValidation, type PreSubmitResult } from './submitValidation';
+import {
+  computeReviewStatus,
+  dropFullyUnreachableAnnotations,
+  pendingReviewCount,
+  sliceAt,
+  type ReviewStatus,
+} from './reviewUtils';
 
 // Short-lived front-end id for a staged annotation. It only exists while the
 // editor modal is open and is never sent to the backend (the server derives its
@@ -19,6 +26,8 @@ export interface DraftAnnotation {
   startIndex: number;
   endIndex: number; // inclusive
   noteText: string;
+  /** Local snapshot for review; server re-derives on save. */
+  anchoredText: string;
 }
 
 export type EditorStep = 1 | 2 | 3 | 4;
@@ -47,21 +56,23 @@ export interface UseCourseEditor {
   skipAnnotationChoice: boolean;
 
   annotations: DraftAnnotation[];
-  addAnnotation: (a: Omit<DraftAnnotation, 'localId'>) => void;
+  addAnnotation: (a: Omit<DraftAnnotation, 'localId' | 'anchoredText'> & { anchoredText?: string }) => void;
   updateAnnotation: (localId: number, patch: Partial<Omit<DraftAnnotation, 'localId'>>) => void;
   deleteAnnotation: (localId: number) => void;
   // Step 1 validation
   step1Error: string | null;
   canProceed: boolean;
 
-  // D2: editing an existing course's content invalidates its annotations.
-  contentChanged: boolean;
+  /** Edit: content differs from last confirmed baseline (Step 1 Next). */
+  contentPendingReview: boolean;
   originalAnnotationCount: number;
-  showContentWarning: boolean; // changed AND there were annotations to lose
+  showContentWarning: boolean;
 
-  // Navigation. goNext returns an optional side-effect signal the modal acts on
-  // (e.g. show the "annotations cleared" toast after a D2 wipe).
-  goNext: () => { clearedAnnotations: number } | void;
+  reviewActive: boolean;
+  pendingReviewCount: number;
+  getReviewStatus: (localId: number) => ReviewStatus;
+
+  goNext: () => { purgedAnnotations: number } | void;
   goBack: () => void;
   isDirty: boolean;
 
@@ -96,21 +107,40 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
       startIndex: a.startIndex,
       endIndex: a.endIndex,
       noteText: a.noteText,
+      anchoredText: a.anchoredText,
     })),
   );
   const nextLocalId = useRef<number>((initial?.annotations?.length ?? 0) + 1);
 
   const [submitIssueMessages, setSubmitIssueMessages] = useState<string[]>([]);
   const [highlightLocalId, setHighlightLocalId] = useState<number | null>(null);
+  const [reviewActive, setReviewActive] = useState(false);
 
-  const originalContent = useRef(initial?.content ?? '');
+  /** Last content confirmed on Step 1 Next; advances each successful Next from step 1. */
+  const contentBaseline = useRef(initial?.content ?? '');
 
   const clearSubmitFeedback = useCallback(() => {
     setSubmitIssueMessages([]);
     setHighlightLocalId(null);
   }, []);
-  const contentChanged = editorMode === 'edit' && content !== originalContent.current;
-  const showContentWarning = contentChanged && originalAnnotationCount > 0;
+
+  const contentPendingReview =
+    editorMode === 'edit' && content !== contentBaseline.current && originalAnnotationCount > 0;
+  const showContentWarning = contentPendingReview;
+
+  const yellowCount = useMemo(
+    () => pendingReviewCount(content, annotations, reviewActive),
+    [content, annotations, reviewActive],
+  );
+
+  const getReviewStatus = useCallback(
+    (localId: number): ReviewStatus => {
+      const ann = annotations.find((a) => a.localId === localId);
+      if (!ann) return 'n/a';
+      return computeReviewStatus(content, ann, reviewActive);
+    },
+    [annotations, content, reviewActive],
+  );
 
   // Edit + still has staged annotations: skip Step 2 Yes/No and go straight to Step 3.
   const skipAnnotationChoice = useMemo(
@@ -119,19 +149,31 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
   );
 
   const addAnnotation = useCallback(
-    (a: Omit<DraftAnnotation, 'localId'>) => {
+    (a: Omit<DraftAnnotation, 'localId' | 'anchoredText'> & { anchoredText?: string }) => {
       clearSubmitFeedback();
-      setAnnotations((prev) => [...prev, { ...a, localId: nextLocalId.current++ }]);
+      const anchoredText = a.anchoredText ?? sliceAt(content, a.startIndex, a.endIndex);
+      setAnnotations((prev) => [...prev, { ...a, anchoredText, localId: nextLocalId.current++ }]);
     },
-    [clearSubmitFeedback],
+    [clearSubmitFeedback, content],
   );
 
   const updateAnnotation = useCallback(
     (localId: number, patch: Partial<Omit<DraftAnnotation, 'localId'>>) => {
       clearSubmitFeedback();
-      setAnnotations((prev) => prev.map((x) => (x.localId === localId ? { ...x, ...patch } : x)));
+      setAnnotations((prev) =>
+        prev.map((x) => {
+          if (x.localId !== localId) return x;
+          const next = { ...x, ...patch };
+          if (patch.startIndex !== undefined || patch.endIndex !== undefined) {
+            const start = patch.startIndex ?? x.startIndex;
+            const end = patch.endIndex ?? x.endIndex;
+            next.anchoredText = sliceAt(content, start, end);
+          }
+          return next;
+        }),
+      );
     },
-    [clearSubmitFeedback],
+    [clearSubmitFeedback, content],
   );
 
   const deleteAnnotation = useCallback(
@@ -144,7 +186,6 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
 
   const setNeedAnnotation = useCallback((v: boolean) => {
     setNeedAnnotationState(v);
-    // Selecting "no" means this course has no annotations; drop any staged ones.
     if (!v) setAnnotations([]);
   }, []);
 
@@ -166,18 +207,24 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
     return true;
   }, [step, step1Error, needAnnotation, annotations.length, skipAnnotationChoice]);
 
-  const goNext = useCallback((): { clearedAnnotations: number } | void => {
+  const goNext = useCallback((): { purgedAnnotations: number } | void => {
     if (step === 1) {
-      // D2: leaving step 1 with a changed content wipes the now-stale annotations.
-      if (contentChanged && annotations.length > 0) {
-        const cleared = annotations.length;
-        setAnnotations([]);
-        originalContent.current = content; // re-baseline so the warning clears
-        setStep(skipAnnotationChoice ? 3 : 2);
-        return { clearedAnnotations: cleared };
+      const contentChangedFromBaseline = content !== contentBaseline.current;
+      let purgedAnnotations = 0;
+
+      if (contentChangedFromBaseline && annotations.length > 0) {
+        const { kept, purgedCount } = dropFullyUnreachableAnnotations(content, annotations);
+        purgedAnnotations = purgedCount;
+        if (purgedCount > 0) setAnnotations(kept);
+
+        if (editorMode === 'edit' && kept.length > 0) {
+          setReviewActive(true);
+        }
       }
+
+      contentBaseline.current = content;
       setStep(skipAnnotationChoice ? 3 : 2);
-      return;
+      return purgedAnnotations > 0 ? { purgedAnnotations } : undefined;
     }
     if (step === 2) {
       setStep(needAnnotation ? 3 : 4);
@@ -187,7 +234,7 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
       setStep(4);
       return;
     }
-  }, [step, contentChanged, annotations.length, content, needAnnotation, skipAnnotationChoice]);
+  }, [step, editorMode, annotations.length, content, needAnnotation, skipAnnotationChoice]);
 
   const goBack = useCallback(() => {
     if (step === 2) setStep(1);
@@ -265,9 +312,12 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
     deleteAnnotation,
     step1Error,
     canProceed,
-    contentChanged,
+    contentPendingReview,
     originalAnnotationCount,
     showContentWarning,
+    reviewActive,
+    pendingReviewCount: yellowCount,
+    getReviewStatus,
     goNext,
     goBack,
     isDirty,

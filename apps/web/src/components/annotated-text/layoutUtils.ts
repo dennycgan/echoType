@@ -26,7 +26,7 @@ export type Band = { id: string; left: number; width: number; variant?: BandVari
 export type Note = { id: string; left: number; width: number; text: string };
 export type LineDatum = { start: number; end: number; bands: Band[]; notes: Note[] };
 
-export type BandVariant = 'committed' | 'draft' | 'conflict';
+export type BandVariant = 'committed' | 'draft' | 'conflict' | 'match' | 'needsReview';
 
 export function toChars(content: string): string[] {
   return content.split('');

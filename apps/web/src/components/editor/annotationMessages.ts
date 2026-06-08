@@ -18,6 +18,19 @@ export const MSG_ESC_DISCARD = 'Discard the current annotation text?';
 export const MSG_ABANDON_PICK = 'You have an unfinished annotation. Discard it?';
 export const MSG_DISCARD_ALL_CHANGES = 'Discard all changes?';
 
+export const MSG_CONTENT_REVIEW_WARNING =
+  'Changing content may invalidate annotation anchors — you will need to review them.';
+
+export function formatReviewBanner(count: number): string {
+  const noun = count === 1 ? 'note' : 'notes';
+  return `⚠ ${count} ${noun} need review — resolve them in the editor below.`;
+}
+
+export function formatPurgedAnnotationsMessage(count: number): string {
+  const noun = count === 1 ? 'annotation' : 'annotations';
+  return `${count} ${noun} no longer fit the shortened text and were removed.`;
+}
+
 export const MSG_INVALID_REQUEST =
   'Invalid request. Check your input and try again.';
 export const MSG_SERVER_ERROR = 'Server error. Please try again.';

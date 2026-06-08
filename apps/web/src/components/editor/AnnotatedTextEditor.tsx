@@ -18,12 +18,13 @@ import {
   useAnnotationPickState,
   type EditorAnnotationView,
 } from './useAnnotationPickState';
+import { computeReviewStatus } from './reviewUtils';
 import type { DraftAnnotation } from './useCourseEditor';
 
 export type AnnotatedTextEditorProps = {
   content: string;
   annotations: EditorAnnotationView[];
-  onCreate: (draft: Omit<DraftAnnotation, 'localId'>) => void;
+  onCreate: (draft: Omit<DraftAnnotation, 'localId' | 'anchoredText'> & { anchoredText?: string }) => void;
   onUpdate: (localId: number, patch: Partial<Omit<DraftAnnotation, 'localId'>>) => void;
   onDelete: (localId: number) => void;
   className?: string;
@@ -31,6 +32,7 @@ export type AnnotatedTextEditorProps = {
   onPickStateChange?: (s: { active: boolean; hasUnsavedNote: boolean }) => void;
   highlightLocalId?: number | null;
   submitIssueMessages?: string[];
+  reviewActive?: boolean;
 };
 
 function bandClass(
@@ -40,6 +42,8 @@ function bandClass(
 ): string {
   if (flashing) return 'rounded-sm bg-red-200 ring-2 ring-red-500 animate-pulse';
   if (highlighted) return 'rounded-sm bg-amber-100 ring-2 ring-red-500';
+  if (variant === 'needsReview') return 'rounded-sm bg-amber-100 ring-2 ring-amber-500';
+  if (variant === 'match') return 'rounded-sm bg-emerald-100';
   if (variant === 'draft') return 'rounded-sm bg-indigo-100 ring-1 ring-indigo-300';
   return 'rounded-sm bg-amber-100';
 }
@@ -262,6 +266,7 @@ export function AnnotatedTextEditor({
   onPickStateChange,
   highlightLocalId = null,
   submitIssueMessages = [],
+  reviewActive = false,
 }: AnnotatedTextEditorProps) {
   const { refs, layout, chars } = useTextMeasurement(content);
   const validateDraft = useMemo(
@@ -300,14 +305,22 @@ export function AnnotatedTextEditor({
 
   const bandVariants = useMemo(() => {
     const m: Record<string, BandVariant> = {};
-    for (const a of annotations) m[String(a.localId)] = 'committed';
+    for (const a of annotations) {
+      const draft = a as DraftAnnotation;
+      if (reviewActive && draft.anchoredText !== undefined) {
+        m[String(a.localId)] =
+          computeReviewStatus(content, draft, true) === 'green' ? 'match' : 'needsReview';
+      } else {
+        m[String(a.localId)] = 'committed';
+      }
+    }
     if (pick.draftRange) m.draft = 'draft';
     if (pick.conflictFlashIds.includes('draft')) m.draft = 'conflict';
     for (const id of pick.conflictFlashIds) {
       if (id !== 'draft') m[id] = 'conflict';
     }
     return m;
-  }, [annotations, pick.draftRange, pick.conflictFlashIds]);
+  }, [annotations, content, reviewActive, pick.draftRange, pick.conflictFlashIds]);
 
   const hiddenNoteIds = useMemo(() => {
     if (pick.state.kind === 'editingNote' || pick.state.kind === 'reanchorReview') {

@@ -74,7 +74,7 @@ export function useAnnotationPickState({
   content: string;
   annotations: EditorAnnotationView[];
   validateDraft: ValidateDraftFn;
-  onCreate: (draft: Omit<DraftAnnotation, 'localId'>) => void;
+  onCreate: (draft: Omit<DraftAnnotation, 'localId' | 'anchoredText'> & { anchoredText?: string }) => void;
   onUpdate: (localId: number, patch: Partial<Omit<DraftAnnotation, 'localId'>>) => void;
   onDelete: (localId: number) => void;
   disabled?: boolean;
