@@ -34,6 +34,65 @@ const STRAY_BIRDS_49_ANNOTATIONS = buildAnnotations(STRAY_BIRDS_49, [
   { phrase: 'the living creatures', note: '有生命的造物；活生生的众生' },
 ]);
 
+// Phase 4.2 manual QA: edit flow with a small, obvious annotation set (≥3).
+const PHASE42_THREE_NOTES = `The maiden in the meadow thanked the wheels of fortune for the gentle rain upon every living creature in the meadow below the amber sky at dusk.`;
+
+const PHASE42_THREE_NOTES_ANNOTATIONS = buildAnnotations(PHASE42_THREE_NOTES, [
+  { phrase: 'maiden', note: '少女；妇人' },
+  { phrase: 'wheels', note: '轮子（喻指命运或权力的齿轮）' },
+  { phrase: 'living creature', note: '有生命的造物' },
+]);
+
+// Phase 4.2 manual QA: prepend one character in Step 1 to turn all notes yellow (10+).
+const PHASE42_TWELVE_NOTES = `When silence falls upon the meadow, the heron stands still by the reeds. A distant bell rings twice across the water. Morning light touches every leaf and every stone along the path we walked yesterday.`;
+
+const PHASE42_TWELVE_NOTES_ANNOTATIONS = buildAnnotations(PHASE42_TWELVE_NOTES, [
+  { phrase: 'silence', note: '寂静' },
+  { phrase: 'meadow', note: '草地' },
+  { phrase: 'heron', note: '苍鹭' },
+  { phrase: 'reeds', note: '芦苇' },
+  { phrase: 'distant', note: '遥远的' },
+  { phrase: 'bell', note: '钟声' },
+  { phrase: 'water', note: '水面' },
+  { phrase: 'Morning', note: '清晨' },
+  { phrase: 'leaf', note: '叶子' },
+  { phrase: 'stone', note: '石头' },
+  { phrase: 'path', note: '小径' },
+  { phrase: 'yesterday', note: '昨天' },
+]);
+
+async function upsertAnnotatedCourse(
+  userId: string,
+  categoryId: string,
+  title: string,
+  content: string,
+  mode: CourseMode,
+  annotations: ReturnType<typeof buildAnnotations>,
+) {
+  let course = await prisma.course.findFirst({ where: { userId, title } });
+  if (!course) {
+    course = await prisma.course.create({
+      data: {
+        userId,
+        categoryId,
+        title,
+        content,
+        mode,
+        annotations: { create: annotations },
+      },
+    });
+    return course;
+  }
+  await prisma.$transaction([
+    prisma.course.update({ where: { id: course.id }, data: { content, mode, categoryId } }),
+    prisma.annotation.deleteMany({ where: { courseId: course.id } }),
+    prisma.annotation.createMany({
+      data: annotations.map((a) => ({ ...a, courseId: course.id })),
+    }),
+  ]);
+  return course;
+}
+
 async function main() {
   const user = await prisma.user.upsert({
     where: { id: DEMO_USER_ID },
@@ -85,6 +144,24 @@ async function main() {
       }),
     ]);
   }
+
+  await upsertAnnotatedCourse(
+    user.id,
+    strayBirdsCategory.id,
+    'Phase 4.2 — Three Notes (SHORT)',
+    PHASE42_THREE_NOTES,
+    CourseMode.SHORT,
+    PHASE42_THREE_NOTES_ANNOTATIONS,
+  );
+
+  await upsertAnnotatedCourse(
+    user.id,
+    strayBirdsCategory.id,
+    'Phase 4.2 — Twelve Notes (SHORT)',
+    PHASE42_TWELVE_NOTES,
+    CourseMode.SHORT,
+    PHASE42_TWELVE_NOTES_ANNOTATIONS,
+  );
 
   const existingArticle = await prisma.course.findFirst({
     where: { userId: user.id, title: 'What I Have Lived For (excerpt)' },

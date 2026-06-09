@@ -4,6 +4,7 @@ import {
   MSG_ANCHOR_START_WHITESPACE,
   MSG_NOTE_EMPTY,
   MSG_ORDER_INVALID,
+  MSG_REVIEW_NEW_ANNOTATION,
   MSG_SERIAL_BLOCK,
   formatOverlapMessage,
 } from './annotationMessages';
@@ -78,6 +79,8 @@ export function useAnnotationPickState({
   onDelete,
   disabled,
   onPickStateChange,
+  reviewPickGate = false,
+  isYellowLocalId = () => false,
 }: {
   content: string;
   annotations: EditorAnnotationView[];
@@ -87,6 +90,9 @@ export function useAnnotationPickState({
   onDelete: (localId: number) => void;
   disabled?: boolean;
   onPickStateChange?: (s: { active: boolean; hasUnsavedNote: boolean }) => void;
+  /** True when review is active and at least one note still needs re-anchoring. */
+  reviewPickGate?: boolean;
+  isYellowLocalId?: (localId: number) => boolean;
 }) {
   const [state, setState] = useState<PickState>({ kind: 'idle' });
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +111,35 @@ export function useAnnotationPickState({
     setState({ kind: 'idle' });
     setError(null);
   }, []);
+
+  const enterReanchor = useCallback(
+    (localId: number) => {
+      if (disabled) return;
+      const ann = annotations.find((a) => a.localId === localId);
+      if (!ann) return;
+
+      if (state.kind === 'idle') {
+        setState({ kind: 'reanchor', localId, phase: 'start', origin: 'idle' });
+        setError(null);
+        return;
+      }
+      if (state.kind === 'editingNote' && state.localId === localId) {
+        setState({ kind: 'reanchor', localId, phase: 'start', origin: 'edit' });
+        setError(null);
+        return;
+      }
+      if (
+        (state.kind === 'reanchor' || state.kind === 'reanchorReview') &&
+        state.localId === localId
+      ) {
+        setState({ kind: 'reanchor', localId, phase: 'start', origin: state.origin });
+        setError(null);
+        return;
+      }
+      setError(MSG_SERIAL_BLOCK);
+    },
+    [disabled, state, annotations],
+  );
 
   const tryRange = useCallback(
     (
@@ -221,6 +256,10 @@ export function useAnnotationPickState({
       // idle: edit an existing band or start a new pick
       const containing = annotations.find((a) => a.startIndex <= index && a.endIndex >= index);
       if (containing) {
+        if (reviewPickGate && isYellowLocalId(containing.localId)) {
+          enterReanchor(containing.localId);
+          return;
+        }
         setState({
           kind: 'editingNote',
           localId: containing.localId,
@@ -228,6 +267,10 @@ export function useAnnotationPickState({
           originalNoteText: containing.noteText,
         });
         setError(null);
+        return;
+      }
+      if (reviewPickGate) {
+        setError(MSG_REVIEW_NEW_ANNOTATION);
         return;
       }
       const err = whitespaceError(content, index, false);
@@ -238,12 +281,16 @@ export function useAnnotationPickState({
       setState({ kind: 'pickingEnd', start: index });
       setError(null);
     },
-    [disabled, state, content, annotations, tryRange, clearEphemeral],
+    [disabled, state, content, annotations, tryRange, clearEphemeral, reviewPickGate, isYellowLocalId, enterReanchor],
   );
 
   const handleBandClick = useCallback(
     (localId: number) => {
       if (disabled) return;
+      if (reviewPickGate && isYellowLocalId(localId)) {
+        enterReanchor(localId);
+        return;
+      }
       if (state.kind !== 'idle') {
         setError(MSG_SERIAL_BLOCK);
         return;
@@ -258,7 +305,7 @@ export function useAnnotationPickState({
       });
       setError(null);
     },
-    [disabled, state.kind, annotations],
+    [disabled, state.kind, annotations, reviewPickGate, isYellowLocalId, enterReanchor],
   );
 
   const setNoteText = useCallback((text: string) => {
@@ -317,20 +364,7 @@ export function useAnnotationPickState({
     setError(null);
   }, [state]);
 
-  const beginReanchorFromIdle = useCallback(
-    (localId: number) => {
-      if (disabled) return;
-      if (state.kind !== 'idle') {
-        setError(MSG_SERIAL_BLOCK);
-        return;
-      }
-      const ann = annotations.find((a) => a.localId === localId);
-      if (!ann) return;
-      setState({ kind: 'reanchor', localId, phase: 'start', origin: 'idle' });
-      setError(null);
-    },
-    [disabled, state.kind, annotations],
-  );
+  const beginReanchorFromIdle = enterReanchor;
 
   const cancelReanchor = useCallback(() => {
     if (state.kind !== 'reanchor' && state.kind !== 'reanchorReview') return;

@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   RESIZE_DEBOUNCE_MS,
+  measureCharEdges,
   measureVisualLines,
-  sameLines,
   toChars,
   type MeasuredLayout,
   type VisualLine,
@@ -42,7 +42,12 @@ export function useTextMeasurement(content: string): {
 
   const [width, setWidth] = useState(0);
   const [fontReady, setFontReady] = useState(false);
-  const [layout, setLayout] = useState<MeasuredLayout>({ lines: [], charWidth: 0, charHeight: 0 });
+  const [layout, setLayout] = useState<MeasuredLayout>({
+    lines: [],
+    charWidth: 0,
+    charHeight: 0,
+    charEdges: null,
+  });
 
   const chars = useMemo(() => toChars(content), [content]);
 
@@ -93,17 +98,14 @@ export function useTextMeasurement(content: string): {
     const rect = first ? first.getBoundingClientRect() : null;
     const charWidth = rect ? rect.width : 0;
     const charHeight = rect ? rect.height : 0;
+    const charEdges = charEls.length > 0 ? measureCharEdges(charEls, mirror) : null;
 
     if (import.meta.env.DEV) {
       logMeasure(prevDepsRef.current, { content, width, fontReady }, lines.length);
     }
     prevDepsRef.current = { content, width, fontReady };
 
-    setLayout((prev) =>
-      sameLines(prev.lines, lines) && prev.charWidth === charWidth && prev.charHeight === charHeight
-        ? prev
-        : { lines, charWidth, charHeight },
-    );
+    setLayout({ lines, charWidth, charHeight, charEdges });
   }, [content, width, fontReady]);
 
   useEffect(() => {

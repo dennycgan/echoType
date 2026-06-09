@@ -168,6 +168,8 @@ export function AnnotatedText({ content, annotations, typed = '', className }: A
         })),
         layout.charWidth,
         layout.charHeight,
+        undefined,
+        layout.charEdges,
       ),
     [layout, annotations],
   );

@@ -229,9 +229,11 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
         purgedAnnotations = purgedCount;
         if (purgedCount > 0) setAnnotations(kept);
 
-        if (editorMode === 'edit' && kept.length > 0) {
-          setReviewActive(true);
+        if (editorMode === 'edit') {
+          setReviewActive(kept.length > 0);
         }
+      } else if (contentChangedFromBaseline && editorMode === 'edit') {
+        setReviewActive(annotations.length > 0);
       }
 
       contentBaseline.current = content;

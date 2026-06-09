@@ -12,7 +12,12 @@ import {
   type Note,
 } from '../annotated-text/layoutUtils';
 import { useTextMeasurement } from '../annotated-text/useTextMeasurement';
-import { MSG_ABANDON_PICK, MSG_ESC_DISCARD } from './annotationMessages';
+import {
+  MSG_ABANDON_PICK,
+  MSG_ESC_DISCARD,
+  STEP3_HELPER_DEFAULT,
+  STEP3_HELPER_REVIEW,
+} from './annotationMessages';
 import {
   buildValidateDraft,
   useAnnotationPickState,
@@ -33,6 +38,9 @@ export type AnnotatedTextEditorProps = {
   highlightLocalId?: number | null;
   submitIssueMessages?: string[];
   reviewActive?: boolean;
+  /** True when at least one note still needs re-anchoring. */
+  reviewPickGate?: boolean;
+  yellowLocalIds?: ReadonlySet<number>;
   /** Fired from review panel Reselect; nonce changes each request. */
   reviewCommand?: { type: 'reanchor'; localId: number; nonce: number } | null;
 };
@@ -269,6 +277,8 @@ export function AnnotatedTextEditor({
   highlightLocalId = null,
   submitIssueMessages = [],
   reviewActive = false,
+  reviewPickGate = false,
+  yellowLocalIds,
   reviewCommand = null,
 }: AnnotatedTextEditorProps) {
   const { refs, layout, chars } = useTextMeasurement(content);
@@ -276,6 +286,11 @@ export function AnnotatedTextEditor({
     () => buildValidateDraft(content, annotations, validateAnnotations),
     [content, annotations],
   );
+
+  const isYellowLocalId = useMemo(() => {
+    const ids = yellowLocalIds;
+    return (localId: number) => ids?.has(localId) ?? false;
+  }, [yellowLocalIds]);
 
   const pick = useAnnotationPickState({
     content,
@@ -286,6 +301,8 @@ export function AnnotatedTextEditor({
     onDelete,
     disabled,
     onPickStateChange,
+    reviewPickGate,
+    isYellowLocalId,
   });
 
   const consumedReviewNonceRef = useRef<number | null>(null);
@@ -341,7 +358,15 @@ export function AnnotatedTextEditor({
   }, [pick.state]);
 
   const lineData = useMemo(
-    () => buildLineData(layout.lines, layoutAnnotations, layout.charWidth, layout.charHeight, bandVariants),
+    () =>
+      buildLineData(
+        layout.lines,
+        layoutAnnotations,
+        layout.charWidth,
+        layout.charHeight,
+        bandVariants,
+        layout.charEdges,
+      ),
     [layout, layoutAnnotations, bandVariants],
   );
 
@@ -418,8 +443,8 @@ export function AnnotatedTextEditor({
         </p>
       )}
 
-      <p className="mb-2 text-xs text-slate-500">
-        Click two characters to anchor an annotation. Amber = saved, indigo = in progress.
+      <p className="mb-2 text-xs text-slate-500" data-testid="step3-editor-helper">
+        {reviewPickGate ? STEP3_HELPER_REVIEW : STEP3_HELPER_DEFAULT}
       </p>
 
       {(pick.isReanchorPicking || pick.state.kind === 'reanchorReview') && (

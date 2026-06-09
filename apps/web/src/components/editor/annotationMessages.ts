@@ -19,11 +19,21 @@ export const MSG_ABANDON_PICK = 'You have an unfinished annotation. Discard it?'
 export const MSG_DISCARD_ALL_CHANGES = 'Discard all changes?';
 
 export const MSG_CONTENT_REVIEW_WARNING =
-  'Changing content may invalidate annotation anchors — you will need to review them.';
+  'Changing content may invalidate annotation anchors. Notes that no longer match will need review on the next step.';
 
 export function formatReviewBanner(count: number): string {
   const noun = count === 1 ? 'note' : 'notes';
-  return `⚠ ${count} ${noun} need review — resolve them in the editor below.`;
+  return `⚠ ${count} ${noun} need review — use Reselect or Delete below, or click a yellow highlight in the editor.`;
+}
+
+export const MSG_REVIEW_COMPLETE =
+  'All notes match the updated text. You can continue to the preview step.';
+
+export function formatReviewExpandToggle(hiddenCount: number, expanded: boolean): string {
+  if (expanded) return 'Show less';
+  const total = hiddenCount + 1;
+  if (hiddenCount >= 9) return `Show all ${total} notes`;
+  return hiddenCount === 1 ? 'and 1 more' : `and ${hiddenCount} more`;
 }
 
 export function formatPurgedAnnotationsMessage(count: number): string {
@@ -32,7 +42,16 @@ export function formatPurgedAnnotationsMessage(count: number): string {
 }
 
 export const MSG_REVIEW_BLOCK =
-  'Resolve all notes that need review before continuing.';
+  'All notes must be reviewed before you can continue. Reselect or delete each yellow note.';
+
+export const MSG_REVIEW_NEW_ANNOTATION =
+  'Resolve yellow notes first before creating new annotations.';
+
+export const STEP3_HELPER_REVIEW =
+  'Yellow highlights need re-anchoring — click a yellow range or use Reselect in the banner. Amber = saved annotations.';
+
+export const STEP3_HELPER_DEFAULT =
+  'Click two characters to anchor an annotation. Amber = saved, indigo = in progress.';
 
 export function truncateForDisplay(text: string, maxLen: number): string {
   const t = text.trim();

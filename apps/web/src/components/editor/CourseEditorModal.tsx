@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ARTICLE_MAX, ARTICLE_MIN, SHORT_MAX, SHORT_MIN, type CourseDTO } from '@echotype/shared';
 import { api, ApiError } from '../../lib/api';
@@ -14,6 +14,7 @@ import {
   STEP3_NO_ANNOTATION_MESSAGE,
   formatPurgedAnnotationsMessage,
   MSG_REVIEW_BLOCK,
+  MSG_REVIEW_COMPLETE,
   mapModeIssueMessage,
 } from './annotationMessages';
 import { ReviewPanel } from './ReviewPanel';
@@ -34,6 +35,12 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [footerHint, setFooterHint] = useState<string | null>(null);
   const [pickState, setPickState] = useState({ active: false, hasUnsavedNote: false });
+
+  useEffect(() => {
+    if (ed.step !== 3) {
+      setPickState({ active: false, hasUnsavedNote: false });
+    }
+  }, [ed.step]);
 
   const save = useMutation({
     mutationFn: () =>
@@ -136,6 +143,7 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
     setFooterHint(null);
     setSubmitError(null);
     if (ed.step === 3 && !confirmAbandonPick(pickState.active, pickState.hasUnsavedNote)) return;
+    if (ed.step === 3) setPickState({ active: false, hasUnsavedNote: false });
     ed.goBack();
   }
 
@@ -397,6 +405,12 @@ function Step3({
     setReviewCommand({ type: 'reanchor', localId, nonce: Date.now() });
   }
 
+  const yellowLocalIds = useMemo(
+    () => new Set(ed.pendingReviewAnnotations.map((a) => a.localId)),
+    [ed.pendingReviewAnnotations],
+  );
+  const reviewPickGate = ed.reviewActive && ed.pendingReviewCount > 0;
+
   return (
     <div className="space-y-0">
       {ed.reviewActive && ed.pendingReviewCount > 0 && (
@@ -406,6 +420,14 @@ function Step3({
           onReselect={handleReselect}
           onDelete={ed.deleteAnnotation}
         />
+      )}
+      {ed.reviewActive && ed.pendingReviewCount === 0 && ed.annotations.length > 0 && (
+        <p
+          className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+          data-testid="review-complete-banner"
+        >
+          {MSG_REVIEW_COMPLETE}
+        </p>
       )}
       <AnnotatedTextEditor
         content={ed.content}
@@ -417,6 +439,8 @@ function Step3({
         highlightLocalId={ed.highlightLocalId}
         submitIssueMessages={ed.submitIssueMessages}
         reviewActive={ed.reviewActive}
+        reviewPickGate={reviewPickGate}
+        yellowLocalIds={yellowLocalIds}
         reviewCommand={reviewCommand}
       />
     </div>

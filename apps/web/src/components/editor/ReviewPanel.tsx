@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   formatReviewBanner,
+  formatReviewExpandToggle,
   truncateForDisplay,
 } from './annotationMessages';
 import type { DraftAnnotation } from './useCourseEditor';
@@ -20,14 +21,21 @@ interface ReviewPanelProps {
 
 const NOTE_PREVIEW_MAX = 48;
 const WAS_PREVIEW_MAX = 60;
+const SCROLL_THRESHOLD = 5;
 
 export function ReviewPanel({ items, onFocus, onReselect, onDelete }: ReviewPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const count = items.length;
+
+  useEffect(() => {
+    if (count <= 1) setExpanded(false);
+  }, [count]);
+
   if (count === 0) return null;
 
   const visibleItems = expanded || count === 1 ? items : items.slice(0, 1);
   const hiddenCount = count - 1;
+  const listScrollable = expanded && count > SCROLL_THRESHOLD;
 
   return (
     <div
@@ -36,7 +44,10 @@ export function ReviewPanel({ items, onFocus, onReselect, onDelete }: ReviewPane
     >
       <p className="font-medium text-amber-800">{formatReviewBanner(count)}</p>
 
-      <ul className="mt-2 space-y-2">
+      <ul
+        className={`mt-2 space-y-2${listScrollable ? ' max-h-60 overflow-y-auto pr-1' : ''}`}
+        data-testid="review-list"
+      >
         {visibleItems.map((item) => (
           <li
             key={item.localId}
@@ -87,7 +98,7 @@ export function ReviewPanel({ items, onFocus, onReselect, onDelete }: ReviewPane
           onClick={() => setExpanded((v) => !v)}
           data-testid="review-expand-toggle"
         >
-          {expanded ? 'Show less' : `and ${hiddenCount} more`}
+          {formatReviewExpandToggle(hiddenCount, expanded)}
         </button>
       )}
     </div>

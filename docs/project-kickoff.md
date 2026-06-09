@@ -170,6 +170,8 @@ EchoType — Repeat, type, and remember meaningful English texts（主slogan）/
 > 保存后**不**自动跳转打字页;用户手动点 card 上的「Type this」。
 > **未来可选 UX**(未做): Save & type 按钮(create 模式);Saved toast + Go to typing 跳转。
 
+> **Phase 4 实现备注（编辑流）**: 编辑窗口1（Step 1）改正文后 Next，若课程原有注释则进入**复核**（见上文第 16 条与「Phase 4 — 基本功能闭环」），**不再**清空注释。Step 3 黄条未清时无法 Next；Step 4 无法 Save。422 `annotation_validation_error` 仍回 Step 3 展示 issue 列表（与 3.2 一致）。
+
 ---
 ### 「简短模式」和「文章模式」的界定
 
@@ -422,7 +424,10 @@ endColumn: 14;
 > 3. **前提**：编辑界面与打字界面字体/字号/宽度规则完全一致，且渲染统一走 `getClientRects()` 路线（禁止手动算行列）。
 > 4. 跨行注释占用其 `[startIndex, endIndex]` 的完整连续区间。中间被跨越的行虽然不显示注释文字，但其字符已被占用，不可再被其他注释锚定。这是为保证注释高亮永不重叠的有意约束。
 
-16. 文本编辑后的注释处理（复核机制）：
+16. 文本编辑后的注释处理（复核机制）（在下面phase4中已经完成）：
+
+> **实现状态（Phase 4，2026-06）**：本条自 Phase 4.0 起在课程编辑弹窗中**完整落地**（非未来设计）。触发、比对、黄/绿 band、复核面板、阻断 Next/Save、保存时服务端重派生 `anchoredText` 均已实现。详见下文「Phase 4 — 基本功能闭环」。
+
     1. 注释存储增加 anchoredText 快照字段（标注时被注释的原文片段）。
     2. 用户编辑"文本内容"期间，注释不实时重算（避免抖动）。
     3. 用户确认修改后，系统逐条比对：取注释当前 `[startIndex, endIndex]` 在**新 content** 上切出的片段 `newContent.slice(startIndex, endIndex+1)`，与存储的 `anchoredText` 快照做**全等比对**：
@@ -437,6 +442,76 @@ endColumn: 14;
 已知限制——重复子串或极短锚在正文编辑后可能出现语义漂移但比对仍为绿；用户可依赖 reanchor，MVP 不做 index 平移。
 例子： 原content中，“注释A”原本对应“一段英文B”。 用户改了content之后。 如果“注释A”，恰巧又在content里对到了和“一段英文B”内容一模一样的“一段英文C” 就会出现假绿。 「在注释 A 原来的 index 槽位上，现在切出来的字，碰巧仍和快照 “一段英文B“ 逐字相同」。 固定 index + 槽位上的字仍与 B 完全一致 → 假绿可能发生。 【条件是：实现：slice(start, end+1) === anchoredText，“一段英文B“和“一段英文C“整段全等。 假绿才会发生。 】
 
+---
+
+### Phase 4 — 基本功能闭环（anchoredText 复核，2026-06）
+
+**里程碑定位**：Phase 4 完成「编辑已有注释的课程 → 改正文 → 复核 → 保存」闭环，与 Phase 3 的多步编辑 + 保存 + 422 回归共同构成 MVP **基本功能闭环**。Phase 4 之后，带注释课程的编辑不再依赖「改正文即清空注释」的过渡策略。
+
+#### 从 D2「清空注释」到复核机制
+
+| 阶段 | 编辑模式下 Step 1 改正文并 Next 的行为 | 问题 |
+|------|----------------------------------------|------|
+| **Phase 3 过渡策略（D2）** | 检测到 content 变化 → **清空** staged 全部注释，toast 提示已清除 | 用户丢失全部注释劳动；与 kickoff 第 16 条「检测失配、用户确认位置」的产品语义冲突 |
+| **Phase 4.0+** | 检测到 content 变化 → **保留**注释 + 设 `reviewActive` + 按 `anchoredText` 全量比对黄/绿 | 系统检测可能失配，用户 Reselect 或 Delete；尾部完全够不到的注释在 Step 1 Next 时自动 purge（`startIndex >= content.length`） |
+
+**D2 语义升级一句话**：由「改正文 = 注释作废」改为「改正文 = 进入复核，注释仍在，逐条确认或删除」。
+
+#### 子阶段交付范围（已实现）
+
+| 子阶段 | 范围摘要 |
+|--------|----------|
+| **4.0** | 废除 D2 wipe；`DraftAnnotation.anchoredText` 与 `contentBaseline` 状态机；Step 1 Next 触发比对；黄/绿 band；最小黄条（仅 count + 引导）；尾部 unreachable 自动 purge |
+| **4.1** | 复核面板（展开列表、note/was 预览、Reselect/Delete）；黄条未清阻断 Step 3 Next 与 Step 4 Save；banner 发起 reanchor；修复 reanchor 重复触发与 cancel 回 idle |
+| **4.2** | Edge cases（0 黄 / 全黄 / 10+ 黄 / Back 再改 content 重算）；文案统一；`charEdges` 逐字像素测量（全角/半角混排 band 对齐）；review 期间点击语义修正 + `pickState` 泄漏修复；seed 两条 QA 示例课 |
+
+#### 关键实现约定（与代码一致）
+
+- **触发**：`edit` 模式 + Step 1 Next + `content !== contentBaseline` → `reviewActive`，全量 `slice === anchoredText` 派生黄/绿。
+- **`contentBaseline`**：每次 Step 1 成功 Next 时推进为当前 content；Back 再改 content 再 Next 时，与**本地已更新**的 `anchoredText` 比对（reanchor confirm 后立即更新本地快照，不等 Save）。
+- **展示**：Step 3 黄条 + 编辑器内黄/绿 band；`pendingReviewCount === 0` 时显示绿色完成条，helper 切回「可新建注释」默认文案。
+- **payload**：客户端 PUT 仍不传 `anchoredText`；服务端 `deriveAnchoredText` 写库（Phase 1 安全原则不变）。
+- **渲染**：band/note 水平位置用 mirror 上逐字 `getBoundingClientRect`（`charEdges`），禁止仅用 `index × 单一 charWidth`（全角标点如 `！` 与半角 `!` 混排时会累积错位）。
+
+#### Phase 衔接处设计教训（Phase 3.1 × Phase 4，4.2 修复）
+
+**问题**：Phase 3.1 约定「点 band / 落在注释区间内的字符 → `editingNote`（改 noteText）」；Phase 4 复核场景下，用户对**黄色**高亮的自然反应是「重锚」，不是「编辑文案」。两套语义共用同一视觉热点（黄色 band），导致：
+
+1. 用户直接点黄字选锚 → 误入 `editingNote` → 再点字符触发 `MSG_SERIAL_BLOCK`；
+2. banner **Reselect** 要求 `idle`，与上条状态互斥，表现为「Reselect 失效」；
+3. Back 丢弃后 Step 3 卸载，modal 层 `pickState` 未清零 → Step 1 **Next 永久灰显**（死路）。
+
+**原则**：**让自然反应 = 正确操作**——视觉强调处应是用户最自然的操作热点，不是「官方入口」与「画布直觉」两套叙事。
+
+**4.2 修正**（`reviewPickGate = reviewActive && pendingReviewCount > 0`）：
+
+| 用户操作 | 行为 |
+|----------|------|
+| 点**黄色** band/字符 | 直接进入 **reanchor**（等同 banner Reselect） |
+| 点**绿色** band | 仍可 `editingNote` 改 noteText（不动锚点，与 3.1 一致） |
+| 点**空白** | 禁止新建注释，显示 hint：`Resolve yellow notes first…` |
+| banner Reselect | 通过统一 `enterReanchor`，在 `editingNote` / `reanchor` 同条时仍有效 |
+| 离开 Step 3 | `pickState` 清零（`useEffect` + Back 确认后 reset） |
+
+**Helper 文案**：有黄条时切换为「Yellow highlights need re-anchoring…」；全绿复核完成后切回 Phase 3.1 默认 helper（反映「可新建注释」语义）。
+
+#### QA 种子数据（`prisma/seed.ts`）
+
+- `Phase 4.2 — Three Notes (SHORT)`：3 条注释，测 ≥3 黄条与单条 Reselect。
+- `Phase 4.2 — Twelve Notes (SHORT)`：12 条注释；Step 1 正文**最前插入 1 个字符**即可制造 12 黄（index 未平移，属复核语义而非渲染 bug）。
+
+---
+
+注释功能开发，完整phase 1- 4
+Phase 1: 数据契约
+Phase 2: 渲染组件
+Phase 3: 编辑器
+Phase 4: 复核机制
+
+1. Phase 1:数据契约(shared Zod + API 接 annotations + 后端校验 + 原子替换)——无 UI。
+2. Phase 2:`<AnnotatedText>` 渲染组件(视觉行切分 / 高亮 / 折叠注释槽 / 跨行 / hover tooltip),只读接入打字页。← 最硬、最出彩的工程部分,且编辑器依赖它。
+3. Phase 3:编辑器窗口 1–4(选锚状态机 + overlap + 逐条注释输入 + 校验)。
+4. Phase 4:复核流程(黄/绿检测 + 重锚 UI)。
 
 
 
