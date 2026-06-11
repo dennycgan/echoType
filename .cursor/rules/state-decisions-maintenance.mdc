@@ -1,0 +1,37 @@
+---
+description: EchoType — when to update STATE.md and append DECISIONS.md
+alwaysApply: true
+---
+# STATE / DECISIONS Maintenance
+
+## Update STATE.md (overwrite) — same turn, when any of these happen:
+- A phase / sub-phase completes -> update the Roadmap icon + "Now working on".
+- A phase is split finer (X -> X.1/X.2) -> add the sub-node to the Roadmap
+  immediately.
+- A debt item is added or paid off -> edit the "Known debt" table.
+- A new fragile "do not touch" area appears -> edit the "Do NOT touch" list.
+Update by rewriting the relevant line. Never append duplicate paragraphs or keep
+stale lines.
+
+## Append DECISIONS.md (never edit old reasoning):
+- When a technical choice that affects future work occurs (an implementation is
+  chosen, an alternative rejected, a constraint accepted), the agent must
+  proactively say "this is a decision worth logging", append a new ADR in the
+  same turn, put a plain-language one-liner at the top, record the date and a
+  commit/PR anchor, and ask the owner to confirm the summary is accurate.
+- Judging whether something is "worth logging" is the agent's responsibility; do
+  not wait for the owner to ask.
+- Overturning a decision: write a NEW ADR and flip the old entry's Status to
+  "Superseded by ADR-xx (date)". Do not edit the old entry's reasoning.
+
+## Revert reconciliation (important):
+- A code revert may cross the implementation point of an Accepted ADR, physically
+  undoing that decision while the log still says "Accepted" — this creates a
+  log/code mismatch.
+- After such a revert, do not leave the log stale. Either write a new ADR for the
+  rollback, or flip the affected entry's Status to "Reverted-in-code (date,
+  reason)" with a one-line note. The original reasoning stays untouched.
+
+## Boundaries:
+- Do not pour ADR detail into STATE (STATE references ADR numbers only).
+- Do not write STATE progress narrative into DECISIONS.

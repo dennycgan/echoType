@@ -1,0 +1,21 @@
+---
+description: EchoType doc layering — STATE/DECISIONS/kickoff roles and read order
+alwaysApply: true
+---
+# Doc Layering
+
+Read docs/STATE.md FIRST before starting work in a new session.
+
+File responsibilities (do not mix layers):
+- docs/STATE.md        : current-state snapshot. Overwrite in place. No history,
+                         no rhetoric.
+- docs/DECISIONS.md    : decision log (ADR). Append-only. Never rewrite/delete an
+                         old entry's reasoning; only flip its Status line.
+- docs/project-kickoff.md : product vision / user flow / feature spec. May evolve
+                         freely as the owner's thinking changes.
+- packages/shared + code : machine contracts, the final source of truth.
+
+Conflict priority: code/git > STATE.md > DECISIONS.md > kickoff.
+
+Do NOT write technical decisions into kickoff (they go in DECISIONS).
+Do NOT write progress or debt into kickoff (they go in STATE).
