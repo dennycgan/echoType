@@ -33,7 +33,7 @@ The typing loop itself is conventional React/Node/Postgres. The interesting choi
 | Contracts | **Zod in a shared package** | Same course and annotation payload parsing on client and server; mode-length rules live next to the types the editor imports. |
 | API + DB | **Fastify 5 + Prisma + PostgreSQL** | Small REST surface; courses own annotations replaced atomically inside one database transaction on update. |
 | Anchor snapshots | **Server-derived only** | Clients send character indices and note text; the API derives the anchored substring at save time so stored snapshots cannot be spoofed. |
-| Overlay layout | **`getClientRects` + global indices** | Annotations are ranges into the full string. A hidden mirror measures per-character positions after `pre-wrap` break — supports cross-line spans and mixed CJK/Latin widths (measured edges per glyph, not index × average width). |
+| Overlay layout | **Mirror measurement + global indices** | A hidden mirror measures per-character `offsetTop` for visual-line breaks and per-glyph `getBoundingClientRect` for horizontal edges (charEdges); annotations are stored as global indices. Supports cross-line spans and mixed CJK/Latin widths (not index × average width). |
 | Frontend | **React 18 + Vite + Tailwind** | Component model fits a measurement-heavy overlay; utilities keep the typing surface simple without a heavy design system. |
 | State | **Zustand + TanStack Query** | Local typing UI state vs server-backed course list and mutations. |
 | Regression guard | **Playwright probe (local)** | Stop-loss after overlay changes: zero measure-on-typing, stable line ranges, bounded DOM mutations per keystroke. |
@@ -45,7 +45,7 @@ The typing loop itself is conventional React/Node/Postgres. The interesting choi
 
 The product loop is intentionally simple: pick a text, type it, repeat. The engineering depth is in making annotations stay aligned with that text — even as the user edits the source, even across line breaks and CJK/Latin glyph widths.
 
-**Rendering:** I store annotations as global string indices, not row/column coordinates. At render time, a mirror DOM measures where each character sits after `pre-wrap` line breaking. Highlight bands and note labels are positioned from those measurements, including cross-line spans and mixed-width glyphs.
+**Rendering:** I store annotations as global string indices, not row/column coordinates. At render time, a hidden mirror uses per-character `offsetTop` for visual-line breaks and per-glyph `getBoundingClientRect` for horizontal edges. Highlight bands and note labels are positioned from those measurements, including cross-line spans and mixed-width glyphs.
 
 **Editing:** When the user changes the source text on an annotated course, blindly keeping old indices would point notes at the wrong words. Phase 4 replaced an earlier "content change clears all annotations" rule with a review flow:
 
@@ -65,7 +65,7 @@ A subtle UX bug: yellow bands reused Phase 3's "click to edit note text" behavio
 
 ![Frontend architecture](docs/architecture.png)
 
-One shared overlay component and one measurement hook (mirror spans → visual lines → per-character edges) power both the typing page and the four-step course editor. The editor adds a staged state machine; Phase 4's review layer (green/yellow status, review panel, review-state click routing) sits on top without forking the renderer.
+One shared overlay component and one measurement hook (mirror spans → `offsetTop` line breaks → per-glyph `getBoundingClientRect` / charEdges) power both the typing page and the four-step course editor. The editor adds a staged state machine; Phase 4's review layer (green/yellow status, review panel, review-state click routing) sits on top without forking the renderer.
 
 ### Deployment
 
@@ -107,7 +107,7 @@ I ship in phases with manual gates (`docs/project-kickoff.md`); after overlay ch
 | Status | Item |
 |--------|------|
 | ✅ | **Phase 1** — Shared Zod contracts, API validation, atomic annotation replacement, server-derived anchor snapshots |
-| ✅ | **Phase 2** — Annotation overlay (`getClientRects`, cross-line highlights, note slots, typing-page integration) |
+| ✅ | **Phase 2** — Annotation overlay (mirror offsetTop + charEdges, cross-line highlights, note slots, typing-page integration) |
 | ✅ | **Phase 3** — Four-step course editor (pick state machine, overlap rules, save + validation regression) |
 | ✅ | **Phase 4** — Annotation review (yellow/green diff, re-anchor/delete, block Next/Save) |
 | 🚧 | **Mode-specific list pages** — Short vs Article routes (today: unified course list) |
