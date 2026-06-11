@@ -13,7 +13,7 @@ import { useTextMeasurement } from './annotated-text/useTextMeasurement';
 
 // Read-only annotated text renderer (Phase 2.0).
 //
-// Architecture (see kickoff spec + Phase 2 design):
+// Architecture (Phase 2 design; measurement details in docs/DECISIONS.md ADR-0002):
 //   - A hidden, full-width "mirror" holds the whole content in normal flow
 //     (white-space: pre-wrap). It is the single source of truth for where the
 //     browser wraps. We measure visual-line index ranges from it via each

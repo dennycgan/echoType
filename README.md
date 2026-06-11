@@ -98,7 +98,7 @@ node apps/web/scripts/phase2-probe.mjs   # needs dev servers; expect SUMMARY PAS
 
 Reset DB: `pnpm --filter @echotype/api prisma:reset` then `seed`.
 
-I ship in phases with manual gates (`docs/project-kickoff.md`); after overlay changes I run the Playwright probe locally. Project rules in `.cursor/rules/` keep AI-assisted sessions inside phase scope.
+I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I run the Playwright probe locally. Project rules in `.cursor/rules/` keep AI-assisted sessions inside phase scope.
 
 ---
 
@@ -119,7 +119,8 @@ I ship in phases with manual gates (`docs/project-kickoff.md`); after overlay ch
 
 ## Further reading
 
-- **`docs/project-kickoff.md`** — Full product spec and phase history (Chinese).
+- **`docs/STATE.md`** — Current engineering snapshot and roadmap.
+- **`docs/DECISIONS.md`** — Decision log (ADR).
 - **`deploy/README.md`** — Terraform, SSM access, cloud deploy.
 
 Private portfolio project — contact me for access or demo.

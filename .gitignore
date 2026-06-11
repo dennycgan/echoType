@@ -176,3 +176,6 @@ build/
 .aws/
 **/.aws/
 aws-credentials.txt
+
+# Private local docs (not published to the remote repo)
+docs/project-kickoff.md

@@ -1,5 +1,5 @@
 ---
-description: EchoType language policy — English for code/UI/commits; Chinese for kickoff doc and seed noteText
+description: EchoType language policy — English for code/UI/commits; Chinese for local kickoff and seed noteText
 alwaysApply: true
 ---
 
@@ -23,13 +23,13 @@ EchoType uses a deliberate split: product-facing engineering artifacts in Englis
 
 **Why:** Commit history is shared engineering record; English keeps it consistent with the codebase.
 
-## docs/project-kickoff.md
+## docs/project-kickoff.md (local only, gitignored)
 
-**Do** write and edit `docs/project-kickoff.md` in Chinese prose, matching the existing spec voice. Code identifiers, field names, API paths, and English technical terms within Chinese text stay as-is (e.g. "`startIndex` 是字符位置").
+**Do** write and edit `docs/project-kickoff.md` in Chinese prose when it exists locally. Code identifiers, field names, API paths, and English technical terms within Chinese text stay as-is (e.g. "`startIndex` 是字符位置").
 
-**Don't** translate kickoff sections to English or rewrite Chinese spec prose into English without user approval. Also don't sinify English technical terms inside Chinese prose.
+**Don't** translate local kickoff sections to English or rewrite Chinese spec prose into English without user approval. Also don't sinify English technical terms inside Chinese prose.
 
-**Why:** Kickoff is the Chinese product/spec source of truth; English code implements it, not replaces it. Real kickoff style is Chinese prose plus English engineering terms.
+**Why:** This file is a private, local-only product notebook — not published to the remote repo. Published engineering truth lives in `docs/STATE.md`, `docs/DECISIONS.md`, and code.
 
 ## Seed and demo annotation text
 

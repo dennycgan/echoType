@@ -279,9 +279,8 @@ function Step1({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
 
       {/*
         TEMP (Phase 3.0 stopgap): mode selector should not be here.
-        Per user flow in docs/project-kickoff.md, mode is preselected
-        on the "模式界面" (mode-specific list page) before opening
-        this modal. To be removed when 模式界面 is implemented:
+        Target UX: mode is preselected on the mode-specific list page
+        before opening this modal. To be removed when mode routes land:
         - CoursesPage will split into short/article routes
         - Modal will receive mode as prop, displaying it read-only
           in edit mode (since changing mode mid-edit is meaningless)

@@ -1,5 +1,5 @@
 ---
-description: EchoType doc layering — STATE/DECISIONS/kickoff roles and read order
+description: EchoType doc layering — STATE/DECISIONS/local kickoff roles and read order
 alwaysApply: true
 ---
 # Doc Layering
@@ -11,11 +11,12 @@ File responsibilities (do not mix layers):
                          no rhetoric.
 - docs/DECISIONS.md    : decision log (ADR). Append-only. Never rewrite/delete an
                          old entry's reasoning; only flip its Status line.
-- docs/project-kickoff.md : product vision / user flow / feature spec. May evolve
-                         freely as the owner's thinking changes.
+- docs/project-kickoff.md (local only, gitignored): owner's private product
+                         vision / user-flow notes. Not in the remote repo; may
+                         exist only on the maintainer's machine.
 - packages/shared + code : machine contracts, the final source of truth.
 
-Conflict priority: code/git > STATE.md > DECISIONS.md > kickoff.
+Conflict priority: code/git > STATE.md > DECISIONS.md > local kickoff (if present).
 
-Do NOT write technical decisions into kickoff (they go in DECISIONS).
-Do NOT write progress or debt into kickoff (they go in STATE).
+Do NOT write technical decisions into local kickoff (they go in DECISIONS).
+Do NOT write progress or debt into local kickoff (they go in STATE).

@@ -3,8 +3,8 @@
 > Current engineering state. Read this FIRST before starting work in a new chat.
 > Maintenance: facts only, no history. Update = rewrite the relevant line.
 > NEVER append paragraphs here.
-> Conflict priority: code/git > this file > DECISIONS.md > kickoff (vision).
-> History / rationale -> DECISIONS.md. Product vision/spec -> kickoff.
+> Conflict priority: code/git > this file > DECISIONS.md > local kickoff (if present).
+> History / rationale -> DECISIONS.md. Private product notes -> docs/project-kickoff.md (local only, gitignored).
 
 ## Roadmap (mark YOU ARE HERE)
 - [x] Phase 1 Data contracts
@@ -21,7 +21,7 @@
 
 ## Now working on (describe ONLY the in-progress item)
 - Goal (one line): Split unified CoursesPage into mode-specific list routes; preset mode on create; read-only mode on edit.
-- Sub-steps done: Phase 3.0 debt documented in kickoff; mode field + editor modal exist; unified list works.
+- Sub-steps done: Phase 3.0 debt known (mode radio stopgap); mode field + editor modal exist; unified list works.
 - Next step: Add short/article routes; filter courses by mode; remove mode radio from modal when opened from mode page.
 - Related decisions: none yet
 
