@@ -16,9 +16,10 @@ import {
   MSG_REVIEW_BLOCK,
   MSG_REVIEW_COMPLETE,
   mapModeIssueMessage,
+  formatContentIssueMessage,
 } from './annotationMessages';
 import { ReviewPanel } from './ReviewPanel';
-import type { AnnotationIssue, ModeIssue } from '@echotype/shared';
+import type { AnnotationIssue, ContentIssue, ModeIssue } from '@echotype/shared';
 import { useCourseEditor, type EditorMode } from './useCourseEditor';
 
 interface CourseEditorModalProps {
@@ -71,6 +72,10 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
         setSubmitError(mapModeIssueMessage(body.issues[0] as ModeIssue));
         return;
       }
+      if (body?.error === 'content_validation_error' && body.issues?.[0]) {
+        setSubmitError(formatContentIssueMessage(body.issues[0] as ContentIssue));
+        return;
+      }
     }
     if (e.status === 400) {
       setSubmitError(MSG_INVALID_REQUEST);
@@ -103,6 +108,10 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
         return;
       }
       if (pre.kind === 'mode') {
+        setSubmitError(pre.message);
+        return;
+      }
+      if (pre.kind === 'content') {
         setSubmitError(pre.message);
         return;
       }

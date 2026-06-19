@@ -1,6 +1,8 @@
 import {
   validateAnnotations,
+  validateContentCharacters,
   validateMode,
+  formatContentIssueMessage,
   type AnnotationIssue,
   type CourseMode,
   type CreateCourseInput,
@@ -14,6 +16,7 @@ import type { DraftAnnotation } from './useCourseEditor';
 
 export type PreSubmitFailure =
   | { kind: 'd5' }
+  | { kind: 'content'; message: string }
   | { kind: 'mode'; message: string }
   | { kind: 'annotation'; issues: AnnotationIssue[]; messages: string[]; highlightLocalId: number | null };
 
@@ -26,6 +29,11 @@ export function runPreSubmitValidation(
 ): PreSubmitResult {
   if (needAnnotation === true && annotations.length === 0) {
     return { ok: false, kind: 'd5' };
+  }
+
+  const contentIssue = validateContentCharacters(payload.content);
+  if (contentIssue) {
+    return { ok: false, kind: 'content', message: formatContentIssueMessage(contentIssue) };
   }
 
   const modeIssue = validateMode(payload.content, payload.mode as CourseMode);

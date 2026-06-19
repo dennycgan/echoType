@@ -85,3 +85,38 @@
   rebuild gets a new CF domain — update SSM `WEB_ORIGIN` via apply, no hardcoded
   URLs in repo.
 - Supersedes / superseded-by: none
+
+---
+
+## ADR-0004 — Course content: line-ending normalization + control-character filter
+- Status: Accepted (2026-06-11)
+- Commit/PR anchor: pending Sub-phase B merge
+- Plain summary (owner reads this): When users paste from Word or Windows, line
+  breaks are automatically turned into normal `\n`; besides that, only regular
+  visible characters are allowed — tabs and other invisible control characters
+  are blocked, but Chinese, emoji, and punctuation are fine.
+- Context: Step 1 never filtered illegal characters; pasted `\r\n` text could
+  shift annotation indices relative to what users see, and control characters
+  (tab, NUL, etc.) are data-hygiene problems, not user expression.
+- Decision:
+  1. **Line-ending normalization** before all validation and DB writes:
+     `\r\n` → `\n`, lone `\r` → `\n` (same approach as Git `core.autocrlf`,
+     Node `fs`, and most HTTP frameworks — absorb OS differences, do not punish
+     the user).
+  2. **Control-character filter** on normalized content: reject Unicode `\p{Cc}`
+     except `\n`; do not restrict Chinese, emoji, or punctuation.
+  3. **Shared validation** in `packages/shared`: `normalizeLineEndings`,
+     `validateContentCharacters`, `prepareCourseContent`; client Step 1 and
+     server API both use it; stored content is always LF-only.
+  4. **Edit-load remap**: when opening a course whose DB content still contains
+     legacy CRLF, remap annotation indices once on editor init (client only).
+- Rejected alternatives:
+  - Reject `\r` outright — punishes high-frequency Word/Windows paste.
+  - Client-only validation — API bypassable.
+  - Server-side annotation index remap on API payloads — hides malformed clients;
+    422 after normalize is enough.
+- Consequences:
+  - New saves are LF-only; `\t` and other control chars blocked with plain-language errors.
+  - Legacy courses with CRLF get silent index remap on first edit open (console log for debug).
+  - Direct API callers must send indices relative to normalized content or get 422 bounds errors.
+- Supersedes / superseded-by: none

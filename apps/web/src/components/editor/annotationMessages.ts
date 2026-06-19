@@ -3,6 +3,8 @@
 import type { AnnotationIssue, AnnotationIssueCode, ModeIssue } from '@echotype/shared';
 import type { DraftAnnotation } from './useCourseEditor';
 
+export { formatContentIssueMessage } from '@echotype/shared';
+
 export const STEP3_NO_ANNOTATION_MESSAGE =
   'You chose to add annotations but have not added any yet. If you do not need annotations, go back and choose "No".';
 

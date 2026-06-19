@@ -125,6 +125,74 @@ export function validateMode(content: string, mode: CourseMode): ModeIssue | nul
   return null;
 }
 
+// --- Content hygiene (line endings + control characters) ----------------------
+// normalizeLineEndings runs before validateContentCharacters. Callers store
+// LF-only content. validateContentCharacters assumes input is already normalized.
+
+export function normalizeLineEndings(content: string): string {
+  return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+export type ContentIssueCode = 'control_character';
+
+export type ContentIssue = {
+  code: ContentIssueCode;
+  index: number;
+  charCode: number;
+};
+
+/** Map an index in pre-normalization content to the normalized string. */
+export function remapAnnotationIndexAfterLineEndingNormalization(
+  oldContent: string,
+  index: number,
+): number {
+  let newIndex = 0;
+  let oldPos = 0;
+  while (oldPos < index && oldPos < oldContent.length) {
+    if (oldContent[oldPos] === '\r' && oldContent[oldPos + 1] === '\n') {
+      oldPos += 2;
+      newIndex += 1;
+    } else if (oldContent[oldPos] === '\r') {
+      oldPos += 1;
+      newIndex += 1;
+    } else {
+      oldPos += 1;
+      newIndex += 1;
+    }
+  }
+  return newIndex;
+}
+
+export function validateContentCharacters(content: string): ContentIssue | null {
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i]!;
+    if (ch === '\n') continue;
+    if (/\p{Cc}/u.test(ch)) {
+      return {
+        code: 'control_character',
+        index: i,
+        charCode: ch.codePointAt(0) ?? ch.charCodeAt(0),
+      };
+    }
+  }
+  return null;
+}
+
+export function formatContentIssueMessage(issue: ContentIssue): string {
+  if (issue.charCode === 0x09) {
+    return 'Text cannot contain tab characters. Please remove them and try again.';
+  }
+  return `Text contains an invisible character at position ${issue.index + 1}. Please remove it and try again.`;
+}
+
+export function prepareCourseContent(raw: string): {
+  content: string;
+  issue: ContentIssue | null;
+} {
+  const content = normalizeLineEndings(raw);
+  return { content, issue: validateContentCharacters(content) };
+}
+
 // --- Annotation business rules (content-aware) --------------------------------
 // Shape is validated by Zod; these rules depend on `content` and are shared by
 // the server (returns 422) and, later, the editor for pre-submit checks.

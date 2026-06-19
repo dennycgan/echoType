@@ -1,5 +1,6 @@
 import type {
   AnnotationIssue,
+  ContentIssue,
   CourseDTO,
   CreateCourseInput,
   CreateSessionInput,
@@ -12,12 +13,13 @@ const BASE = '/api';
 
 export type CourseApiErrorCode =
   | 'annotation_validation_error'
+  | 'content_validation_error'
   | 'mode_length_violation'
   | string;
 
 export type CourseApiErrorBody = {
   error: CourseApiErrorCode;
-  issues?: Array<AnnotationIssue | ModeIssue>;
+  issues?: Array<AnnotationIssue | ContentIssue | ModeIssue>;
 };
 
 /** Structured API failure so the editor can branch on status + error code. */

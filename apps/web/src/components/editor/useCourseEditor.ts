@@ -4,6 +4,10 @@ import {
   ARTICLE_MIN,
   SHORT_MAX,
   SHORT_MIN,
+  formatContentIssueMessage,
+  normalizeLineEndings,
+  remapAnnotationIndexAfterLineEndingNormalization,
+  validateContentCharacters,
   type AnnotationIssue,
   type CourseDTO,
   type CourseMode,
@@ -37,6 +41,41 @@ export { STEP3_NO_ANNOTATION_MESSAGE } from './annotationMessages';
 
 function lengthOk(mode: CourseMode, len: number): boolean {
   return mode === 'SHORT' ? len >= SHORT_MIN && len <= SHORT_MAX : len >= ARTICLE_MIN && len <= ARTICLE_MAX;
+}
+
+function resolveInitialEditorState(
+  editorMode: EditorMode,
+  initial: CourseDTO | undefined,
+): { content: string; annotations: DraftAnnotation[]; nextLocalId: number } {
+  const rawContent = initial?.content ?? '';
+  const content = normalizeLineEndings(rawContent);
+  const rawAnnotations = initial?.annotations ?? [];
+
+  if (editorMode === 'edit' && rawContent !== content) {
+    const crCount = (rawContent.match(/\r/g) ?? []).length;
+    console.log(
+      `[EchoType] Normalized ${crCount} legacy CRLF endings; annotation indices remapped.`,
+    );
+  }
+
+  const contentChanged = rawContent !== content;
+  const annotations: DraftAnnotation[] = rawAnnotations.map((a, i) => {
+    const startIndex = contentChanged
+      ? remapAnnotationIndexAfterLineEndingNormalization(rawContent, a.startIndex)
+      : a.startIndex;
+    const endIndex = contentChanged
+      ? remapAnnotationIndexAfterLineEndingNormalization(rawContent, a.endIndex)
+      : a.endIndex;
+    return {
+      localId: i + 1,
+      startIndex,
+      endIndex,
+      noteText: a.noteText,
+      anchoredText: contentChanged ? sliceAt(content, startIndex, endIndex) : a.anchoredText,
+    };
+  });
+
+  return { content, annotations, nextLocalId: annotations.length + 1 };
 }
 
 export interface UseCourseEditor {
@@ -93,9 +132,15 @@ export interface UseCourseEditor {
 }
 
 export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): UseCourseEditor {
+  const initialState = useMemo(() => resolveInitialEditorState(editorMode, initial), [editorMode, initial]);
+  const initialContentNorm = initialState.content;
+
   const [step, setStep] = useState<EditorStep>(1);
   const [title, setTitle] = useState(initial?.title ?? '');
-  const [content, setContent] = useState(initial?.content ?? '');
+  const [content, setContentState] = useState(initialState.content);
+  const setContent = useCallback((v: string) => {
+    setContentState(normalizeLineEndings(v));
+  }, []);
   const [courseMode, setCourseMode] = useState<CourseMode>(initial?.mode ?? 'SHORT');
   const originalAnnotationCount = initial?.annotations?.length ?? 0;
 
@@ -103,23 +148,15 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
     editorMode === 'edit' && originalAnnotationCount > 0 ? true : null,
   );
 
-  const [annotations, setAnnotations] = useState<DraftAnnotation[]>(() =>
-    (initial?.annotations ?? []).map((a, i) => ({
-      localId: i + 1,
-      startIndex: a.startIndex,
-      endIndex: a.endIndex,
-      noteText: a.noteText,
-      anchoredText: a.anchoredText,
-    })),
-  );
-  const nextLocalId = useRef<number>((initial?.annotations?.length ?? 0) + 1);
+  const [annotations, setAnnotations] = useState<DraftAnnotation[]>(() => initialState.annotations);
+  const nextLocalId = useRef<number>(initialState.nextLocalId);
 
   const [submitIssueMessages, setSubmitIssueMessages] = useState<string[]>([]);
   const [highlightLocalId, setHighlightLocalId] = useState<number | null>(null);
   const [reviewActive, setReviewActive] = useState(false);
 
   /** Last content confirmed on Step 1 Next; advances each successful Next from step 1. */
-  const contentBaseline = useRef(initial?.content ?? '');
+  const contentBaseline = useRef(initialContentNorm);
 
   const clearSubmitFeedback = useCallback(() => {
     setSubmitIssueMessages([]);
@@ -200,6 +237,8 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
   const step1Error = useMemo(() => {
     if (!title.trim()) return 'Title is required.';
     if (!content) return 'Text content is required.';
+    const contentIssue = validateContentCharacters(content);
+    if (contentIssue) return formatContentIssueMessage(contentIssue);
     if (!lengthOk(courseMode, content.length)) {
       return courseMode === 'SHORT'
         ? `Short mode needs ${SHORT_MIN}-${SHORT_MAX} characters (currently ${content.length}).`
@@ -260,11 +299,11 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
     }
     return (
       title !== (initial?.title ?? '') ||
-      content !== (initial?.content ?? '') ||
+      content !== initialContentNorm ||
       courseMode !== (initial?.mode ?? 'SHORT') ||
       annotations.length !== originalAnnotationCount
     );
-  }, [editorMode, title, content, courseMode, annotations.length, initial, originalAnnotationCount]);
+  }, [editorMode, title, content, courseMode, annotations.length, initial, originalAnnotationCount, initialContentNorm]);
 
   const buildPayload = useCallback(
     (): CreateCourseInput => ({

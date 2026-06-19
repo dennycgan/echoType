@@ -8,6 +8,8 @@ import {
   type AnnotationInput,
   type CourseMode as CourseModeType,
   deriveAnchoredText,
+  formatContentIssueMessage,
+  prepareCourseContent,
   validateAnnotations,
   validateMode,
 } from '@echotype/shared';
@@ -35,6 +37,23 @@ function serializeCourse(course: CourseWithAnnotations) {
     createdAt: course.createdAt.toISOString(),
     updatedAt: course.updatedAt.toISOString(),
   };
+}
+
+// Line-ending normalization + control-character filter. Returns normalized content
+// or replies 422. Shape was already validated by Zod.
+function rejectInvalidContent(
+  reply: FastifyReply,
+  rawContent: string,
+): { ok: true; content: string } | { ok: false } {
+  const { content, issue } = prepareCourseContent(rawContent);
+  if (issue) {
+    reply.status(422).send({
+      error: 'content_validation_error',
+      issues: [{ ...issue, message: formatContentIssueMessage(issue) }],
+    });
+    return { ok: false };
+  }
+  return { ok: true, content };
 }
 
 // Mode-length business rule. Shape was already validated by Zod; this rejects a
@@ -107,17 +126,20 @@ export async function registerCourseRoutes(app: FastifyInstance) {
 
   app.post('/courses', async (req, reply) => {
     const body = CreateCourseInput.parse(req.body);
-    if (rejectInvalidMode(reply, body.content, body.mode as CourseModeType)) return;
-    if (rejectInvalidAnnotations(reply, body.content, body.annotations)) return;
+    const contentCheck = rejectInvalidContent(reply, body.content);
+    if (!contentCheck.ok) return;
+    const content = contentCheck.content;
+    if (rejectInvalidMode(reply, content, body.mode as CourseModeType)) return;
+    if (rejectInvalidAnnotations(reply, content, body.annotations)) return;
 
     const created = await prisma.course.create({
       data: {
         userId: req.userId,
         title: body.title,
-        content: body.content,
+        content,
         mode: body.mode as CourseMode,
         categoryId: body.categoryId ?? null,
-        annotations: { create: toAnnotationRows(body.content, body.annotations) },
+        annotations: { create: toAnnotationRows(content, body.annotations) },
       },
       include: { annotations: true },
     });
@@ -126,8 +148,11 @@ export async function registerCourseRoutes(app: FastifyInstance) {
 
   app.put<{ Params: { id: string } }>('/courses/:id', async (req, reply) => {
     const body = UpdateCourseInput.parse(req.body);
-    if (rejectInvalidMode(reply, body.content, body.mode as CourseModeType)) return;
-    if (rejectInvalidAnnotations(reply, body.content, body.annotations)) return;
+    const contentCheck = rejectInvalidContent(reply, body.content);
+    if (!contentCheck.ok) return;
+    const content = contentCheck.content;
+    if (rejectInvalidMode(reply, content, body.mode as CourseModeType)) return;
+    if (rejectInvalidAnnotations(reply, content, body.annotations)) return;
 
     const existing = await prisma.course.findFirst({
       where: { id: req.params.id, userId: req.userId },
@@ -145,10 +170,10 @@ export async function registerCourseRoutes(app: FastifyInstance) {
         where: { id: existing.id },
         data: {
           title: body.title,
-          content: body.content,
+          content,
           mode: body.mode as CourseMode,
           categoryId: body.categoryId ?? null,
-          annotations: { create: toAnnotationRows(body.content, body.annotations) },
+          annotations: { create: toAnnotationRows(content, body.annotations) },
         },
         include: { annotations: true },
       });
