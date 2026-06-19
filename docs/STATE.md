@@ -28,8 +28,9 @@ Active capability: Cloud deploy
 - [x] AWS Support verification (CloudFront account unblocked)
 - [x] Terraform apply (35 resources; CF Deployed)
 - [x] CI deploy + 4G verify (https://d3a9mgremswg7d.cloudfront.net — UI + /api)
-- [ ] Post-deploy fixes surfaced during annotation work: create-mode review,
-      illegal-character filter, click-to-view note popover, (maybe) doc wording
+- [x] Post-deploy: create-mode content-change review
+- [x] Post-deploy: line-ending normalize + control-character filter (ADR-0004)
+- [ ] Post-deploy: click-to-view note popover
 - [ ] Go live -> real EchoType usage
 - [ ] Resume other feature development
 
@@ -39,9 +40,9 @@ Active capability: Cloud deploy
 
 ## Now working on (describe ONLY the in-progress item)
 - Goal (one line): Stabilize the live CloudFront deployment before moving to the next capability.
-- Sub-steps done: Full stack apply; deploy.yml + deploy-web.yml green; 4G verified UI at `https://d3a9mgremswg7d.cloudfront.net`.
-- Next step: Post-deploy annotation fixes (see Phase Roadmap) and real self-usage; custom domain/ACM deferred (separate capability line).
-- Related decisions: ADR-0003
+- Sub-steps done: Full stack apply; CI deploy green; 4G verified; create-mode review + content hygiene (ADR-0004) shipped.
+- Next step: Sub-phase C — typing page click-to-view note popover; then go live / self-usage.
+- Related decisions: ADR-0003, ADR-0004
 
 ## Contract pointers (don't memorize, go read the source)
 - Types/validation: packages/shared/course.ts
@@ -57,9 +58,7 @@ Active capability: Cloud deploy
 ## Known debt / intentionally deferred
 | Capability | Item | Reason | Picks it up | Related ADR |
 |---|---|---|---|---|
-| Annotation | create-mode content edit skips review | Phase 4 scoped to edit flow only | post-deploy / feature resume | — |
 | Course mgmt | CoursesPage not split into routes | Phase 3.0 debt | course management capability | — |
 | Annotation | false-green (duplicate substring, no index shift) | MVP skips index shift | user reanchor | — |
-| Editor | Step 1 no illegal-character filter | Never implemented; length/mode only | post-deploy fixes | — |
-| Typing | Typing page: no click-to-view full note (hover title only) | Phase 2 scope | polish / post-deploy | — |
+| Typing | Typing page: no click-to-view full note (hover title only) | Phase 2 scope | post-deploy Sub-phase C | — |
 | Annotation | Overlay measurement = mirror offsetTop (lines) + per-glyph getBoundingClientRect (charEdges); NOT Range.getClientRects() | Phase 2 deliberate | do not revert without ADR | ADR-0002 |
