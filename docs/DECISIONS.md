@@ -7,6 +7,8 @@
 > understandable without deep technical knowledge.
 > Append new entries at the end; numbering increments. Always record the date
 > and a commit/PR anchor.
+> **Accepted date** = the calendar day the implementing commit lands on `main`
+> (same day as the Commit/PR anchor), not the design-discussion day.
 >
 > Status values: Accepted | Superseded by ADR-xx (date) | Deprecated (no
 > replacement) | Reverted-in-code (implementation rolled back; see note)
@@ -20,7 +22,7 @@
 ---
 
 ## ADR Template
-- Status: Accepted (YYYY-MM-DD)
+- Status: Accepted (YYYY-MM-DD)  <!-- date = merge to main, matches anchor commit -->
 - Commit/PR anchor: <sha or #PR>
 - Plain summary (owner reads this): <one plain-language sentence>
 - Context / what problem forced this:
@@ -89,8 +91,8 @@
 ---
 
 ## ADR-0004 — Course content: line-ending normalization + control-character filter
-- Status: Accepted (2026-06-11)
-- Commit/PR anchor: pending Sub-phase B merge
+- Status: Accepted (2026-06-19)
+- Commit/PR anchor: c29f9fc
 - Plain summary (owner reads this): When users paste from Word or Windows, line
   breaks are automatically turned into normal `\n`; besides that, only regular
   visible characters are allowed — tabs and other invisible control characters
@@ -124,8 +126,8 @@
 ---
 
 ## ADR-0005 — Annotation anchors: grapheme-boundary expansion + ill-formed range guard
-- Status: Accepted (2026-06-11)
-- Commit/PR anchor: pending emoji-anchor hotfix merge
+- Status: Accepted (2026-06-19)
+- Commit/PR anchor: 903dc90
 - Plain summary (owner reads this): When you anchor a note on an emoji, the editor
   now selects the whole emoji automatically; if a range still cuts through the
   middle of a multi-unit character, save is blocked with a clear message instead

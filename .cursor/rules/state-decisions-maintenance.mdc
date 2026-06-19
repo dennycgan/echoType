@@ -24,6 +24,10 @@ stale lines.
   proactively say "this is a decision worth logging", append a new ADR in the
   same turn, put a plain-language one-liner at the top, record the date and a
   commit/PR anchor, and ask the owner to confirm the summary is accurate.
+- **Accepted (YYYY-MM-DD)** = the day the implementing commit is on `main`
+  (must match the anchor commit's date). Do not use the design-review day or
+  copy dates from unrelated ADRs. Fill `Commit/PR anchor` with the real sha (or
+  `#PR`) when the commit exists — no `pending` placeholders after merge.
 - Judging whether something is "worth logging" is the agent's responsibility; do
   not wait for the owner to ask.
 - Overturning a decision: write a NEW ADR and flip the old entry's Status to
