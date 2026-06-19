@@ -61,3 +61,27 @@
 - Consequences: More accurate; re-measured only on layout change
   (content/width/font), never per keystroke, to preserve typing performance.
 - Supersedes / superseded-by: none
+
+---
+
+## ADR-0003 — Single CloudFront distribution serves SPA + /api (same-origin HTTPS)
+- Status: Accepted (2026-06-11)
+- Commit/PR anchor: cc9c378
+- Plain summary: The public site is one HTTPS address on CloudFront — pages come
+  from a private S3 bucket, API calls under /api go to EC2; the browser never
+  talks to plain HTTP or a second domain, so no mixed-content or CORS headaches.
+- Context: New AWS accounts cannot create CloudFront until Support verifies the
+  account. Browsers block HTTPS pages calling HTTP APIs (mixed content). Hosting
+  the SPA on CloudFront while the API stayed on EC2:80 would fail without
+  end-to-end HTTPS or same-origin routing.
+- Decision: One CloudFront distribution, two origins — default `/*` → S3 (OAC,
+  private bucket); ordered `/api/*` → EC2 EIP over HTTP (server-to-server).
+  Backend routes live under `/api` prefix; `WEB_ORIGIN` = CloudFront URL in SSM.
+  EC2 port 80 locked to CloudFront origin-facing prefix list only.
+- Rejected alternatives: SPA on CloudFront + API on `http://EIP` — mixed content;
+  separate API subdomain without custom domain/ACM — extra cost/complexity for MVP.
+- Consequences: Custom domain later needs ACM + DNS on this distribution. First
+  deploy order: terraform apply → backend workflow → frontend workflow. Destroy
+  rebuild gets a new CF domain — update SSM `WEB_ORIGIN` via apply, no hardcoded
+  URLs in repo.
+- Supersedes / superseded-by: none

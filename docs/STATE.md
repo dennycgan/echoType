@@ -6,23 +6,28 @@
 > Conflict priority: code/git > this file > DECISIONS.md > local kickoff (if present).
 > History / rationale -> DECISIONS.md. Private product notes -> docs/project-kickoff.md (local only, gitignored).
 
-## Capability Roadmap (project-level; YOU ARE HERE)
+## Capability Roadmap (project-level; top-to-bottom = execution order; YOU ARE HERE)
 - [x] Annotation feature
-- [ ] Course management — mode-specific list pages
-- [ ] Typing experience (typing page, text-vs-typed live diff)
-- [ ] Course stats (per-session + cumulative)
-- [ ] Auth (Cognito; replaces demo-user shim)
-- [~] Cloud deploy (CloudFront cutover)   <-- YOU ARE HERE
+- [~] Cloud deploy (CloudFront cutover; default *.cloudfront.net URL)    <-- YOU ARE HERE
+- [ ] Course management (short/article routes, card list, search/filter/sort)
+- [ ] Typing experience (live diff exists; add IME handling, session flow)
+- [ ] Course stats (per-session + cumulative; needs typing session data first)
+- [ ] Auth (Cognito; replaces demo-user shim; required before sharing externally)
+- [ ] Custom domain (purchase + ACM cert + CloudFront alias; deferred until self-testing settles)
+- [ ] Ops & safety (Sentry, CloudWatch, rate limiting, disclaimer, error/empty states)
+
 
 > Each line is a capability, not a sub-step. Completed capabilities stay one line
 > (internal history -> git/DECISIONS). Only the ACTIVE capability is expanded in
 > the Phase Roadmap below.
+> Top-to-bottom = current execution order. Reorder if priorities change; never leave it unordered.
 
 ## Phase Roadmap (active capability only)
 Active capability: Cloud deploy
 - [x] AWS Support ticket opened
-- [~] AWS Support verification (in progress)
-- [ ] Terraform apply -> deploy
+- [x] AWS Support verification (CloudFront account unblocked)
+- [x] Terraform apply (35 resources; CF Deployed)
+- [x] CI deploy + 4G verify (https://d3a9mgremswg7d.cloudfront.net — UI + /api)
 - [ ] Post-deploy fixes surfaced during annotation work: create-mode review,
       illegal-character filter, click-to-view note popover, (maybe) doc wording
 - [ ] Go live -> real EchoType usage
@@ -33,10 +38,10 @@ Active capability: Cloud deploy
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Complete CloudFront production cutover so the deployed site is publicly reachable.
-- Sub-steps done: AWS Support ticket opened; infra (EC2, RDS, S3, CloudFront, OIDC deploy workflows) exists in repo.
-- Next step: Finish AWS Support verification; then Terraform apply and deploy.
-- Related decisions: none yet
+- Goal (one line): Stabilize the live CloudFront deployment before moving to the next capability.
+- Sub-steps done: Full stack apply; deploy.yml + deploy-web.yml green; 4G verified UI at `https://d3a9mgremswg7d.cloudfront.net`.
+- Next step: Post-deploy annotation fixes (see Phase Roadmap) and real self-usage; custom domain/ACM deferred (separate capability line).
+- Related decisions: ADR-0003
 
 ## Contract pointers (don't memorize, go read the source)
 - Types/validation: packages/shared/course.ts
