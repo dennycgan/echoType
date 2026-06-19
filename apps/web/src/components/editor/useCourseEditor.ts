@@ -131,7 +131,7 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
   }, []);
 
   const contentPendingReview =
-    editorMode === 'edit' && content !== contentBaseline.current && originalAnnotationCount > 0;
+    content !== contentBaseline.current && annotations.length > 0;
   const showContentWarning = contentPendingReview;
 
   const pendingReviewAnnotations = useMemo(
@@ -229,10 +229,8 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
         purgedAnnotations = purgedCount;
         if (purgedCount > 0) setAnnotations(kept);
 
-        if (editorMode === 'edit') {
-          setReviewActive(kept.length > 0);
-        }
-      } else if (contentChangedFromBaseline && editorMode === 'edit') {
+        setReviewActive(kept.length > 0);
+      } else if (contentChangedFromBaseline) {
         setReviewActive(annotations.length > 0);
       }
 
