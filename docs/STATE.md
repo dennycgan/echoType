@@ -9,7 +9,7 @@
 ## Capability Roadmap (project-level; top-to-bottom = execution order; YOU ARE HERE)
 - [x] Annotation feature
 - [x] Cloud deploy (CloudFront cutover; live at *.cloudfront.net + post-deploy fixes)
-- [~] Typing experience (live diff exists; add auto-loop session flow, IME)    <-- YOU ARE HERE
+- [~] Typing experience (Phase 1 auto-loop done; Session flow + IME remain)    <-- YOU ARE HERE
 - [ ] Course management (short/article routes, card list, DELETE, search/filter/sort)
 - [ ] Course stats (per-session + cumulative; needs typing session data first)
 - [ ] Auth (Cognito; replaces demo-user shim; required before sharing externally)
@@ -24,20 +24,19 @@
 
 ## Phase Roadmap (active capability only)
 Active capability: Typing experience
-- [ ] Phase breakdown TBD — known targets for this capability:
-      auto-loop / continuous repeat after finishing a pass (current bug: input keeps
-      accepting but text line stops responding); IME deferred to later phase within
-      this capability
+- [x] Phase 1 — Auto-loop (cap input, loop reset, session counters; ADR-0006)
+- [ ] Phase 2 — Session flow (loop UI, idle timer, pasteRanges, End/Reset polish)
+- [ ] Phase 3 — IME (composition events; highest risk)
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Add auto-loop to typing page so finishing a pass restarts text for continuous repeat (the core echo loop).
-- Sub-steps done: none yet (capability just opened)
-- Next step: Cursor designs Typing experience phase breakdown; review then build
-- Related decisions: none yet for this capability
+- Goal (one line): Phase 2 Session flow — polish one sitting (loop UI, timer, pasteRanges, End/Reset).
+- Sub-steps done: Phase 1 auto-loop shipped (owner验收 pass)
+- Next step: Phase 2 design review, then implement
+- Related decisions: ADR-0006 (monotonic session charCount)
 
 ## Contract pointers (don't memorize, go read the source)
 - Types/validation: packages/shared/course.ts

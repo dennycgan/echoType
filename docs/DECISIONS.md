@@ -154,3 +154,32 @@
   - Picking inside an emoji may slightly widen the highlighted anchor (intended).
   - Direct API clients sending split-surrogate ranges get 422, not 500.
 - Supersedes / superseded-by: none
+
+---
+
+## ADR-0006 — Session charCount is monotonic keystroke count (backspace does not reduce)
+- Status: Accepted (2026-06-11)
+- Commit/PR anchor: pending Typing experience Phase 1 merge
+- Plain summary (owner reads this): When you save a typing session, charCount
+  counts every key you pressed that added a character — even if you backspaced
+  later — so WPM reflects typing activity, not final draft length.
+- Context: Auto-loop repeats the same passage; live UI resets errors each loop
+  (quiet repetition) while the saved session needs cumulative stats for future
+  course analytics. charCount feeds session WPM and accuracy denominator.
+- Decision:
+  1. **sessionCharCount** increments only when `typed` grows (delta > 0 after
+     cap to target.length); backspace never decrements it.
+  2. **Live UI** errors/accuracy derive from current `typed` only (reset each loop).
+  3. **Saved session** `errorCount` / `accuracy` use cumulative session counters;
+     `loopCount` increments on each length-complete pass.
+- Rejected alternatives:
+  - charCount tracks current `typed.length` (decreases on backspace) — understates
+    typing activity and WPM in an echo/repetition product.
+  - Live errors accumulate across loops — conflicts with quiet repetition UX.
+- Consequences:
+  - Typo + backspace + correct finish: final loop shows 0 live errors but charCount
+    includes correction keystrokes; saved accuracy may look high — intentional
+    (accuracy = correctness of final positions per loop at completion; charCount =
+    activity volume).
+  - Extreme backspace spam inflates charCount; acceptable for echo use case.
+- Supersedes / superseded-by: none
