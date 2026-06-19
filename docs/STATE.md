@@ -8,9 +8,9 @@
 
 ## Capability Roadmap (project-level; top-to-bottom = execution order; YOU ARE HERE)
 - [x] Annotation feature
-- [~] Cloud deploy (CloudFront cutover; default *.cloudfront.net URL)    <-- YOU ARE HERE
-- [ ] Course management (short/article routes, card list, search/filter/sort)
-- [ ] Typing experience (live diff exists; add IME handling, session flow)
+- [x] Cloud deploy (CloudFront cutover; live at *.cloudfront.net + post-deploy fixes)
+- [~] Typing experience (live diff exists; add auto-loop session flow, IME)    <-- YOU ARE HERE
+- [ ] Course management (short/article routes, card list, DELETE, search/filter/sort)
 - [ ] Course stats (per-session + cumulative; needs typing session data first)
 - [ ] Auth (Cognito; replaces demo-user shim; required before sharing externally)
 - [ ] Custom domain (purchase + ACM cert + CloudFront alias; deferred until self-testing settles)
@@ -23,26 +23,21 @@
 > Top-to-bottom = current execution order. Reorder if priorities change; never leave it unordered.
 
 ## Phase Roadmap (active capability only)
-Active capability: Cloud deploy
-- [x] AWS Support ticket opened
-- [x] AWS Support verification (CloudFront account unblocked)
-- [x] Terraform apply (35 resources; CF Deployed)
-- [x] CI deploy + 4G verify (https://d3a9mgremswg7d.cloudfront.net — UI + /api)
-- [x] Post-deploy: create-mode content-change review
-- [x] Post-deploy: line-ending normalize + control-character filter (ADR-0004)
-- [x] Post-deploy: click-to-view note popover (typing page)
-- [ ] Go live -> real EchoType usage
-- [ ] Resume other feature development
+Active capability: Typing experience
+- [ ] Phase breakdown TBD — known targets for this capability:
+      auto-loop / continuous repeat after finishing a pass (current bug: input keeps
+      accepting but text line stops responding); IME deferred to later phase within
+      this capability
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Stabilize the live CloudFront deployment before moving to the next capability.
-- Sub-steps done: Post-deploy fixes complete (review, content hygiene, note popover, emoji-anchor hotfix).
-- Next step: Go live — real self-usage on CloudFront; then resume feature development.
-- Related decisions: ADR-0003, ADR-0004, ADR-0005
+- Goal (one line): Add auto-loop to typing page so finishing a pass restarts text for continuous repeat (the core echo loop).
+- Sub-steps done: none yet (capability just opened)
+- Next step: Cursor designs Typing experience phase breakdown; review then build
+- Related decisions: none yet for this capability
 
 ## Contract pointers (don't memorize, go read the source)
 - Types/validation: packages/shared/course.ts
