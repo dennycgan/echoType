@@ -28,6 +28,9 @@ stale lines.
   (must match the anchor commit's date). Do not use the design-review day or
   copy dates from unrelated ADRs. Fill `Commit/PR anchor` with the real sha (or
   `#PR`) when the commit exists — no `pending` placeholders after merge.
+- **Hard constraint:** Accepted date MUST come from
+  `git log -1 --format=%cs <anchor-sha>`; never use Cursor `user_info` date or
+  the design-discussion day.
 - Judging whether something is "worth logging" is the agent's responsibility; do
   not wait for the owner to ask.
 - Overturning a decision: write a NEW ADR and flip the old entry's Status to
