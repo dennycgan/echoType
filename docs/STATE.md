@@ -25,7 +25,7 @@
 ## Phase Roadmap (active capability only)
 Active capability: Course management
 - [x] Phase 1 — Mode shell (`/courses/short` + `/courses/article`, shared `CourseListPage`; Home cards; `/courses` → `/`; create preset mode; edit mode read-only)
-- [x] Phase 2 — DELETE (`DELETE /courses/:id` 204, physical + Prisma cascade, `window.confirm`, typing 404 → `/`; ADR-0010)
+- [x] Phase 2 — DELETE (`DELETE /courses/:id` 204, physical + Prisma cascade, `window.confirm`, typing not-found → `/`; GET missing **410** + CloudFront client guard; ADR-0010)
 - [ ] Phase 3 — Search + sort (search title/content/noteText; sort: createdAt asc/desc, updatedAt desc, title A–Z only)
 - [ ] Phase 4 — Categories (album model: create category with name + description; move course into/out of category)
 
@@ -35,7 +35,7 @@ Active capability: Course management
 
 ## Now working on (describe ONLY the in-progress item)
 - Goal (one line): Course management Phase 3 — search + sort on mode-scoped lists.
-- Sub-steps done: Phase 2 DELETE shipped (816ff3f; owner验收 pass)
+- Sub-steps done: Phase 2 DELETE shipped + prod not-found fix (816ff3f, f43eda0; owner验收 pass)
 - Next step: Phase 3 design review, then implement
 - Related decisions: ADR-0009 (mode-scoped lists); ADR-0010 (delete semantics)
 

@@ -324,39 +324,57 @@
 
 ## ADR-0010 — Course DELETE: physical row removal, 204, no undo
 - Status: Accepted (2026-06-22)
-- Commit/PR anchor: 816ff3f
+- Commit/PR anchor: 816ff3f (Phase 2); f43eda0 (CloudFront GET not-found fix)
 - Plain summary (owner reads this): Deleting a course removes it from the database
   for good (annotations and typing sessions cascade). The list uses a browser
   confirm dialog; success returns HTTP 204. Sample/seed courses are deletable like
   any course — restore only via re-seed or deploy, not in-app undo. Visiting a
-  deleted course's typing URL shows a friendly 404 and auto-redirects home after
-  5 seconds.
+  deleted course's typing URL shows a friendly not-found panel and auto-redirects
+  home after 5 seconds. On production, missing courses use **410 Gone** on
+  `GET /courses/:id` so CloudFront does not rewrite the API error into SPA HTML.
 - Context: Course management Phase 2 needed delete on mode-scoped list cards.
   Kickoff implies hard removal, not a recycle bin. Typing sessions and annotations
   are owned by the course; orphan rows would complicate stats and editor state.
-  Users may bookmark `/type/:id` or keep a tab open after delete.
+  Users may bookmark `/courses/:id/type` or keep a tab open after delete.
+  **Post-deploy (prod only):** CloudFront `custom_error_response` maps origin
+  **404 → 200 + `/index.html`** for the whole distribution (`infra/cloudfront.tf`),
+  including `/api/*`. A deleted course's `GET /api/courses/:id` therefore arrived at
+  the browser as HTML, not JSON `{ error: 'not_found' }`, breaking the typing
+  not-found panel (local dev via Vite proxy was unaffected).
 - Decision:
   1. **Semantics**: `prisma.course.delete` — physical delete; `Annotation` and
      `TypingSession` removed via schema `onDelete: Cascade` (no soft-delete column).
   2. **API**: `DELETE /courses/:id` — owner check (`userId`), **204 No Content**
-     on success; 404 when missing or not owned.
+     on success; **404** when missing or not owned (unchanged).
   3. **UI confirm**: `window.confirm` (same pattern as typing "Start over"); no
      custom modal in Phase 2.
   4. **Seed / samples**: seed courses are normal rows for `demo-user`; deletable.
      Recovery is operational (re-run seed / deploy upsert), not user-facing undo.
-  5. **Typing 404**: `getCourse` 404 → friendly panel + 5s countdown → `/` (Home
-     mode picker), with immediate "Go now" link; no retry on 404.
+  5. **Typing not-found**: `getCourse` failure → friendly panel + 5s countdown →
+     `/` (Home mode picker), with immediate "Go now" link; no retry on not-found.
   6. **Client HTTP**: bodyless DELETE must not send `Content-Type: application/json`
      (Fastify 5 rejects empty JSON body → 500).
+  7. **CloudFront / GET missing course** (`f43eda0`):
+     - `GET /courses/:id` when missing → **410 Gone** + `{ error: 'not_found' }`
+       (410 is not rewritten by the SPA 404→index.html rule; 404 was).
+     - Client `isCourseNotFoundError` treats **404 or 410**; `request()` also maps
+       a **200 HTML** success body (legacy/cached path) to not-found.
+     - PUT/DELETE missing course stay **404** (no typing-page dependency; list UI
+       already handles 404 on delete).
 - Rejected alternatives:
   - Soft delete / recycle bin — deferred; adds list filters, restore UX, and
     typing-session ambiguity for "deleted but restorable" courses.
   - DELETE 200 with body — REST convention prefers 204 for success without entity.
   - 404 redirect to `/courses/short` — Home (`/`) is the canonical mode entry.
   - Custom confirm modal — unnecessary for Phase 2; matches existing Start over.
+  - Terraform: separate CloudFront error responses per behavior — not done in MVP;
+    410 + client HTML guard is sufficient without infra churn.
+  - Rely on GET 404 only — broken on CloudFront production until infra changes.
 - Consequences:
   - No undo API or "recently deleted" list until a future phase explicitly adds one.
   - List invalidate `['courses', mode]` + `removeQueries(['course', id])` on success.
-  - Production delete requires API deploy (not web-only).
+  - Production delete + typing not-found fix require **both** API and web deploy.
   - Phase 3 search/sort operates on surviving courses only (no tombstones).
+  - Any future API route that must surface real 404 JSON through CloudFront should
+    avoid 404 or add a client guard — same SPA rewrite applies to all origins.
 - Supersedes / superseded-by: none
