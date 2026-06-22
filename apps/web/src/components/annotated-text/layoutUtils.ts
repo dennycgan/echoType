@@ -3,7 +3,7 @@
 
 export const RESIZE_DEBOUNCE_MS = 100;
 export const NOTE_FONT_PX = 12;
-export const NOTE_LINE_PX = 15;
+export const NOTE_LINE_PX = 12;
 export const NOTE_MAX_LINES = 2;
 export const NOTE_SLOT_PX = NOTE_LINE_PX * NOTE_MAX_LINES + 2;
 
