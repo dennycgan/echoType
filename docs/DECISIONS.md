@@ -277,3 +277,45 @@
     ADR-0002). Sample course `Deer Enclosure 鹿柴` (Samples category) added to
     `apps/api/prisma/seed.ts` for IME + newline-skip manual QA.
 - Supersedes / superseded-by: none
+
+---
+
+## ADR-0009 — Course mode locked by list route; editor Step 1 read-only
+- Status: Accepted (2026-06-22)
+- Commit/PR anchor: da5d54d
+- Plain summary (owner reads this): Short vs Article is chosen on the mode list
+  page (or Home), not inside the course editor. Once you open New/Edit, mode is
+  fixed and shown read-only — you cannot switch a course between modes in the modal.
+- Context: Walking skeleton used one `/courses` page mixing SHORT and ARTICLE,
+  with a temporary mode radio in editor Step 1 (Phase 3.0 stopgap). Kickoff user
+  flow requires separate short/article mode screens, create with preset mode, and
+  read-only mode on edit (a course's mode is a product classification, not a
+  mid-edit toggle). Overlap range (200–500 chars) means the same text could
+  validate under either mode; the user's route choice must lock validation rules.
+- Decision:
+  1. **Routes**: `/courses/short` and `/courses/article` share `CourseListPage`
+     with `courseMode` prop; `GET /courses?mode=` filters server-side.
+  2. **Home**: two mode entry cards; legacy `/courses` redirects to `/` (mode
+     picker), not silently to Short.
+  3. **Create**: `presetCourseMode` from the active list route; `useCourseEditor`
+     receives `lockedCourseMode` with no UI to change it.
+  4. **Edit**: mode = `course.mode`, read-only in Step 1; PUT still sends the
+     same mode (no cross-mode migration).
+  5. **Nav**: Short | Article links bypass `/courses`.
+- Rejected alternatives:
+  - Mode radio in editor Step 1 (Phase 3.0) — hides the mode decision until late;
+    allows creating an Article-length course while thinking "short list".
+  - Single mixed list with per-card mode badge — contradicts kickoff separate mode
+    screens; redundant pills on a already mode-scoped page.
+  - `/courses` → `/courses/short` default — silently picks Short; rejected for
+    kickoff alignment; `/courses` → `/` instead.
+  - Allow mode change on edit — would require re-validating content length against
+    a new range and blur user mental model ("this course is a short piece").
+- Consequences:
+  - Editor `setCourseMode` removed from public hook surface; mode length errors
+    always refer to the locked mode.
+  - Typing page Back links to `/courses/short` or `/courses/article` by
+    `course.mode`.
+  - Phase 2+ course management builds on mode-scoped lists (search/sort per route;
+    categories scoped by mode in schema).
+- Supersedes / superseded-by: none
