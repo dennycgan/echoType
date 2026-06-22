@@ -10,7 +10,7 @@
 - [x] Annotation feature
 - [x] Cloud deploy (CloudFront cutover; live at *.cloudfront.net + post-deploy fixes)
 - [x] Typing experience (auto-loop, newline skip, session flow, IME composition; ADR-0006/0007/0008)
-- [ ] Course management (short/article routes, card list, DELETE, search/filter/sort)    <-- YOU ARE HERE
+- [ ] Course management (mode routes, card list, DELETE, search/sort, categories)    <-- YOU ARE HERE
 - [ ] Course stats (per-session + cumulative; needs typing session data first)
 - [ ] Auth (Cognito; replaces demo-user shim; required before sharing externally)
 - [ ] Custom domain (purchase + ACM cert + CloudFront alias; deferred until self-testing settles)
@@ -24,19 +24,20 @@
 
 ## Phase Roadmap (active capability only)
 Active capability: Course management
-- [ ] Phase 1 — Short/article routes (split CoursesPage; preset mode on create; read-only mode on edit)
-- [ ] Phase 2 — Card list + DELETE (confirm dialog; remove editor mode radio debt)
-- [ ] Phase 3 — Search, filter, sort on course cards
+- [ ] Phase 1 — Mode shell (`/courses/short` + `/courses/article`, shared list component; Home Short/Article entry; create preset mode; edit mode read-only)
+- [ ] Phase 2 — DELETE + editor cleanup (`DELETE /courses/:id` + confirm; remove Step1 mode radio)
+- [ ] Phase 3 — Search + sort (search title/content/noteText; sort: createdAt asc/desc, updatedAt desc, title A–Z only)
+- [ ] Phase 4 — Categories (album model: create category with name + description; move course into/out of category)
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Typing experience capability closed; next up Course management or continued self-testing.
-- Sub-steps done: Typing Phases 1–3 shipped (owner验收 pass); ADR-0006/0007/0008
-- Next step: Course management Phase 1 design, or deploy/seed verification (Deer Enclosure sample)
-- Related decisions: ADR-0006, ADR-0007, ADR-0008
+- Goal (one line): Course management Phase 1 design — mode routes + shared list shell.
+- Sub-steps done: Typing capability closed; course-mgmt phase plan aligned with kickoff user flow
+- Next step: Phase 1 design review, then implement
+- Related decisions: ADR-0006, ADR-0007, ADR-0008 (typing); course-mgmt routing/sort/category scope locked in STATE
 
 ## Contract pointers (don't memorize, go read the source)
 - Types/validation: packages/shared/course.ts
@@ -46,13 +47,14 @@ Active capability: Course management
 
 ## Do NOT touch (unless explicitly opening a new phase)
 - annotation measurement hook (charEdges per-glyph measurement) — ADR-0002
-- Phase 4 review state machine / reviewPickGate
+- Phase 4 review state machine / reviewPickGate (annotation editor — not course-mgmt Phase 4)
 - server-side deriveAnchoredText (client never sends anchoredText) — ADR-0001
 
 ## Known debt / intentionally deferred
 | Capability | Item | Reason | Picks it up | Related ADR |
 |---|---|---|---|---|
-| Course mgmt | CoursesPage not split into routes | Phase 3.0 debt | course management capability | — |
+| Course mgmt | CoursesPage not split into routes | Phase 3.0 debt | course management Phase 1 | — |
+| Course mgmt | Sort modes 4/5/7 (loop count, cumulative session time, last practice) + card cumulative stats on list cards | Need aggregated course stats from TypingSession; Phase 3 sort limited to createdAt/updatedAt/title | **return after Course stats capability** — wire sorts + card fields then | — |
 | Typing | English course + accidental IME shows red diff only, no explicit "switch to English" guidance | Phase 3 chose IME-as-valid-input (ADR-0008) over kickoff #7 banner/pause; red diff implies the error | future polish / real-usage feedback | ADR-0008 |
 | Annotation | false-green (duplicate substring, no index shift) | MVP skips index shift | user reanchor | — |
 | Annotation | Overlay measurement = mirror offsetTop (lines) + per-glyph getBoundingClientRect (charEdges); NOT Range.getClientRects() | Phase 2 deliberate | do not revert without ADR | ADR-0002 |
