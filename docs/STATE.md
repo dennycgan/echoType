@@ -9,7 +9,7 @@
 ## Capability Roadmap (project-level; top-to-bottom = execution order; YOU ARE HERE)
 - [x] Annotation feature
 - [x] Cloud deploy (CloudFront cutover; live at *.cloudfront.net + post-deploy fixes)
-- [~] Typing experience (Phase 1 auto-loop done; Session flow + IME remain)    <-- YOU ARE HERE
+- [~] Typing experience (Phase 2 session flow done; IME remains)    <-- YOU ARE HERE
 - [ ] Course management (short/article routes, card list, DELETE, search/filter/sort)
 - [ ] Course stats (per-session + cumulative; needs typing session data first)
 - [ ] Auth (Cognito; replaces demo-user shim; required before sharing externally)
@@ -25,7 +25,7 @@
 ## Phase Roadmap (active capability only)
 Active capability: Typing experience
 - [x] Phase 1 — Auto-loop (cap input, loop reset, session counters; ADR-0006)
-- [ ] Phase 2 — Session flow (loop UI, idle timer, pasteRanges, End/Reset polish)
+- [x] Phase 2 — Session flow (textarea, newline skip, idle, pasteRanges, immersive)
 - [ ] Phase 3 — IME (composition events; highest risk)
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
@@ -33,9 +33,9 @@ Active capability: Typing experience
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Phase 2 Session flow — polish one sitting (loop UI, timer, pasteRanges, End/Reset).
-- Sub-steps done: Phase 1 auto-loop shipped (owner验收 pass)
-- Next step: Phase 2 design review, then implement
+- Goal (one line): Phase 3 IME — composition events on typing page without breaking ADR-0002 measurement.
+- Sub-steps done: Phase 2 session flow shipped (owner验收 pass)
+- Next step: Phase 3 design review, then implement
 - Related decisions: ADR-0006 (monotonic session charCount)
 
 ## Contract pointers (don't memorize, go read the source)

@@ -67,7 +67,7 @@ async function main() {
     });
     obs.observe(visible, { attributes: true, childList: true, subtree: true, characterData: true });
 
-    const input = document.querySelector('input');
+    const input = document.querySelector('[data-testid="typing-input"]') ?? document.querySelector('textarea');
     w.__lat = [];
     input.addEventListener('input', () => {
       const t0 = performance.now();
@@ -75,7 +75,7 @@ async function main() {
     });
   });
 
-  const input = page.locator('input');
+  const input = page.locator('[data-testid="typing-input"]');
   await input.focus();
 
   // --- a' : per-keystroke DOM mutation counts -------------------------------

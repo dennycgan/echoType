@@ -1,17 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import type { AnnotationDTO } from '@echotype/shared';
+import type { AnnotationDTO, PasteRange } from '@echotype/shared';
 import { api } from '../lib/api';
 import { AnnotatedText } from '../components/AnnotatedText';
+import {
+  alignedProgress,
+  buildTargetStatuses,
+  clampTyped,
+  countAlignedErrors,
+  isPassComplete,
+} from '../lib/typingAlign';
+import {
+  IMMERSIVE_MODE_STORAGE_KEY,
+  TYPING_TEXTAREA_CLASS,
+  TYPING_TEXTAREA_IMMERSIVE_CLASS,
+  formatTypingDuration,
+} from '../lib/typingSurface';
 
-/** Live per-loop diff errors (typed is capped to target.length). */
-function countLoopErrors(typed: string, target: string): number {
-  let errors = 0;
-  for (let i = 0; i < typed.length; i++) {
-    if (typed[i] !== target[i]) errors++;
+const IDLE_MS = 5000;
+const TICK_MS = 100;
+
+function readImmersiveModePreference(): boolean {
+  try {
+    return localStorage.getItem(IMMERSIVE_MODE_STORAGE_KEY) === '1';
+  } catch {
+    return false;
   }
-  return errors;
 }
 
 export function TypingPage() {
@@ -53,7 +68,10 @@ function TypingSession({
   const [loopCount, setLoopCount] = useState(0);
   const [sessionCharCount, setSessionCharCount] = useState(0);
   const [sessionErrorCount, setSessionErrorCount] = useState(0);
-  const [submitted, setSubmitted] = useState<null | {
+  const [pasteRanges, setPasteRanges] = useState<PasteRange[]>([]);
+  const [activeMs, setActiveMs] = useState(0);
+  /** Stats from the most recent successful Save; shown while user continues typing. */
+  const [lastSaved, setLastSaved] = useState<null | {
     durationSec: number;
     wpm: number;
     accuracy: number;
@@ -61,26 +79,61 @@ function TypingSession({
     charCount: number;
     loopCount: number;
   }>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [immersiveMode, setImmersiveMode] = useState(readImmersiveModePreference);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lastActivityAtRef = useRef<number | null>(null);
+  const pasteMetaRef = useRef<{ start: number; end: number; clipLen: number } | null>(null);
 
   useEffect(() => {
-    inputRef.current?.focus();
+    textareaRef.current?.focus();
   }, []);
 
+  const touchActivity = useCallback(() => {
+    lastActivityAtRef.current = Date.now();
+  }, []);
+
+  useEffect(() => {
+    if (!startedAt) return;
+    const id = window.setInterval(() => {
+      const last = lastActivityAtRef.current;
+      if (last === null) return;
+      if (Date.now() - last < IDLE_MS) {
+        setActiveMs((ms) => ms + TICK_MS);
+      }
+    }, TICK_MS);
+    return () => window.clearInterval(id);
+  }, [startedAt]);
+
+  const typingStatuses = useMemo(() => buildTargetStatuses(typed, target), [typed, target]);
+
   const liveStats = useMemo(() => {
-    const errors = countLoopErrors(typed, target);
+    const errors = countAlignedErrors(typed, target);
     const accuracy = typed.length === 0 ? 1 : 1 - errors / typed.length;
     return { errors, accuracy };
   }, [typed, target]);
 
-  const elapsedSec = startedAt ? (Date.now() - startedAt.getTime()) / 1000 : 0;
-  const wpm = elapsedSec > 0 ? sessionCharCount / 5 / (elapsedSec / 60) : 0;
-  const progress = target.length === 0 ? 0 : typed.length / target.length;
+  const elapsedSecWhole = Math.floor(activeMs / 1000);
+  const wpm =
+    elapsedSecWhole > 0 ? sessionCharCount / 5 / (elapsedSecWhole / 60) : 0;
+  const progress = alignedProgress(typed, target);
+  const passNumber = startedAt ? loopCount + 1 : null;
+
+  function beginFreshSession() {
+    setTyped('');
+    setStartedAt(null);
+    setLoopCount(0);
+    setSessionCharCount(0);
+    setSessionErrorCount(0);
+    setPasteRanges([]);
+    setActiveMs(0);
+    lastActivityAtRef.current = null;
+  }
 
   const submitMutation = useMutation({
     mutationFn: api.createSession,
     onSuccess: (s) => {
-      setSubmitted({
+      setLastSaved({
         durationSec: s.durationSec,
         wpm: s.wpm,
         accuracy: s.accuracy,
@@ -88,20 +141,56 @@ function TypingSession({
         charCount: s.charCount,
         loopCount: s.loopCount,
       });
+      beginFreshSession();
+      queueMicrotask(() => textareaRef.current?.focus());
     },
   });
 
-  function handleChange(value: string) {
-    const normalized = value.slice(0, target.length);
+  function handleImmersiveModeChange(enabled: boolean) {
+    setImmersiveMode(enabled);
+    try {
+      localStorage.setItem(IMMERSIVE_MODE_STORAGE_KEY, enabled ? '1' : '0');
+    } catch {
+      /* ignore quota / private mode */
+    }
+    queueMicrotask(() => textareaRef.current?.focus());
+  }
 
-    if (!startedAt && normalized.length > 0) setStartedAt(new Date());
+  useLayoutEffect(() => {
+    if (immersiveMode) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const maxPx = Math.floor(window.innerHeight * 0.4);
+    el.style.height = `${Math.min(el.scrollHeight, maxPx)}px`;
+  }, [typed, immersiveMode]);
+
+  function applyTypedChange(next: string) {
+    const normalized = clampTyped(next, target);
+
+    if (pasteMetaRef.current) {
+      const { start, end, clipLen } = pasteMetaRef.current;
+      pasteMetaRef.current = null;
+      const replaced = end - start;
+      const netAdded = normalized.length - typed.length + replaced;
+      if (netAdded > 0) {
+        const length = Math.min(clipLen, netAdded);
+        setPasteRanges((ranges) => [...ranges, { start, length }]);
+      }
+    }
+
+    if (!startedAt && normalized.length > 0) {
+      const now = Date.now();
+      setStartedAt(new Date(now));
+      lastActivityAtRef.current = now;
+    }
 
     if (normalized.length > typed.length) {
       setSessionCharCount((c) => c + (normalized.length - typed.length));
     }
 
-    if (normalized.length === target.length && target.length > 0) {
-      setSessionErrorCount((c) => c + countLoopErrors(normalized, target));
+    if (isPassComplete(normalized, target)) {
+      setSessionErrorCount((c) => c + countAlignedErrors(normalized, target));
       setLoopCount((n) => n + 1);
       setTyped('');
       return;
@@ -110,15 +199,29 @@ function TypingSession({
     setTyped(normalized);
   }
 
+  function handleChange(value: string) {
+    touchActivity();
+    applyTypedChange(value);
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    touchActivity();
+    const el = e.currentTarget;
+    pasteMetaRef.current = {
+      start: el.selectionStart ?? typed.length,
+      end: el.selectionEnd ?? typed.length,
+      clipLen: e.clipboardData.getData('text').length,
+    };
+  }
+
   function handleFinish() {
     if (!startedAt) return;
     const endedAt = new Date();
-    const durationSec = Math.max(0, Math.round((endedAt.getTime() - startedAt.getTime()) / 1000));
-    const partialErrors = typed.length > 0 ? countLoopErrors(typed, target) : 0;
+    const durationSec = Math.max(0, Math.round(activeMs / 1000));
+    const partialErrors = typed.length > 0 ? countAlignedErrors(typed, target) : 0;
     const errorCount = sessionErrorCount + partialErrors;
     const finalWpm = durationSec > 0 ? sessionCharCount / 5 / (durationSec / 60) : 0;
-    const accuracy =
-      sessionCharCount === 0 ? 1 : 1 - errorCount / sessionCharCount;
+    const accuracy = sessionCharCount === 0 ? 1 : 1 - errorCount / sessionCharCount;
 
     submitMutation.mutate({
       courseId,
@@ -130,18 +233,20 @@ function TypingSession({
       wpm: Number(finalWpm.toFixed(2)),
       accuracy: Number(accuracy.toFixed(4)),
       loopCount,
-      pasteRanges: [],
+      pasteRanges,
     });
   }
 
   function handleReset() {
-    setTyped('');
-    setStartedAt(null);
-    setLoopCount(0);
-    setSessionCharCount(0);
-    setSessionErrorCount(0);
-    setSubmitted(null);
-    inputRef.current?.focus();
+    if (
+      startedAt &&
+      !window.confirm('Discard this session and start from scratch?')
+    ) {
+      return;
+    }
+    beginFreshSession();
+    setLastSaved(null);
+    textareaRef.current?.focus();
   }
 
   return (
@@ -153,50 +258,114 @@ function TypingSession({
         </Link>
       </div>
 
-      <AnnotatedText content={target} annotations={annotations} typed={typed} clickableNotes />
+      <div
+        className={immersiveMode ? 'cursor-text' : undefined}
+        onMouseDown={
+          immersiveMode
+            ? (e) => {
+                if ((e.target as HTMLElement).closest('[role="button"]')) return;
+                textareaRef.current?.focus();
+              }
+            : undefined
+        }
+      >
+        <AnnotatedText
+          content={target}
+          annotations={annotations}
+          typingStatuses={typingStatuses}
+          clickableNotes
+        />
+      </div>
 
-      <input
-        ref={inputRef}
-        type="text"
-        autoFocus
-        value={typed}
-        onChange={(e) => handleChange(e.target.value)}
-        className="w-full rounded-md border bg-white px-3 py-2 font-mono text-sm shadow-sm focus:border-slate-500 focus:outline-none"
-        placeholder="Start typing…"
-        disabled={!!submitted}
-      />
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={immersiveMode}
+            aria-label="Immersive mode"
+            onClick={() => handleImmersiveModeChange(!immersiveMode)}
+            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 ${
+              immersiveMode ? 'bg-slate-900' : 'bg-slate-200'
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                immersiveMode ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-700">Immersive mode</p>
+            <p className="text-xs text-slate-400">Hide typing box</p>
+          </div>
+        </div>
+
+        <textarea
+          ref={textareaRef}
+          data-testid="typing-input"
+          autoFocus
+          rows={1}
+          value={typed}
+          onChange={(e) => handleChange(e.target.value)}
+          onPaste={handlePaste}
+          onKeyDown={touchActivity}
+          className={immersiveMode ? TYPING_TEXTAREA_IMMERSIVE_CLASS : TYPING_TEXTAREA_CLASS}
+          placeholder={immersiveMode ? undefined : 'Type here…'}
+          spellCheck={false}
+          autoComplete="off"
+          autoCorrect="off"
+        />
+
+        {immersiveMode && (
+          <p className="text-sm text-slate-500">
+            Typing box hidden — click the passage or start typing. Turn off immersive mode to view
+            or copy your input.
+          </p>
+        )}
+      </div>
 
       <StatsBar
-        durationSec={elapsedSec}
+        durationSec={elapsedSecWhole}
         wpm={wpm}
         accuracy={liveStats.accuracy}
         progress={progress}
         errors={liveStats.errors}
+        pass={passNumber}
       />
 
       <div className="flex gap-2">
         <button
           onClick={handleFinish}
-          disabled={!startedAt || submitMutation.isPending || !!submitted}
+          disabled={!startedAt || submitMutation.isPending}
           className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {submitMutation.isPending ? 'Saving…' : 'End session & save'}
+          {submitMutation.isPending ? 'Saving…' : 'Save session'}
         </button>
         <button
           onClick={handleReset}
           className="rounded-md border bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
         >
-          Reset
+          Start over
         </button>
       </div>
 
-      {submitted && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-          <p className="font-medium">Session saved.</p>
-          <p>
-            duration {submitted.durationSec}s · wpm {submitted.wpm.toFixed(1)} · accuracy{' '}
-            {(submitted.accuracy * 100).toFixed(1)}% · errors {submitted.errorCount} · chars{' '}
-            {submitted.charCount} · loops {submitted.loopCount}
+      {lastSaved && (
+        <div className="relative rounded-md border border-emerald-200 bg-emerald-50 p-4 pr-10 text-sm text-emerald-900">
+          <button
+            type="button"
+            onClick={() => setLastSaved(null)}
+            className="absolute right-2 top-2 rounded p-1 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900"
+            aria-label="Dismiss last saved session stats"
+          >
+            ×
+          </button>
+          <p className="font-medium">Last session saved</p>
+          <p className="mt-1 text-emerald-800">
+            Stats from your most recent save: duration {formatTypingDuration(lastSaved.durationSec)} · wpm{' '}
+            {lastSaved.wpm.toFixed(1)} · accuracy {(lastSaved.accuracy * 100).toFixed(1)}% · errors{' '}
+            {lastSaved.errorCount} · chars {lastSaved.charCount} · loops {lastSaved.loopCount}
           </p>
         </div>
       )}
@@ -213,20 +382,23 @@ function StatsBar({
   accuracy,
   progress,
   errors,
+  pass,
 }: {
   durationSec: number;
   wpm: number;
   accuracy: number;
   progress: number;
   errors: number;
+  pass: number | null;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2 rounded-md border bg-white p-3 text-sm sm:grid-cols-5">
-      <Stat label="time" value={`${durationSec.toFixed(1)}s`} />
+    <div className="grid grid-cols-2 gap-2 rounded-md border bg-white p-3 text-sm sm:grid-cols-6">
+      <Stat label="time" value={formatTypingDuration(durationSec)} />
       <Stat label="wpm" value={wpm.toFixed(1)} />
       <Stat label="accuracy" value={`${(accuracy * 100).toFixed(1)}%`} />
       <Stat label="progress" value={`${(progress * 100).toFixed(0)}%`} />
       <Stat label="errors" value={String(errors)} />
+      <Stat label="pass" value={pass === null ? '—' : String(pass)} />
     </div>
   );
 }

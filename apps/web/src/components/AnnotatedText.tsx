@@ -21,6 +21,8 @@ import {
   type Note,
 } from './annotated-text/layoutUtils';
 import { useTextMeasurement } from './annotated-text/useTextMeasurement';
+import type { TargetCharStatus } from '../lib/typingAlign';
+import { TYPING_SURFACE_CLASS } from '../lib/typingSurface';
 
 // Read-only annotated text renderer (Phase 2.0).
 //
@@ -40,6 +42,8 @@ import { useTextMeasurement } from './annotated-text/useTextMeasurement';
 
 export type CharStatus = 'untyped' | 'correct' | 'wrong' | 'cursor';
 
+export type { TargetCharStatus };
+
 export interface AnnotationView {
   id: string;
   startIndex: number;
@@ -50,18 +54,69 @@ export interface AnnotationView {
 interface AnnotatedTextProps {
   content: string;
   annotations: AnnotationView[];
-  typed?: string; // typing page passes this; editor (Phase 3) omits it
+  /** Legacy index-aligned diff when typingStatuses omitted. */
+  typed?: string;
+  /** Typing page: per-target-index statuses from sync alignment (direction R). */
+  typingStatuses?: TargetCharStatus[];
   /** Typing page: click truncated notes to view full text in a popover. */
   clickableNotes?: boolean;
   className?: string;
 }
 
-function charClassName(ch: string, typedCh: string | undefined, isCursor: boolean): string {
+function legacyCharClassName(ch: string, typedCh: string | undefined, isCursor: boolean): string {
   if (typedCh !== undefined) {
     return typedCh === ch ? 'text-emerald-600' : 'rounded-sm bg-red-200 text-red-800';
   }
   if (isCursor) return 'underline decoration-2 underline-offset-2 text-slate-700';
   return 'text-slate-400';
+}
+
+function typingStatusClassName(status: TargetCharStatus): string {
+  switch (status) {
+    case 'correct':
+      return 'text-emerald-600';
+    case 'wrong':
+      return 'rounded-sm bg-red-200 text-red-800';
+    case 'correct-newline':
+      return 'text-emerald-600';
+    case 'wrong-enter':
+      return 'rounded-sm bg-red-200 text-red-800';
+    case 'cursor':
+      return 'underline decoration-2 underline-offset-2 text-slate-700';
+    case 'skipped-newline':
+    case 'untyped':
+    default:
+      return 'text-slate-400';
+  }
+}
+
+function renderLegacyChar(ch: string, typedCh: string | undefined, isCursor: boolean) {
+  return (
+    <span className={`relative z-[1] ${legacyCharClassName(ch, typedCh, isCursor)}`}>
+      {ch === '\n' ? '' : ch}
+    </span>
+  );
+}
+
+function renderTypingChar(ch: string, status: TargetCharStatus) {
+  if (status === 'skipped-newline') {
+    return <span className="relative z-[1]" aria-hidden />;
+  }
+  if (status === 'correct-newline' || status === 'wrong-enter') {
+    return (
+      <span className={`relative z-[1] ${typingStatusClassName(status)}`} aria-label="line break">
+        ↵
+      </span>
+    );
+  }
+  if (ch === '\n' && status !== 'cursor') {
+    return <span className="relative z-[1]" aria-hidden />;
+  }
+  return (
+    <span className={`relative z-[1] ${typingStatusClassName(status)}`}>
+      {ch === '\n' ? '' : ch}
+    </span>
+  );
 }
 
 const Char = memo(function Char({
@@ -73,11 +128,17 @@ const Char = memo(function Char({
   typedCh: string | undefined;
   isCursor: boolean;
 }) {
-  return (
-    <span className={`relative z-[1] ${charClassName(ch, typedCh, isCursor)}`}>
-      {ch === '\n' ? '' : ch}
-    </span>
-  );
+  return renderLegacyChar(ch, typedCh, isCursor);
+});
+
+const TypingChar = memo(function TypingChar({
+  ch,
+  status,
+}: {
+  ch: string;
+  status: TargetCharStatus;
+}) {
+  return renderTypingChar(ch, status);
 });
 
 const NoteBox = memo(function NoteBox({
@@ -185,6 +246,7 @@ const LineRow = memo(function LineRow({
   datum,
   chars,
   typed,
+  typingStatuses,
   charHeight,
   clickableNotes,
   openNoteId,
@@ -193,6 +255,7 @@ const LineRow = memo(function LineRow({
   datum: LineDatum;
   chars: string[];
   typed: string;
+  typingStatuses?: TargetCharStatus[];
   charHeight: number;
   clickableNotes: boolean;
   openNoteId: string | null;
@@ -200,6 +263,7 @@ const LineRow = memo(function LineRow({
 }) {
   const indices: number[] = [];
   for (let i = datum.start; i <= datum.end; i++) indices.push(i);
+  const useTypingStatuses = typingStatuses !== undefined;
   return (
     <div className="mb-2.5 last:mb-0">
       <LineDecorations
@@ -211,14 +275,18 @@ const LineRow = memo(function LineRow({
       <div className="relative" style={{ whiteSpace: 'pre' }}>
         <BandLayer bands={datum.bands} charHeight={charHeight} />
         <span className="relative z-[1]">
-          {indices.map((i) => (
-            <Char
-              key={i}
-              ch={chars[i] ?? ''}
-              typedCh={i < typed.length ? typed[i] : undefined}
-              isCursor={i === typed.length}
-            />
-          ))}
+          {indices.map((i) =>
+            useTypingStatuses ? (
+              <TypingChar key={i} ch={chars[i] ?? ''} status={typingStatuses[i] ?? 'untyped'} />
+            ) : (
+              <Char
+                key={i}
+                ch={chars[i] ?? ''}
+                typedCh={i < typed.length ? typed[i] : undefined}
+                isCursor={i === typed.length}
+              />
+            ),
+          )}
         </span>
       </div>
     </div>
@@ -277,6 +345,7 @@ export function AnnotatedText({
   content,
   annotations,
   typed = '',
+  typingStatuses,
   clickableNotes = false,
   className,
 }: AnnotatedTextProps) {
@@ -357,10 +426,15 @@ export function AnnotatedText({
     if (!openNoteId) return;
 
     window.addEventListener('resize', closePopover);
-    window.addEventListener('scroll', closePopover, { passive: true, capture: true });
+    const onScroll = (e: Event) => {
+      const el = e.target;
+      if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) return;
+      closePopover();
+    };
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
     return () => {
       window.removeEventListener('resize', closePopover);
-      window.removeEventListener('scroll', closePopover, true);
+      window.removeEventListener('scroll', onScroll, true);
     };
   }, [clickableNotes, openNoteId, closePopover]);
 
@@ -370,7 +444,7 @@ export function AnnotatedText({
 
   return (
     <div
-      className={`rounded-md border bg-white p-4 font-mono text-base leading-relaxed ${className ?? ''}`}
+      className={`${TYPING_SURFACE_CLASS} ${className ?? ''}`}
       data-testid="annotated-text"
     >
       <div ref={refs.boxRef as Ref<HTMLDivElement>} style={{ position: 'relative' }}>
@@ -403,6 +477,7 @@ export function AnnotatedText({
               datum={datum}
               chars={chars}
               typed={typed}
+              typingStatuses={typingStatuses}
               charHeight={layout.charHeight}
               clickableNotes={clickableNotes}
               openNoteId={openNoteId}

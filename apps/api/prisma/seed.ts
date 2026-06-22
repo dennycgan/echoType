@@ -8,6 +8,10 @@ const STRAY_BIRDS_49 = `I thank thee that I am none of the wheels of power but I
 
 const WHAT_I_HAVE_LIVED_FOR = `Three passions, simple but overwhelmingly strong, have governed my life: the longing for love, the search for knowledge, and unbearable pity for the suffering of mankind. These passions, like great winds, have blown me hither and thither, in a wayward course, over a deep ocean of anguish, reaching to the very verge of despair. I have sought love, first, because it brings ecstasy - ecstasy so great that I would often have sacrificed all the rest of life for a few hours of this joy. I have sought it, next, because it relieves loneliness - that terrible loneliness in which one shivering consciousness looks over the rim of the world into the cold unfathomable lifeless abyss. I have sought it, finally, because in the union of love I have seen, in a mystic miniature, the prefiguring vision of the heaven that saints and poets have imagined. This is what I sought, and though it might seem too good for human life, this is what - at last - I have found.`;
 
+const GETTYSBURG_OPENING = `Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal.
+
+Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this.`;
+
 // Build annotation rows by locating each phrase in the content. endIndex is
 // inclusive (anchoredText === content.slice(start, end + 1)); the anchor chars
 // must be non-whitespace, which holds for all phrases below.
@@ -177,6 +181,15 @@ async function main() {
       },
     });
   }
+
+  await upsertAnnotatedCourse(
+    user.id,
+    essaysCategory.id,
+    'Gettysburg Address (opening)',
+    GETTYSBURG_OPENING,
+    CourseMode.ARTICLE,
+    [],
+  );
 
   console.log(`Seed complete. Demo user: ${user.id}`);
 }
