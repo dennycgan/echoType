@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import type { CourseDTO, CourseMode } from '@echotype/shared';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, isCourseNotFoundError } from '../lib/api';
 import { CourseEditorModal } from '../components/editor/CourseEditorModal';
 
 type EditorTarget =
@@ -54,7 +54,7 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
     },
     onError: (e: unknown) => {
       setDeletingId(null);
-      if (e instanceof ApiError && e.status === 404) {
+      if (isCourseNotFoundError(e)) {
         setDeleteError('Course not found — it may have already been deleted.');
         qc.invalidateQueries({ queryKey: ['courses', courseMode] });
         return;

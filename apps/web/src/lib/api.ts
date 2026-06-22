@@ -43,6 +43,25 @@ export class ApiError extends Error {
   }
 }
 
+export function getApiErrorStatus(error: unknown): number | null {
+  if (error instanceof ApiError) return error.status;
+  if (error && typeof error === 'object' && 'status' in error) {
+    const status = (error as { status: unknown }).status;
+    if (typeof status === 'number') return status;
+  }
+  return null;
+}
+
+/** Missing/deleted course — 410 avoids CloudFront SPA 404→index.html rewrite on /api. */
+export function isCourseNotFoundError(error: unknown): boolean {
+  const status = getApiErrorStatus(error);
+  return status === 404 || status === 410;
+}
+
+function looksLikeHtmlDocument(text: string): boolean {
+  return /^\s*</.test(text) || /<!DOCTYPE/i.test(text);
+}
+
 async function parseErrorBody(res: Response): Promise<unknown> {
   const text = await res.text();
   if (!text) return null;
@@ -74,6 +93,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(res.status, body);
   }
   if (res.status === 204) return undefined as T;
+
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!contentType.includes('json')) {
+    const text = await res.text();
+    // CloudFront custom_error_response maps origin 404 → 200 + index.html for SPA.
+    if (looksLikeHtmlDocument(text)) {
+      throw new ApiError(410, { error: 'not_found' });
+    }
+    throw new ApiError(res.status, { message: text }, 'Unexpected response format');
+  }
   return res.json() as Promise<T>;
 }
 

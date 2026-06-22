@@ -119,7 +119,7 @@ export async function registerCourseRoutes(app: FastifyInstance) {
       include: { annotations: true },
     });
     if (!course) {
-      return reply.status(404).send({ error: 'not_found' });
+      return reply.status(410).send({ error: 'not_found' });
     }
     return serializeCourse(course);
   });

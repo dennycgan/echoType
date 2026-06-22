@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { AnnotationDTO, CourseMode, PasteRange } from '@echotype/shared';
-import { api, ApiError } from '../lib/api';
+import { api, isCourseNotFoundError } from '../lib/api';
 import { AnnotatedText } from '../components/AnnotatedText';
 import {
   alignedProgress,
@@ -64,7 +64,7 @@ export function TypingPage() {
     queryFn: () => api.getCourse(id!),
     enabled: !!id,
     retry: (failureCount, err) => {
-      if (err instanceof ApiError && err.status === 404) return false;
+      if (isCourseNotFoundError(err)) return false;
       return failureCount < 3;
     },
   });
@@ -74,7 +74,7 @@ export function TypingPage() {
   }
 
   if (isError) {
-    if (error instanceof ApiError && error.status === 404) {
+    if (isCourseNotFoundError(error)) {
       return <CourseNotFoundPanel />;
     }
     return <p className="text-slate-500">Failed to load course.</p>;
