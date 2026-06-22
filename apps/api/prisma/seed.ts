@@ -65,6 +65,22 @@ const PHASE42_TWELVE_NOTES_ANNOTATIONS = buildAnnotations(PHASE42_TWELVE_NOTES, 
   { phrase: 'yesterday', note: '昨天' },
 ]);
 
+// Sample course for IME (Phase 3) + newline-skip (ADR-0007) manual QA: a short
+// multi-line Chinese passage. Wang Wei's poem echoes EchoType's theme ("但闻人语
+// 响" = echo; "复照" = repetition). noteText is English gloss for English-native
+// readers exploring the Chinese text.
+const DEER_ENCLOSURE = `空山不见人，但闻人语响。
+返景入深林，复照青苔上。`;
+
+const DEER_ENCLOSURE_ANNOTATIONS = buildAnnotations(DEER_ENCLOSURE, [
+  { phrase: '空山', note: 'On the lonely mountain' },
+  { phrase: '不见人', note: 'I see no one' },
+  { phrase: '但闻人语响', note: 'Yet I hear the echo of voices' },
+  { phrase: '返景', note: 'the returning sun rays' },
+  { phrase: '入深林', note: 'Into the deep, deep forest' },
+  { phrase: '复照青苔上', note: 'Shining once more upon luscious, green moss' },
+]);
+
 async function upsertAnnotatedCourse(
   userId: string,
   categoryId: string,
@@ -122,6 +138,14 @@ async function main() {
     },
     update: {},
     create: { userId: user.id, mode: CourseMode.ARTICLE, name: 'Classic Essays' },
+  });
+
+  const samplesCategory = await prisma.category.upsert({
+    where: {
+      userId_mode_name: { userId: user.id, mode: CourseMode.SHORT, name: 'Samples' },
+    },
+    update: {},
+    create: { userId: user.id, mode: CourseMode.SHORT, name: 'Samples' },
   });
 
   let shortCourse = await prisma.course.findFirst({
@@ -189,6 +213,15 @@ async function main() {
     GETTYSBURG_OPENING,
     CourseMode.ARTICLE,
     [],
+  );
+
+  await upsertAnnotatedCourse(
+    user.id,
+    samplesCategory.id,
+    'Deer Enclosure 鹿柴 (Wang Wei)',
+    DEER_ENCLOSURE,
+    CourseMode.SHORT,
+    DEER_ENCLOSURE_ANNOTATIONS,
   );
 
   console.log(`Seed complete. Demo user: ${user.id}`);

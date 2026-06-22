@@ -64,6 +64,8 @@ function TypingSession({
   annotations: AnnotationDTO[];
 }) {
   const [typed, setTyped] = useState('');
+  /** Raw textarea value (mirrors the DOM, incl. IME preedit). Invariant: draft === textarea value. */
+  const [draft, setDraft] = useState('');
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [loopCount, setLoopCount] = useState(0);
   const [sessionCharCount, setSessionCharCount] = useState(0);
@@ -84,6 +86,8 @@ function TypingSession({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastActivityAtRef = useRef<number | null>(null);
   const pasteMetaRef = useRef<{ start: number; end: number; clipLen: number } | null>(null);
+  /** True between compositionstart and compositionend (IME in progress). */
+  const composingRef = useRef(false);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -121,6 +125,7 @@ function TypingSession({
 
   function beginFreshSession() {
     setTyped('');
+    setDraft('');
     setStartedAt(null);
     setLoopCount(0);
     setSessionCharCount(0);
@@ -163,10 +168,11 @@ function TypingSession({
     el.style.height = 'auto';
     const maxPx = Math.floor(window.innerHeight * 0.4);
     el.style.height = `${Math.min(el.scrollHeight, maxPx)}px`;
-  }, [typed, immersiveMode]);
+  }, [draft, immersiveMode]);
 
-  function applyTypedChange(next: string) {
-    const normalized = clampTyped(next, target);
+  /** Commit a settled (non-composing) textarea value into the aligned `typed` buffer + stats. */
+  function commitDraft(raw: string) {
+    const normalized = clampTyped(raw, target);
 
     if (pasteMetaRef.current) {
       const { start, end, clipLen } = pasteMetaRef.current;
@@ -193,15 +199,32 @@ function TypingSession({
       setSessionErrorCount((c) => c + countAlignedErrors(normalized, target));
       setLoopCount((n) => n + 1);
       setTyped('');
+      setDraft('');
       return;
     }
 
     setTyped(normalized);
+    if (normalized !== raw) setDraft(normalized);
   }
 
-  function handleChange(value: string) {
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const value = e.target.value;
+    setDraft(value);
     touchActivity();
-    applyTypedChange(value);
+    // Hold off diff/stats/loop while an IME composition is active; commit on end.
+    if ((e.nativeEvent as InputEvent).isComposing || composingRef.current) return;
+    commitDraft(value);
+  }
+
+  function handleCompositionStart() {
+    composingRef.current = true;
+  }
+
+  function handleCompositionEnd(e: React.CompositionEvent<HTMLTextAreaElement>) {
+    composingRef.current = false;
+    const value = e.currentTarget.value;
+    setDraft(value);
+    commitDraft(value);
   }
 
   function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
@@ -298,7 +321,10 @@ function TypingSession({
           </button>
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-700">Immersive mode</p>
-            <p className="text-xs text-slate-400">Hide typing box</p>
+            <p className="text-xs text-slate-400">
+              Immersive mode hides the box. Best with English or non-IME input — IME candidate
+              windows may appear off-screen.
+            </p>
           </div>
         </div>
 
@@ -307,8 +333,10 @@ function TypingSession({
           data-testid="typing-input"
           autoFocus
           rows={1}
-          value={typed}
-          onChange={(e) => handleChange(e.target.value)}
+          value={draft}
+          onChange={handleChange}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           onPaste={handlePaste}
           onKeyDown={touchActivity}
           className={immersiveMode ? TYPING_TEXTAREA_IMMERSIVE_CLASS : TYPING_TEXTAREA_CLASS}
