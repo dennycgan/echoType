@@ -180,4 +180,16 @@ export async function registerCourseRoutes(app: FastifyInstance) {
     });
     return reply.send(serializeCourse(updated));
   });
+
+  app.delete<{ Params: { id: string } }>('/courses/:id', async (req, reply) => {
+    const existing = await prisma.course.findFirst({
+      where: { id: req.params.id, userId: req.userId },
+      select: { id: true },
+    });
+    if (!existing) {
+      return reply.status(404).send({ error: 'not_found' });
+    }
+    await prisma.course.delete({ where: { id: existing.id } });
+    return reply.status(204).send();
+  });
 }

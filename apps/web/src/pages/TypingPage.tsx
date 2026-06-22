@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { AnnotationDTO, CourseMode, PasteRange } from '@echotype/shared';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { AnnotatedText } from '../components/AnnotatedText';
 import {
   alignedProgress,
@@ -20,6 +20,7 @@ import {
 
 const IDLE_MS = 5000;
 const TICK_MS = 100;
+const COURSE_NOT_FOUND_REDIRECT_SEC = 5;
 
 function readImmersiveModePreference(): boolean {
   try {
@@ -29,16 +30,58 @@ function readImmersiveModePreference(): boolean {
   }
 }
 
+function CourseNotFoundPanel() {
+  const navigate = useNavigate();
+  const [secLeft, setSecLeft] = useState(COURSE_NOT_FOUND_REDIRECT_SEC);
+
+  useEffect(() => {
+    if (secLeft <= 0) {
+      navigate('/', { replace: true });
+      return;
+    }
+    const id = window.setTimeout(() => setSecLeft((s) => s - 1), 1000);
+    return () => window.clearTimeout(id);
+  }, [secLeft, navigate]);
+
+  return (
+    <div className="space-y-3 rounded-md border border-slate-200 bg-white p-6">
+      <p className="font-medium text-slate-900">Course not found</p>
+      <p className="text-sm text-slate-600">
+        This course was deleted or is no longer available.
+      </p>
+      <p className="text-sm text-slate-500">Redirecting to home in {secLeft}s…</p>
+      <Link to="/" className="text-sm text-slate-700 underline hover:text-slate-900">
+        Go now
+      </Link>
+    </div>
+  );
+}
+
 export function TypingPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: course, isLoading } = useQuery({
+  const { data: course, isLoading, isError, error } = useQuery({
     queryKey: ['course', id],
     queryFn: () => api.getCourse(id!),
     enabled: !!id,
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status === 404) return false;
+      return failureCount < 3;
+    },
   });
 
-  if (isLoading || !course) {
+  if (isLoading) {
     return <p className="text-slate-500">Loading…</p>;
+  }
+
+  if (isError) {
+    if (error instanceof ApiError && error.status === 404) {
+      return <CourseNotFoundPanel />;
+    }
+    return <p className="text-slate-500">Failed to load course.</p>;
+  }
+
+  if (!course) {
+    return null;
   }
 
   return (

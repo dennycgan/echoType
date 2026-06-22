@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import type { CourseDTO, CourseMode } from '@echotype/shared';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { CourseEditorModal } from '../components/editor/CourseEditorModal';
 
 type EditorTarget =
@@ -32,6 +32,7 @@ const MODE_COPY: Record<
 
 export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
   const copy = MODE_COPY[courseMode];
+  const qc = useQueryClient();
 
   const { data: courses, isLoading } = useQuery({
     queryKey: ['courses', courseMode],
@@ -40,6 +41,37 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
 
   const [editor, setEditor] = useState<EditorTarget>(null);
   const [highlightCourseId, setHighlightCourseId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (courseId: string) => api.deleteCourse(courseId),
+    onSuccess: (_data, courseId) => {
+      setDeleteError(null);
+      qc.invalidateQueries({ queryKey: ['courses', courseMode] });
+      qc.removeQueries({ queryKey: ['course', courseId] });
+      setDeletingId(null);
+    },
+    onError: (e: unknown) => {
+      setDeletingId(null);
+      if (e instanceof ApiError && e.status === 404) {
+        setDeleteError('Course not found — it may have already been deleted.');
+        qc.invalidateQueries({ queryKey: ['courses', courseMode] });
+        return;
+      }
+      setDeleteError('Failed to delete course. Please try again.');
+    },
+  });
+
+  function handleDelete(course: CourseDTO) {
+    const ok = window.confirm(
+      `Delete "${course.title}"? This cannot be undone. All annotations and typing sessions for this course will be removed.`,
+    );
+    if (!ok) return;
+    setDeleteError(null);
+    setDeletingId(course.id);
+    deleteMutation.mutate(course.id);
+  }
 
   useEffect(() => {
     if (!highlightCourseId) return;
@@ -64,6 +96,12 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
             New course
           </button>
         </div>
+
+        {deleteError && (
+          <p className="mb-3 text-sm text-red-600" role="alert">
+            {deleteError}
+          </p>
+        )}
 
         {isLoading ? (
           <p className="text-slate-500">Loading…</p>
@@ -92,6 +130,14 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
                     className="rounded border px-3 py-1 text-sm text-slate-700 hover:bg-slate-50"
                   >
                     Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(c)}
+                    disabled={deletingId === c.id}
+                    className="rounded border border-red-200 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {deletingId === c.id ? 'Deleting…' : 'Delete'}
                   </button>
                   {c.annotations.length > 0 && (
                     <span className="text-xs text-slate-400">
