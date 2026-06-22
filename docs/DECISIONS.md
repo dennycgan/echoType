@@ -224,3 +224,56 @@
   - Implementation: `apps/web/src/lib/typingAlign.ts`, `TypingPage.tsx`,
     `AnnotatedText.tsx` (`typingStatuses` prop only — no charEdges change; ADR-0002).
 - Supersedes / superseded-by: none
+
+---
+
+## ADR-0008 — IME composition: dual buffer (draft / typed) + controlled-value invariant
+- Status: Accepted (2026-06-22)
+- Commit/PR anchor: 3a67a2f
+- Plain summary (owner reads this): When you type with an input method (e.g.
+  Chinese pinyin), the box shows your in-progress composition without disturbing
+  the diff, error count, or auto-loop; only the confirmed text counts. Two pieces
+  of state (`draft`, `typed`) are intentional, not redundant.
+- Context: Phase 2 made typing a controlled `<textarea value={typed}>` plus an
+  idle timer that re-renders every 100ms. During IME composition the browser
+  writes preedit into the textarea and fires `input` events. If the change handler
+  ran the diff/stats each time, preedit would pollute the passage diff, pinyin
+  keys would inflate charCount, and a pass could complete mid-composition. More
+  subtly, the idle timer's periodic re-render resets the controlled `value` back
+  to stale `typed`, wiping the preedit and breaking the IME (classic controlled-
+  input + IME bug, amplified by the Phase 2 timer).
+- Decision:
+  1. **Dual buffer**: `draft` mirrors the live textarea value (incl. preedit) and
+     is bound as `value={draft}`; `typed` is the committed, sync-aligned buffer
+     feeding diff/stats/loop (ADR-0007 logic reused unchanged).
+  2. **Invariant**: `draft` always equals the textarea's current value, so any
+     re-render writing `value={draft}` is a no-op (React skips DOM write when
+     `node.value === nextValue`) → preedit is never clobbered.
+  3. **Gating**: `onChange` always `setDraft`; while
+     `nativeEvent.isComposing || composingRef.current` it does NOT touch
+     `typed`/stats/loop. `compositionend` commits once; idempotent with any
+     trailing `input(isComposing=false)` (delta 0 on re-commit).
+  4. **charCount**: counts committed output characters (你好 = 2), not pinyin
+     keystrokes — consistent with ADR-0006 "characters added".
+  5. Typing engine is mode-agnostic (SHORT == ARTICLE); IME path identical.
+- Rejected alternatives:
+  - Single buffer, only skip setState while composing — broken by the idle-timer
+    re-render that resets `value` and wipes preedit.
+  - Lock/flag to pause rendering — more fragile and easier to miss a path than an
+    invariant guarded by React's own value comparison.
+  - Switch textarea to uncontrolled during composition — React forbids
+    controlled↔uncontrolled swaps, and caret/selection handoff is error-prone.
+- Consequences:
+  - English / no-IME steady state has `draft === typed`; behavior == Phase 2 (zero
+    regression).
+  - **The invariant depends on React's controlled-input value comparison.** Any
+    refactor of the textarea rendering that breaks "draft == DOM value" will make
+    IME break again — this is the invariant to guard (core reason for this ADR).
+  - Immersive mode (hidden textarea) may render the IME candidate window off-
+    screen; surfaced via a constant helper line near the toggle (no extra logic).
+  - Real IME is OS-level; automation can only synthesize composition events as a
+    smoke probe — primary acceptance is manual QA with a real input method.
+  - Implementation: `apps/web/src/pages/TypingPage.tsx` only (no charEdges change;
+    ADR-0002). Sample course `Deer Enclosure 鹿柴` (Samples category) added to
+    `apps/api/prisma/seed.ts` for IME + newline-skip manual QA.
+- Supersedes / superseded-by: none
