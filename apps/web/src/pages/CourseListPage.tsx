@@ -1,18 +1,41 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import type { CourseDTO } from '@echotype/shared';
+import type { CourseDTO, CourseMode } from '@echotype/shared';
 import { api } from '../lib/api';
 import { CourseEditorModal } from '../components/editor/CourseEditorModal';
 
-type EditorTarget = { mode: 'create' } | { mode: 'edit'; course: CourseDTO } | null;
+type EditorTarget =
+  | { mode: 'create' }
+  | { mode: 'edit'; course: CourseDTO }
+  | null;
 
 const HIGHLIGHT_MS = 2000;
 
-export function CoursesPage() {
+const MODE_COPY: Record<
+  CourseMode,
+  { title: string; empty: string; otherLabel: string; otherPath: string }
+> = {
+  SHORT: {
+    title: 'Short courses',
+    empty: 'No short courses yet. Create one above.',
+    otherLabel: 'Article courses',
+    otherPath: '/courses/article',
+  },
+  ARTICLE: {
+    title: 'Article courses',
+    empty: 'No article courses yet. Create one above.',
+    otherLabel: 'Short courses',
+    otherPath: '/courses/short',
+  },
+};
+
+export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
+  const copy = MODE_COPY[courseMode];
+
   const { data: courses, isLoading } = useQuery({
-    queryKey: ['courses'],
-    queryFn: api.listCourses,
+    queryKey: ['courses', courseMode],
+    queryFn: () => api.listCourses(courseMode),
   });
 
   const [editor, setEditor] = useState<EditorTarget>(null);
@@ -27,8 +50,13 @@ export function CoursesPage() {
   return (
     <div className="space-y-6">
       <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Your courses</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-xl font-semibold">{copy.title}</h2>
+            <Link to={copy.otherPath} className="text-sm text-slate-500 hover:text-slate-800">
+              Switch to {copy.otherLabel.toLowerCase()} →
+            </Link>
+          </div>
           <button
             onClick={() => setEditor({ mode: 'create' })}
             className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
@@ -40,7 +68,7 @@ export function CoursesPage() {
         {isLoading ? (
           <p className="text-slate-500">Loading…</p>
         ) : !courses?.length ? (
-          <p className="text-slate-500">No courses yet. Create one above.</p>
+          <p className="text-slate-500">{copy.empty}</p>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">
             {courses.map((c) => (
@@ -50,12 +78,7 @@ export function CoursesPage() {
                   highlightCourseId === c.id ? 'ring-2 ring-emerald-400' : ''
                 }`}
               >
-                <div className="mb-1 flex items-center justify-between">
-                  <h3 className="font-medium">{c.title}</h3>
-                  <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                    {c.mode}
-                  </span>
-                </div>
+                <h3 className="mb-1 font-medium">{c.title}</h3>
                 <p className="line-clamp-2 text-sm text-slate-500">{c.content}</p>
                 <div className="mt-3 flex items-center gap-2">
                   <Link
@@ -84,9 +107,10 @@ export function CoursesPage() {
 
       {editor && (
         <CourseEditorModal
-          key={editor.mode === 'edit' ? `edit-${editor.course.id}` : 'create'}
+          key={editor.mode === 'edit' ? `edit-${editor.course.id}` : `create-${courseMode}`}
           mode={editor.mode}
           course={editor.mode === 'edit' ? editor.course : undefined}
+          presetCourseMode={courseMode}
           onClose={() => setEditor(null)}
           onSaved={(courseId) => {
             setEditor(null);

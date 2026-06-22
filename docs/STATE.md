@@ -24,8 +24,8 @@
 
 ## Phase Roadmap (active capability only)
 Active capability: Course management
-- [ ] Phase 1 — Mode shell (`/courses/short` + `/courses/article`, shared list component; Home Short/Article entry; create preset mode; edit mode read-only)
-- [ ] Phase 2 — DELETE + editor cleanup (`DELETE /courses/:id` + confirm; remove Step1 mode radio)
+- [x] Phase 1 — Mode shell (`/courses/short` + `/courses/article`, shared `CourseListPage`; Home cards; `/courses` → `/`; create preset mode; edit mode read-only)
+- [ ] Phase 2 — DELETE (`DELETE /courses/:id` + confirm dialog)
 - [ ] Phase 3 — Search + sort (search title/content/noteText; sort: createdAt asc/desc, updatedAt desc, title A–Z only)
 - [ ] Phase 4 — Categories (album model: create category with name + description; move course into/out of category)
 
@@ -34,10 +34,10 @@ Active capability: Course management
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Course management Phase 1 design — mode routes + shared list shell.
-- Sub-steps done: Typing capability closed; course-mgmt phase plan aligned with kickoff user flow
-- Next step: Phase 1 design review, then implement
-- Related decisions: ADR-0006, ADR-0007, ADR-0008 (typing); course-mgmt routing/sort/category scope locked in STATE
+- Goal (one line): Course management Phase 2 — course DELETE API + confirm UI.
+- Sub-steps done: Phase 1 mode shell shipped (owner验收 pass)
+- Next step: Phase 2 design review, then implement
+- Related decisions: kickoff user flow 10–12; course-mgmt scope in STATE
 
 ## Contract pointers (don't memorize, go read the source)
 - Types/validation: packages/shared/course.ts
@@ -53,7 +53,6 @@ Active capability: Course management
 ## Known debt / intentionally deferred
 | Capability | Item | Reason | Picks it up | Related ADR |
 |---|---|---|---|---|
-| Course mgmt | CoursesPage not split into routes | Phase 3.0 debt | course management Phase 1 | — |
 | Course mgmt | Sort modes 4/5/7 (loop count, cumulative session time, last practice) + card cumulative stats on list cards | Need aggregated course stats from TypingSession; Phase 3 sort limited to createdAt/updatedAt/title | **return after Course stats capability** — wire sorts + card fields then | — |
 | Typing | English course + accidental IME shows red diff only, no explicit "switch to English" guidance | Phase 3 chose IME-as-valid-input (ADR-0008) over kickoff #7 banner/pause; red diff implies the error | future polish / real-usage feedback | ADR-0008 |
 | Annotation | false-green (duplicate substring, no index shift) | MVP skips index shift | user reanchor | — |

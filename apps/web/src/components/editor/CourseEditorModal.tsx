@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ARTICLE_MAX, ARTICLE_MIN, SHORT_MAX, SHORT_MIN, type CourseDTO } from '@echotype/shared';
+import { ARTICLE_MAX, ARTICLE_MIN, SHORT_MAX, SHORT_MIN, type CourseDTO, type CourseMode } from '@echotype/shared';
 import { api, ApiError } from '../../lib/api';
 import { AnnotatedText } from '../AnnotatedText';
 import { AnnotatedTextEditor, confirmAbandonPick } from './AnnotatedTextEditor';
@@ -25,12 +25,21 @@ import { useCourseEditor, type EditorMode } from './useCourseEditor';
 interface CourseEditorModalProps {
   mode: EditorMode;
   course?: CourseDTO; // present when editing
+  /** Locks mode for create (from list route) and must match course.mode when editing. */
+  presetCourseMode: CourseMode;
   onClose: () => void;
   onSaved: (courseId: string) => void;
 }
 
-export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEditorModalProps) {
-  const ed = useCourseEditor(mode, course);
+export function CourseEditorModal({
+  mode,
+  course,
+  presetCourseMode,
+  onClose,
+  onSaved,
+}: CourseEditorModalProps) {
+  const lockedCourseMode = mode === 'edit' ? course!.mode : presetCourseMode;
+  const ed = useCourseEditor(mode, course, lockedCourseMode);
   const qc = useQueryClient();
   const [toast, setToast] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -274,6 +283,16 @@ export function CourseEditorModal({ mode, course, onClose, onSaved }: CourseEdit
 
 function Step1({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
   const len = ed.content.length;
+  const modeLabel = ed.courseMode === 'SHORT' ? 'Short mode' : 'Article mode';
+  const modeRange =
+    ed.courseMode === 'SHORT'
+      ? `${SHORT_MIN}–${SHORT_MAX} characters`
+      : `${ARTICLE_MIN}–${ARTICLE_MAX} characters`;
+  const modeHint =
+    ed.courseMode === 'SHORT'
+      ? 'Best for quotes, short poems, a single sentence or paragraph'
+      : 'Best for full speeches, poems, essays, self-contained passages';
+
   return (
     <div className="space-y-4">
       <label className="block">
@@ -286,53 +305,15 @@ function Step1({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
         />
       </label>
 
-      {/*
-        TEMP (Phase 3.0 stopgap): mode selector should not be here.
-        Target UX: mode is preselected on the mode-specific list page
-        before opening this modal. To be removed when mode routes land:
-        - CoursesPage will split into short/article routes
-        - Modal will receive mode as prop, displaying it read-only
-          in edit mode (since changing mode mid-edit is meaningless)
-      */}
-      <fieldset className="space-y-2">
-        <legend className="text-sm text-slate-600">Mode</legend>
-        <label className="flex cursor-pointer items-start gap-2 rounded border px-3 py-2 hover:bg-slate-50">
-          <input
-            type="radio"
-            name="course-mode"
-            className="mt-1"
-            checked={ed.courseMode === 'SHORT'}
-            onChange={() => ed.setCourseMode('SHORT')}
-          />
-          <span>
-            <span className="text-sm font-medium">Short mode</span>
-            <span className="block text-xs text-slate-400">
-              Best for quotes, short poems, a single sentence or paragraph ({SHORT_MIN}-{SHORT_MAX}{' '}
-              characters)
-            </span>
-          </span>
-        </label>
-        <label className="flex cursor-pointer items-start gap-2 rounded border px-3 py-2 hover:bg-slate-50">
-          <input
-            type="radio"
-            name="course-mode"
-            className="mt-1"
-            checked={ed.courseMode === 'ARTICLE'}
-            onChange={() => ed.setCourseMode('ARTICLE')}
-          />
-          <span>
-            <span className="text-sm font-medium">Article mode</span>
-            <span className="block text-xs text-slate-400">
-              Best for full speeches, poems, essays, self-contained passages ({ARTICLE_MIN}-
-              {ARTICLE_MAX} characters)
-            </span>
-          </span>
-        </label>
-        <span className="block text-xs text-slate-400">
-          A character = each keystroke (letters, punctuation, spaces, and line breaks each count as
-          one).
-        </span>
-      </fieldset>
+      <div className="rounded-md border bg-slate-50 px-3 py-2">
+        <p className="text-sm font-medium text-slate-800">{modeLabel}</p>
+        <p className="mt-1 text-xs text-slate-500">
+          {modeHint} ({modeRange})
+        </p>
+        <p className="mt-2 text-xs text-slate-400">
+          Mode is set by the list you opened this course from and cannot be changed here.
+        </p>
+      </div>
 
       <label className="block">
         <span className="text-sm text-slate-600">

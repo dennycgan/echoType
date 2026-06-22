@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import type { AnnotationDTO, PasteRange } from '@echotype/shared';
+import type { AnnotationDTO, CourseMode, PasteRange } from '@echotype/shared';
 import { api } from '../lib/api';
 import { AnnotatedText } from '../components/AnnotatedText';
 import {
@@ -45,6 +45,7 @@ export function TypingPage() {
     <TypingSession
       key={course.id}
       courseId={course.id}
+      courseMode={course.mode}
       target={course.content}
       title={course.title}
       annotations={course.annotations}
@@ -52,13 +53,19 @@ export function TypingPage() {
   );
 }
 
+function coursesListPath(mode: CourseMode): string {
+  return mode === 'SHORT' ? '/courses/short' : '/courses/article';
+}
+
 function TypingSession({
   courseId,
+  courseMode,
   target,
   title,
   annotations,
 }: {
   courseId: string;
+  courseMode: CourseMode;
   target: string;
   title: string;
   annotations: AnnotationDTO[];
@@ -276,7 +283,7 @@ function TypingSession({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{title}</h1>
-        <Link to="/courses" className="text-sm text-slate-500 hover:text-slate-800">
+        <Link to={coursesListPath(courseMode)} className="text-sm text-slate-500 hover:text-slate-800">
           ← Back
         </Link>
       </div>

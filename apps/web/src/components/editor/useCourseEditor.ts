@@ -87,7 +87,6 @@ export interface UseCourseEditor {
   content: string;
   setContent: (v: string) => void;
   courseMode: CourseMode;
-  setCourseMode: (v: CourseMode) => void;
 
   needAnnotation: boolean | null;
   setNeedAnnotation: (v: boolean) => void;
@@ -131,9 +130,14 @@ export interface UseCourseEditor {
   clearSubmitFeedback: () => void;
 }
 
-export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): UseCourseEditor {
+export function useCourseEditor(
+  editorMode: EditorMode,
+  initial: CourseDTO | undefined,
+  lockedCourseMode: CourseMode,
+): UseCourseEditor {
   const initialState = useMemo(() => resolveInitialEditorState(editorMode, initial), [editorMode, initial]);
   const initialContentNorm = initialState.content;
+  const courseMode = lockedCourseMode;
 
   const [step, setStep] = useState<EditorStep>(1);
   const [title, setTitle] = useState(initial?.title ?? '');
@@ -141,7 +145,6 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
   const setContent = useCallback((v: string) => {
     setContentState(normalizeLineEndings(v));
   }, []);
-  const [courseMode, setCourseMode] = useState<CourseMode>(initial?.mode ?? 'SHORT');
   const originalAnnotationCount = initial?.annotations?.length ?? 0;
 
   const [needAnnotation, setNeedAnnotationState] = useState<boolean | null>(() =>
@@ -353,7 +356,6 @@ export function useCourseEditor(editorMode: EditorMode, initial?: CourseDTO): Us
     content,
     setContent,
     courseMode,
-    setCourseMode,
     needAnnotation,
     setNeedAnnotation,
     skipAnnotationChoice,
