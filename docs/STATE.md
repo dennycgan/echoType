@@ -25,7 +25,7 @@
 ## Phase Roadmap (active capability only)
 Active capability: Typing experience
 - [x] Phase 1 — Auto-loop (cap input, loop reset, session counters; ADR-0006)
-- [x] Phase 2 — Session flow (textarea, newline skip, idle, pasteRanges, immersive)
+- [x] Phase 2 — Session flow (textarea, newline skip, idle, pasteRanges, immersive; ADR-0007)
 - [ ] Phase 3 — IME (composition events; highest risk)
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
@@ -36,7 +36,7 @@ Active capability: Typing experience
 - Goal (one line): Phase 3 IME — composition events on typing page without breaking ADR-0002 measurement.
 - Sub-steps done: Phase 2 session flow shipped (owner验收 pass)
 - Next step: Phase 3 design review, then implement
-- Related decisions: ADR-0006 (monotonic session charCount)
+- Related decisions: ADR-0006, ADR-0007
 
 ## Contract pointers (don't memorize, go read the source)
 - Types/validation: packages/shared/course.ts
