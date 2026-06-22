@@ -10,7 +10,7 @@
 - [x] Annotation feature
 - [x] Cloud deploy (CloudFront cutover; live at *.cloudfront.net + post-deploy fixes)
 - [x] Typing experience (auto-loop, newline skip, session flow, IME composition; ADR-0006/0007/0008)
-- [ ] Course management (mode routes, card list, DELETE, search/sort, categories)    <-- YOU ARE HERE
+- [ ] Course management (mode routes, card list, DELETE, description, search/sort, categories)    <-- YOU ARE HERE
 - [ ] Course stats (per-session + cumulative; needs typing session data first)
 - [ ] Auth (Cognito; replaces demo-user shim; required before sharing externally)
 - [ ] Custom domain (purchase + ACM cert + CloudFront alias; deferred until self-testing settles)
@@ -26,18 +26,19 @@
 Active capability: Course management
 - [x] Phase 1 — Mode shell (`/courses/short` + `/courses/article`, shared `CourseListPage`; Home cards; `/courses` → `/`; create preset mode; edit mode read-only)
 - [x] Phase 2 — DELETE (`DELETE /courses/:id` 204, physical + Prisma cascade, `window.confirm`, typing not-found → `/`; GET missing **410** + CloudFront client guard; ADR-0010)
-- [ ] Phase 3 — Search + sort (search title/content/noteText; sort: createdAt asc/desc, updatedAt desc, title A–Z only)
-- [ ] Phase 4 — Categories (album model: create category with name + description; move course into/out of category)
+- [ ] Phase 3 — Course description (`DESCRIPTION_MAX` 1000; schema + migration; Step 1 optional textarea; typing display ≤280 full / >280 fold; list card fixed 4-row — title + description `line-clamp-1` + content `line-clamp-1` + pinned actions; plain text + URL linkify; Deer Enclosure EN seed; ADR-0011; Phase 5 album reuse)
+- [ ] Phase 4 — Search + sort (server `GET /courses?q&sort`; search title/content/noteText/**description**; sort createdAt asc/desc, updatedAt desc, title A–Z; IME-aware debounce; English UI; no URL state)
+- [ ] Phase 5 — Categories / album (album description reuses Phase 3 field + editor pattern)
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Course management Phase 3 — search + sort on mode-scoped lists.
-- Sub-steps done: Phase 2 DELETE shipped + prod not-found fix (816ff3f, f43eda0; owner验收 pass)
-- Next step: Phase 3 design review, then implement
-- Related decisions: ADR-0009 (mode-scoped lists); ADR-0010 (delete semantics)
+- Goal (one line): Course management Phase 3 — optional per-course description (schema, editor, typing + card display, seed).
+- Sub-steps done: Phase 2 DELETE + prod not-found fix (816ff3f, f43eda0; owner验收 pass); Phase 3 design approved
+- Next step: Phase 3 implement (ADR-0011 + code)
+- Related decisions: ADR-0011 (description semantics); ADR-0009/0010; Phase 4 search deferred until description lands
 
 ## Contract pointers (don't memorize, go read the source)
 - Types/validation: packages/shared/course.ts
@@ -53,7 +54,8 @@ Active capability: Course management
 ## Known debt / intentionally deferred
 | Capability | Item | Reason | Picks it up | Related ADR |
 |---|---|---|---|---|
-| Course mgmt | Sort modes 4/5/7 (loop count, cumulative session time, last practice) + card cumulative stats on list cards | Need aggregated course stats from TypingSession; Phase 3 sort limited to createdAt/updatedAt/title | **return after Course stats capability** — wire sorts + card fields then | — |
+| Course mgmt | Sort modes 4/5/7 (loop count, cumulative session time, last practice) + card cumulative stats on list cards | Need aggregated course stats from TypingSession; Phase 4 sort limited to createdAt/updatedAt/title | **return after Course stats capability** — wire sorts + card fields then | — |
+| Course mgmt | Full markdown in description (headings, `[text](url)` syntax) | Phase 3 plain text + optional URL linkify only; no markdown renderer | future polish if users paste rich notes | ADR-0011 (pending) |
 | Typing | English course + accidental IME shows red diff only, no explicit "switch to English" guidance | Phase 3 chose IME-as-valid-input (ADR-0008) over kickoff #7 banner/pause; red diff implies the error | future polish / real-usage feedback | ADR-0008 |
 | Annotation | false-green (duplicate substring, no index shift) | MVP skips index shift | user reanchor | — |
 | Annotation | Overlay measurement = mirror offsetTop (lines) + per-glyph getBoundingClientRect (charEdges); NOT Range.getClientRects() | Phase 2 deliberate | do not revert without ADR | ADR-0002 |
