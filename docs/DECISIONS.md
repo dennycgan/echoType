@@ -467,3 +467,59 @@
   - Phase 5 categories build on the same list shell; category filter is a future
     `GET /courses` query extension, not Phase 4.
 - Supersedes / superseded-by: none
+
+---
+
+## ADR-0013 — Collections (user-facing), assignment, bulk actions, title uniqueness
+- Status: Accepted (2026-06-24)
+- Commit/PR anchor: f26a6ed
+- Plain summary (owner reads this): Mode-scoped **collections** group courses. Users
+  create/edit collections (optional description reuses Phase 3 patterns), assign
+  courses via overflow menus and bulk actions, and delete collections (cascade-deletes
+  contained courses). Removing a course from a collection returns it to the main
+  list; deleting a course is always permanent. Collection and course **names/titles**
+  are unique per user+mode (case-sensitive); duplicates return **409** with explicit
+  copy. Mode list search with `q` finds collections and **all** matching courses
+  (including inside collections); without `q`, only uncategorized courses appear.
+- Context: ADR-0009 scoped lists by mode; ADR-0011 reserved description field/component
+  for collections; ADR-0012 added list search/sort. Product requires folder-like
+  collections (not iPhone-album semantics): delete collection deletes courses;
+  remove-from-collection on detail is unlink, batch delete is real delete. English UI
+  label **Collection**; code/schema `Category`.
+- Decision:
+  1. **Schema**: `Category.description` VARCHAR(1000); `Course.categoryId` FK
+     `onDelete: Cascade`; `@@unique([userId, mode, name])` on categories;
+     `@@unique([userId, mode, title])` on courses.
+  2. **API**: `GET/POST/PUT/DELETE /categories`; `GET /courses?categoryId=null|<id>`
+     (omit = all); `PATCH /courses/category` batch assign/move/remove;
+     `GET /courses/title-available` for editor Step 1; `CourseDTO.categoryName` for
+     search hits; duplicate name/title → **409** (`duplicate_collection_name` /
+     `duplicate_course_title`).
+  3. **Main list UI**: full-width collection bars (scroll when **>3** visible);
+     course cards below; **Bulk actions** + **Cancel** toggles checkboxes; collection
+     bars not bulk-selectable.
+  4. **Search**: empty `q` → collections + **uncategorized** courses only; with `q`
+     → global course OR search + collection name/description; in-collection hits
+     show `Inside collection: {name}` badge.
+  5. **Collection detail**: `/courses/{short|article}/collections/:id`; description
+     via `CourseDescriptionPanel` + `Description: ` prefix; sort only (no in-page
+     search — Known debt); Edit/Delete collection in title row.
+  6. **Assignment UX**: `⋯` menus — Delete (always real delete); Move/Add/Remove with
+     confirms on remove; batch Move/Remove/Delete on detail and mode list.
+  7. **Editor**: `OptionalDescriptionField` parameterized; course title duplicate
+     checked on **Step 1 Next** (skip when edit title unchanged); Save still guards
+     409 for races.
+  8. **Delete semantics**: delete collection → cascade courses; remove from collection
+     → `categoryId: null`; delete course → `DELETE /courses/:id` everywhere.
+- Rejected alternatives:
+  - iPhone-album unlink-on-delete — product chose folder-like cascade delete.
+  - Album UI label — **Collection** avoids Photos muscle memory.
+  - Main-list-only search (ADR-0012 draft) — superseded by global `q` search (5B).
+  - Checkboxes always visible — bulk mode gated behind Bulk actions button.
+  - Client-only duplicate detection — server 409 + Step 1 `title-available` API.
+  - Case-insensitive unique names — PostgreSQL default case-sensitive (3A).
+- Consequences:
+  - Deploy requires API migrations + web together.
+  - Phase 4 list `categoryId` filter extends ADR-0012 list contract.
+  - Course stats capability picks up deferred sort modes 4/5/7 (STATE Known debt).
+- Supersedes / superseded-by: refines ADR-0012 consequence on category filter (implemented in Phase 5, not deferred)
