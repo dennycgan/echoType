@@ -10,12 +10,17 @@ export type OverflowMenuItem = {
 type CardOverflowMenuProps = {
   items: OverflowMenuItem[];
   ariaLabel: string;
+  onOpenChange?: (open: boolean) => void;
 };
 
-export function CardOverflowMenu({ items, ariaLabel }: CardOverflowMenuProps) {
+export function CardOverflowMenu({ items, ariaLabel, onOpenChange }: CardOverflowMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [open, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;

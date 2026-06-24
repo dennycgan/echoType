@@ -27,6 +27,8 @@ export const CategoryDTO = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   rollup: CategoryRollupDTO,
+  /** True when the mode-wide most recently practiced course belongs to this collection. */
+  lastPracticeHere: z.boolean(),
 });
 export type CategoryDTO = z.infer<typeof CategoryDTO>;
 

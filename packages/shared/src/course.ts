@@ -73,6 +73,8 @@ export const CourseDTO = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   stats: CourseStatsDTO,
+  /** True when this course is the mode-wide most recently practiced (tie-break: smallest id). */
+  lastPracticeHere: z.boolean(),
 });
 export type CourseDTO = z.infer<typeof CourseDTO>;
 

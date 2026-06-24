@@ -10,6 +10,7 @@ import {
 import { prisma } from '../prisma.js';
 import { toOptionalDescription } from '../text.js';
 import { isUniqueConstraintViolation } from '../prismaErrors.js';
+import { findModeLastPracticedCourse, modeLastPracticeCategoryIds } from '../modeLastPractice.js';
 
 const categoryInclude = {
   _count: { select: { courses: true } },
@@ -37,7 +38,7 @@ function listCategoriesOrderBy(sort: CourseListSort): Prisma.CategoryOrderByWith
   }
 }
 
-function serializeCategory(category: CategoryWithRollup) {
+function serializeCategory(category: CategoryWithRollup, lastPracticeHere: boolean) {
   return {
     id: category.id,
     name: category.name,
@@ -47,7 +48,20 @@ function serializeCategory(category: CategoryWithRollup) {
     createdAt: category.createdAt.toISOString(),
     updatedAt: category.updatedAt.toISOString(),
     rollup: categoryRollupFromMembers(category.courses),
+    lastPracticeHere,
   };
+}
+
+async function lastPracticeHereForCategory(
+  userId: string,
+  category: CategoryWithRollup,
+  winnerCategoryByMode?: Map<string, string | null>,
+) {
+  const winnerCategoryId =
+    winnerCategoryByMode?.get(category.mode) ??
+    (await findModeLastPracticedCourse(userId, category.mode))?.categoryId ??
+    null;
+  return winnerCategoryId != null && winnerCategoryId === category.id;
 }
 
 export async function registerCategoryRoutes(app: FastifyInstance) {
@@ -71,7 +85,15 @@ export async function registerCategoryRoutes(app: FastifyInstance) {
       orderBy: listCategoriesOrderBy(sort),
       include: categoryInclude,
     });
-    return categories.map(serializeCategory);
+    const winnerByMode = await modeLastPracticeCategoryIds(
+      req.userId,
+      categories.map((c) => c.mode),
+    );
+    return categories.map((c) => {
+      const winnerCategoryId = winnerByMode.get(c.mode) ?? null;
+      const lastPracticeHere = winnerCategoryId != null && winnerCategoryId === c.id;
+      return serializeCategory(c, lastPracticeHere);
+    });
   });
 
   app.get<{ Params: { id: string } }>('/categories/:id', async (req, reply) => {
@@ -82,7 +104,8 @@ export async function registerCategoryRoutes(app: FastifyInstance) {
     if (!category) {
       return reply.status(404).send({ error: 'not_found' });
     }
-    return serializeCategory(category);
+    const lastPracticeHere = await lastPracticeHereForCategory(req.userId, category);
+    return serializeCategory(category, lastPracticeHere);
   });
 
   app.post('/categories', async (req, reply) => {
@@ -97,7 +120,8 @@ export async function registerCategoryRoutes(app: FastifyInstance) {
         },
         include: categoryInclude,
       });
-      return reply.status(201).send(serializeCategory(created));
+      const lastPracticeHere = await lastPracticeHereForCategory(req.userId, created);
+      return reply.status(201).send(serializeCategory(created, lastPracticeHere));
     } catch (error) {
       if (isUniqueConstraintViolation(error)) {
         return reply.status(409).send({ error: 'duplicate_collection_name' });
@@ -124,7 +148,8 @@ export async function registerCategoryRoutes(app: FastifyInstance) {
         },
         include: categoryInclude,
       });
-      return serializeCategory(updated);
+      const lastPracticeHere = await lastPracticeHereForCategory(req.userId, updated);
+      return serializeCategory(updated, lastPracticeHere);
     } catch (error) {
       if (isUniqueConstraintViolation(error)) {
         return reply.status(409).send({ error: 'duplicate_collection_name' });

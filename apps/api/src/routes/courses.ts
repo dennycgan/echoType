@@ -20,13 +20,17 @@ import { prisma } from '../prisma.js';
 import { toOptionalDescription } from '../text.js';
 import { isUniqueConstraintViolation } from '../prismaErrors.js';
 import { serializeCourseStats } from '../courseStats.js';
+import {
+  findModeLastPracticedCourse,
+  modeLastPracticeCourseIds,
+} from '../modeLastPractice.js';
 
 type CourseWithAnnotations = Course & {
   annotations: Annotation[];
   category?: { name: string } | null;
 };
 
-function serializeCourse(course: CourseWithAnnotations) {
+function serializeCourse(course: CourseWithAnnotations, lastPracticeHere: boolean) {
   return {
     id: course.id,
     title: course.title,
@@ -48,7 +52,20 @@ function serializeCourse(course: CourseWithAnnotations) {
     createdAt: course.createdAt.toISOString(),
     updatedAt: course.updatedAt.toISOString(),
     stats: serializeCourseStats(course),
+    lastPracticeHere,
   };
+}
+
+async function lastPracticeHereForCourse(
+  userId: string,
+  course: { id: string; mode: CourseMode },
+  winnerCourseByMode?: Map<CourseMode, string | null>,
+) {
+  const winnerId =
+    winnerCourseByMode?.get(course.mode) ??
+    (await findModeLastPracticedCourse(userId, course.mode))?.id ??
+    null;
+  return winnerId != null && winnerId === course.id;
 }
 
 // Line-ending normalization + control-character filter. Returns normalized content
@@ -170,7 +187,15 @@ export async function registerCourseRoutes(app: FastifyInstance) {
       orderBy: listCoursesOrderBy(sort),
       include: { annotations: true, category: { select: { name: true } } },
     });
-    return courses.map(serializeCourse);
+    const winnerByMode = await modeLastPracticeCourseIds(
+      req.userId,
+      courses.map((c) => c.mode),
+    );
+    return courses.map((c) => {
+      const winnerId = winnerByMode.get(c.mode) ?? null;
+      const lastPracticeHere = winnerId != null && winnerId === c.id;
+      return serializeCourse(c, lastPracticeHere);
+    });
   });
 
   app.get<{ Params: { id: string } }>('/courses/:id', async (req, reply) => {
@@ -181,7 +206,8 @@ export async function registerCourseRoutes(app: FastifyInstance) {
     if (!course) {
       return reply.status(410).send({ error: 'not_found' });
     }
-    return serializeCourse(course);
+    const lastPracticeHere = await lastPracticeHereForCourse(req.userId, course);
+    return serializeCourse(course, lastPracticeHere);
   });
 
   app.post('/courses', async (req, reply) => {
@@ -205,7 +231,8 @@ export async function registerCourseRoutes(app: FastifyInstance) {
         },
         include: { annotations: true, category: { select: { name: true } } },
       });
-      return reply.status(201).send(serializeCourse(created));
+      const lastPracticeHere = await lastPracticeHereForCourse(req.userId, created);
+      return reply.status(201).send(serializeCourse(created, lastPracticeHere));
     } catch (error) {
       if (isUniqueConstraintViolation(error)) {
         return reply.status(409).send({ error: 'duplicate_course_title' });
@@ -248,7 +275,8 @@ export async function registerCourseRoutes(app: FastifyInstance) {
           include: { annotations: true, category: { select: { name: true } } },
         });
       });
-      return reply.send(serializeCourse(updated));
+      const lastPracticeHere = await lastPracticeHereForCourse(req.userId, updated);
+      return reply.send(serializeCourse(updated, lastPracticeHere));
     } catch (error) {
       if (isUniqueConstraintViolation(error)) {
         return reply.status(409).send({ error: 'duplicate_course_title' });

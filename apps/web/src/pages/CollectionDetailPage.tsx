@@ -7,6 +7,7 @@ import { modeListPath } from '../lib/collectionPaths';
 import { DEFAULT_SORT, SORT_OPTIONS } from '../lib/courseListSort';
 import { BulkActionBar } from '../components/BulkActionBar';
 import { CourseDescriptionPanel } from '../components/CourseDescriptionPanel';
+import { CollectionCardPracticeStats, PracticeTag } from '../components/card/CardPracticeStats';
 import { AddCoursesModal } from '../components/collection/AddCoursesModal';
 import { CollectionEditorModal } from '../components/collection/CollectionEditorModal';
 import { CollectionPickerModal } from '../components/collection/CollectionPickerModal';
@@ -238,7 +239,20 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
           ← Back
         </Link>
         <div className="mt-1 flex flex-wrap items-start justify-between gap-2">
-          <h1 className="text-xl font-semibold">{category.name}</h1>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-semibold">{category.name}</h1>
+              {category.lastPracticeHere && <PracticeTag label="Last practiced here" />}
+            </div>
+            <div className="mt-2 max-w-md">
+              <CollectionCardPracticeStats
+                rollup={category.rollup}
+                courseCount={category.courseCount}
+                lastPracticeHere={false}
+                statsRowInline
+              />
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
