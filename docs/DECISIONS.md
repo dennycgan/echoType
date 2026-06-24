@@ -528,14 +528,14 @@
 
 ## ADR-0014 — Course stats: persistence policy, phases, list UI, timer, pause
 - Status: Accepted (2026-06-24)
-- Commit/PR anchor: c9421bd (Phase 2 persistence); 2b0e443 (Phase 3 collection rollup); fd15f5d (Phase 1 STATS + loops display)
+- Commit/PR anchor: c9421bd (Phase 2 persistence); 2b0e443 (Phase 3 collection rollup); fd15f5d (Phase 1 STATS + loops display); d58ed9b (Phase 4 card stats UI + tags)
 - Plain summary (owner reads this): Course and collection **statistics** are driven by
   explicit **Save session** (`POST /sessions`); formulas live in `docs/STATS.md`.
   Cumulative course fields update in the same transaction as each saved session.
-  List cards show explicit duration + loops; full stats in a popover. **Recent**
-  tag (rolling 7 days) on courses; **Last practiced here** on collections when the
-  mode-wide most recently practiced course belongs to that collection. Session
-  **timer** (10min–2h) and **pause** ship in later phases of this capability.
+  Course cards show explicit duration + loops and a hover/pinned stats popover (ⓘ).
+  **Last practiced here** tags the mode-wide most recently practiced course (per
+  SHORT/ARTICLE) and the collection that contains it. Session **timer** (10min–2h)
+  and **pause** ship in later phases of this capability.
 - Context: ADR-0006/0007 define per-session counters; ADR-0012 deferred sort modes
   4/5/7 and card stats; ADR-0013 added collections needing rollup metrics. Kickoff
   requires cumulative stats on cards and practice-based sorts. Product sign-off
@@ -561,13 +561,22 @@
      **Phase 3 shipped** (`2b0e443`): `CategoryDTO.rollup` on `GET/POST/PUT /categories`;
      read-time aggregate via `categoryRollupFromMembers` (no Category table columns).
      Local smoke: `apps/api/scripts/phase3-rollup-probe.mjs`.
-  7. **Course card UI**: explicit `Xh Ym · N loops`; popover for full stats +
-     annotation count (moved off card face); **Recent** if `lastPracticedAt` within
-     7 days (rolling, local clock).
-  8. **Collection card UI**: explicit rollup duration + loops (symmetric to course);
-     **Last practiced here** when mode-wide last-practiced course (tie-break smallest
-     `courseId`) has `categoryId` equal to this collection; same tag on collection
-     detail header.
+  7. **Course card UI**: explicit `formatCardDuration · N loops` on its own row;
+     full stats + annotation count in ⓘ popover (desktop: hover preview without ✕;
+     click pins with ✕ + click-outside dismiss; touch: click-only pinned). ⓘ on
+     the same row as **Type this** / **Edit**. **Last practiced here** on the
+     course title when this course is the mode-wide `lastPracticedAt` winner
+     (tie-break smallest `courseId`). No **Recent** tag (removed — multiple
+     courses would qualify; redundant with last-practice tag).
+     **Phase 4 shipped** (`d58ed9b`): `CourseDTO.lastPracticeHere`,
+     `packages/shared/practiceDisplay.ts`, `CardPracticeStats.tsx`; probes
+     `phase4-display-probe.mjs`, `phase4-last-practice-tag-probe.mjs`.
+  8. **Collection card UI**: list card shows `{courseCount} courses · duration · loops`
+     on one line (no ⓘ, no extra row). **Last practiced here** on collection title
+     when mode-wide winner’s `categoryId` equals this collection. Collection
+     detail header: explicit rollup line + ⓘ popover (same hover/pinned rules as
+     course card). **Phase 4 shipped** (`d58ed9b`): `CategoryDTO.lastPracticeHere`
+     via `modeLastPractice.ts`.
   9. **Sort modes 4/5/7**: `loopCount_desc`, `totalDuration_desc`,
      `lastPracticed_desc` — wire after cumulative columns exist (STATE Phase 5).
   10. **Session timer**: pre-typing choice untimed vs timed (10min–2h); countdown
@@ -582,14 +591,17 @@
       `loopCount + 1` (Phase 1 shipped).
 - Rejected alternatives:
   - Auto-save on timer end or page leave — MVP keeps manual Save (sign-off S1).
-  - `Practiced today` (24h) tag — only **Recent** (7d) retained.
+  - `Practiced today` (24h) tag — rejected.
+  - **Recent** (7d rolling) tag — initially retained, then removed in Phase 4
+    (too many simultaneous tags; **Last practiced here** on course + collection
+    is the sole practice tag).
   - Navigate to mode list after timer-end modal — stay on course typing page (T2).
   - Re-arm countdown after timer block (T3-B) — untimed continuation for rest of visit.
   - Collection tag when any member practiced recently (S6 B) — mode-wide winner only.
   - STATS.md as combined product + metrics doc — split per doc layering.
 - Consequences:
-  - Phases 4–7 remain in STATE; Phase 3 anchor `2b0e443`.
-  - ADR-0012 Known debt sorts/card stats close in Phases 4–5.
+  - Phases 5–7 remain in STATE; Phase 4 anchor `d58ed9b`.
+  - ADR-0012 Known debt sorts close in Phase 5.
   - Timer/pause behavior does not change metric formulas in STATS.md; pause only
     affects when `activeMs` advances.
 - Supersedes / superseded-by: none (extends ADR-0012 deferred sorts; extends ADR-0013 with rollup UI)

@@ -92,7 +92,9 @@ Materialized on the `courses` table. Updated atomically (increment) when a new `
 
 Default when no sessions: `totalDurationSec = 0`, `totalCompletedPasses = 0`, `sessionCount = 0`, `lastPracticedAt = null`, averages `null`.
 
-Code: `packages/shared/src/courseStats.ts`, `apps/api/src/courseStats.ts`.
+**Read-time tag (not stored):** `CourseDTO.lastPracticeHere` — `true` when this course is the mode-wide winner: max `lastPracticedAt` (tie-break smallest `courseId`). At most one per mode per user.
+
+Code: `packages/shared/src/courseStats.ts`, `apps/api/src/courseStats.ts`, `apps/api/src/modeLastPractice.ts`.
 
 ## 4. Collection rollup (on `Category`)
 
@@ -108,6 +110,8 @@ Code: `packages/shared/src/courseStats.ts`, `apps/api/src/courseStats.ts`.
 
 Empty collection: `rollup` is `{ totalDurationSec: 0, totalCompletedPasses: 0, lastPracticedAt: null }`.
 
+**Read-time tag (not stored):** `CategoryDTO.lastPracticeHere` — `true` when the mode-wide last-practiced course’s `categoryId` equals this collection’s `id`.
+
 Code: `packages/shared/src/categoryRollup.ts`, `apps/api/src/routes/categories.ts`.
 
 ## 5. List sort keys (stats-based)
@@ -120,7 +124,19 @@ Code: `packages/shared/src/categoryRollup.ts`, `apps/api/src/routes/categories.t
 
 Non-stats sorts (`createdAt_*`, `updatedAt_desc`, `title_asc`) use `Course` metadata only — see ADR-0012.
 
-## 6. Calculation edge cases
+## 6. Card face display (explicit stats line)
+
+Used on course cards and collection list cards. Code: `packages/shared/src/practiceDisplay.ts`.
+
+| Helper | Output |
+|--------|--------|
+| `formatCardDuration(sec)` | `0m` if &lt; 1 min; else `Nm`, `Nh`, or `Nh Mm` (floor minutes within hour) |
+| `formatLoopCount(n)` | `N loop` / `N loops` |
+| `formatCardStatsLine(duration, passes)` | `{duration} · {loops}` e.g. `2h 15m · 12 loops` |
+
+Collection list card appends rollup to course count: `{courseCount} courses · {stats line}`.
+
+## 7. Calculation edge cases
 
 | Condition | Effect |
 |-----------|--------|
