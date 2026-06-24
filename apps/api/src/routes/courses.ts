@@ -4,6 +4,8 @@ import {
   CreateCourseInput,
   UpdateCourseInput,
   ListCoursesQuery,
+  PatchCoursesCategoryInput,
+  CheckCourseTitleQuery,
   CourseMode,
   type CourseListSort,
   type AnnotationInput,
@@ -15,13 +17,13 @@ import {
   validateMode,
 } from '@echotype/shared';
 import { prisma } from '../prisma.js';
+import { toOptionalDescription } from '../text.js';
+import { isUniqueConstraintViolation } from '../prismaErrors.js';
 
-type CourseWithAnnotations = Course & { annotations: Annotation[] };
-
-function toOptionalDescription(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
+type CourseWithAnnotations = Course & {
+  annotations: Annotation[];
+  category?: { name: string } | null;
+};
 
 function serializeCourse(course: CourseWithAnnotations) {
   return {
@@ -30,6 +32,7 @@ function serializeCourse(course: CourseWithAnnotations) {
     content: course.content,
     mode: course.mode,
     categoryId: course.categoryId,
+    categoryName: course.category?.name ?? null,
     description: course.description,
     annotations: course.annotations
       .slice()
@@ -120,6 +123,20 @@ function listCoursesOrderBy(sort: CourseListSort): Prisma.CourseOrderByWithRelat
 }
 
 export async function registerCourseRoutes(app: FastifyInstance) {
+  app.get('/courses/title-available', async (req) => {
+    const query = CheckCourseTitleQuery.parse(req.query);
+    const existing = await prisma.course.findFirst({
+      where: {
+        userId: req.userId,
+        mode: query.mode,
+        title: query.title,
+        ...(query.excludeId ? { NOT: { id: query.excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+    return { available: !existing };
+  });
+
   app.get('/courses', async (req) => {
     const query = ListCoursesQuery.parse(req.query);
     const q = query.q?.trim() || undefined;
@@ -128,6 +145,11 @@ export async function registerCourseRoutes(app: FastifyInstance) {
       where: {
         userId: req.userId,
         ...(query.mode ? { mode: query.mode } : {}),
+        ...(query.categoryId === 'null'
+          ? { categoryId: null }
+          : query.categoryId
+            ? { categoryId: query.categoryId }
+            : {}),
         ...(q
           ? {
               OR: [
@@ -144,7 +166,7 @@ export async function registerCourseRoutes(app: FastifyInstance) {
           : {}),
       },
       orderBy: listCoursesOrderBy(sort),
-      include: { annotations: true },
+      include: { annotations: true, category: { select: { name: true } } },
     });
     return courses.map(serializeCourse);
   });
@@ -152,7 +174,7 @@ export async function registerCourseRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>('/courses/:id', async (req, reply) => {
     const course = await prisma.course.findFirst({
       where: { id: req.params.id, userId: req.userId },
-      include: { annotations: true },
+      include: { annotations: true, category: { select: { name: true } } },
     });
     if (!course) {
       return reply.status(410).send({ error: 'not_found' });
@@ -168,19 +190,26 @@ export async function registerCourseRoutes(app: FastifyInstance) {
     if (rejectInvalidMode(reply, content, body.mode as CourseModeType)) return;
     if (rejectInvalidAnnotations(reply, content, body.annotations)) return;
 
-    const created = await prisma.course.create({
-      data: {
-        userId: req.userId,
-        title: body.title,
-        content,
-        mode: body.mode as CourseMode,
-        categoryId: body.categoryId ?? null,
-        description: toOptionalDescription(body.description),
-        annotations: { create: toAnnotationRows(content, body.annotations) },
-      },
-      include: { annotations: true },
-    });
-    return reply.status(201).send(serializeCourse(created));
+    try {
+      const created = await prisma.course.create({
+        data: {
+          userId: req.userId,
+          title: body.title,
+          content,
+          mode: body.mode as CourseMode,
+          categoryId: body.categoryId ?? null,
+          description: toOptionalDescription(body.description),
+          annotations: { create: toAnnotationRows(content, body.annotations) },
+        },
+        include: { annotations: true, category: { select: { name: true } } },
+      });
+      return reply.status(201).send(serializeCourse(created));
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        return reply.status(409).send({ error: 'duplicate_course_title' });
+      }
+      throw error;
+    }
   });
 
   app.put<{ Params: { id: string } }>('/courses/:id', async (req, reply) => {
@@ -201,22 +230,29 @@ export async function registerCourseRoutes(app: FastifyInstance) {
 
     // Atomic replace: update scalar fields and swap the entire annotation set in
     // one transaction so a course is never persisted with a stale/partial set.
-    const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.annotation.deleteMany({ where: { courseId: existing.id } });
-      return tx.course.update({
-        where: { id: existing.id },
-        data: {
-          title: body.title,
-          content,
-          mode: body.mode as CourseMode,
-          categoryId: body.categoryId ?? null,
-          description: toOptionalDescription(body.description),
-          annotations: { create: toAnnotationRows(content, body.annotations) },
-        },
-        include: { annotations: true },
+    try {
+      const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.annotation.deleteMany({ where: { courseId: existing.id } });
+        return tx.course.update({
+          where: { id: existing.id },
+          data: {
+            title: body.title,
+            content,
+            mode: body.mode as CourseMode,
+            categoryId: body.categoryId ?? null,
+            description: toOptionalDescription(body.description),
+            annotations: { create: toAnnotationRows(content, body.annotations) },
+          },
+          include: { annotations: true, category: { select: { name: true } } },
+        });
       });
-    });
-    return reply.send(serializeCourse(updated));
+      return reply.send(serializeCourse(updated));
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        return reply.status(409).send({ error: 'duplicate_course_title' });
+      }
+      throw error;
+    }
   });
 
   app.delete<{ Params: { id: string } }>('/courses/:id', async (req, reply) => {
@@ -229,5 +265,74 @@ export async function registerCourseRoutes(app: FastifyInstance) {
     }
     await prisma.course.delete({ where: { id: existing.id } });
     return reply.status(204).send();
+  });
+
+  app.patch('/courses/category', async (req, reply) => {
+    const body = PatchCoursesCategoryInput.parse(req.body);
+    const uniqueIds = [...new Set(body.courseIds)];
+    if (uniqueIds.length !== body.courseIds.length) {
+      return reply.status(422).send({ error: 'duplicate_course_ids' });
+    }
+
+    const courses = await prisma.course.findMany({
+      where: { id: { in: uniqueIds }, userId: req.userId },
+      select: { id: true, mode: true, categoryId: true },
+    });
+    if (courses.length !== uniqueIds.length) {
+      return reply.status(404).send({ error: 'course_not_found' });
+    }
+
+    const modes = new Set(courses.map((c) => c.mode));
+    if (modes.size !== 1) {
+      return reply.status(422).send({ error: 'mixed_modes' });
+    }
+    const mode = courses[0]!.mode;
+
+    if (body.categoryId === null) {
+      const sourceIds = new Set(courses.map((c) => c.categoryId));
+      if (sourceIds.size !== 1 || sourceIds.has(null)) {
+        return reply.status(422).send({ error: 'courses_not_in_same_collection' });
+      }
+      await prisma.course.updateMany({
+        where: { id: { in: uniqueIds }, userId: req.userId },
+        data: { categoryId: null },
+      });
+      return { updated: uniqueIds.length };
+    }
+
+    const target = await prisma.category.findFirst({
+      where: { id: body.categoryId, userId: req.userId },
+      select: { id: true, mode: true },
+    });
+    if (!target) {
+      return reply.status(404).send({ error: 'category_not_found' });
+    }
+    if (target.mode !== mode) {
+      return reply.status(422).send({ error: 'mode_mismatch' });
+    }
+
+    const categoryIds = new Set(courses.map((c) => c.categoryId));
+
+    if (categoryIds.size === 1 && categoryIds.has(null)) {
+      await prisma.course.updateMany({
+        where: { id: { in: uniqueIds }, userId: req.userId },
+        data: { categoryId: target.id },
+      });
+      return { updated: uniqueIds.length };
+    }
+
+    if (categoryIds.size === 1 && !categoryIds.has(null)) {
+      const sourceId = [...categoryIds][0]!;
+      if (sourceId === target.id) {
+        return { updated: 0 };
+      }
+      await prisma.course.updateMany({
+        where: { id: { in: uniqueIds }, userId: req.userId },
+        data: { categoryId: target.id },
+      });
+      return { updated: uniqueIds.length };
+    }
+
+    return reply.status(422).send({ error: 'invalid_category_transition' });
   });
 }

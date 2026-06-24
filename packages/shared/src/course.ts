@@ -66,6 +66,7 @@ export const CourseDTO = z.object({
   content: z.string(),
   mode: CourseMode,
   categoryId: z.string().nullable(),
+  categoryName: z.string().nullable(),
   description: z.string().nullable(),
   annotations: z.array(AnnotationDTO),
   createdAt: z.string(),
@@ -87,8 +88,22 @@ export const ListCoursesQuery = z.object({
   mode: CourseMode.optional(),
   q: z.string().trim().max(SEARCH_Q_MAX).optional(),
   sort: CourseListSort.optional(),
+  /** `null` = uncategorized only; omit = all courses for the user/mode filter. */
+  categoryId: z.union([z.literal('null'), z.string().cuid()]).optional(),
 });
 export type ListCoursesQuery = z.infer<typeof ListCoursesQuery>;
+
+export const CheckCourseTitleQuery = z.object({
+  mode: CourseMode,
+  title: z.string().trim().min(1).max(200),
+  excludeId: z.string().cuid().optional(),
+});
+export type CheckCourseTitleQuery = z.infer<typeof CheckCourseTitleQuery>;
+
+export const CourseTitleAvailabilityDTO = z.object({
+  available: z.boolean(),
+});
+export type CourseTitleAvailabilityDTO = z.infer<typeof CourseTitleAvailabilityDTO>;
 
 // --- Mode-length business rule ------------------------------------------------
 // Same class as annotation rules: the payload shape is valid, but the content

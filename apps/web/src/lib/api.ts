@@ -4,10 +4,13 @@ import type {
   CourseDTO,
   CourseListSort,
   CourseMode,
+  CategoryDTO,
+  CreateCategoryInput,
   CreateCourseInput,
   CreateSessionInput,
   ModeIssue,
   SessionDTO,
+  UpdateCategoryInput,
   UpdateCourseInput,
 } from '@echotype/shared';
 
@@ -108,14 +111,46 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listCourses: (mode?: CourseMode, opts?: { q?: string; sort?: CourseListSort }) => {
+  listCourses: (
+    mode?: CourseMode,
+    opts?: { q?: string; sort?: CourseListSort; categoryId?: string | 'null' },
+  ) => {
+    const params = new URLSearchParams();
+    if (mode) params.set('mode', mode);
+    if (opts?.q) params.set('q', opts.q);
+    if (opts?.sort) params.set('sort', opts.sort);
+    if (opts?.categoryId !== undefined) params.set('categoryId', opts.categoryId);
+    const qs = params.toString();
+    return request<CourseDTO[]>(`/courses${qs ? `?${qs}` : ''}`);
+  },
+  checkCourseTitleAvailable: (
+    mode: CourseMode,
+    title: string,
+    excludeId?: string,
+  ) => {
+    const params = new URLSearchParams({ mode, title });
+    if (excludeId) params.set('excludeId', excludeId);
+    return request<{ available: boolean }>(`/courses/title-available?${params.toString()}`);
+  },
+  patchCoursesCategory: (courseIds: string[], categoryId: string | null) =>
+    request<{ updated: number }>('/courses/category', {
+      method: 'PATCH',
+      body: JSON.stringify({ courseIds, categoryId }),
+    }),
+  listCategories: (mode?: CourseMode, opts?: { q?: string; sort?: CourseListSort }) => {
     const params = new URLSearchParams();
     if (mode) params.set('mode', mode);
     if (opts?.q) params.set('q', opts.q);
     if (opts?.sort) params.set('sort', opts.sort);
     const qs = params.toString();
-    return request<CourseDTO[]>(`/courses${qs ? `?${qs}` : ''}`);
+    return request<CategoryDTO[]>(`/categories${qs ? `?${qs}` : ''}`);
   },
+  getCategory: (id: string) => request<CategoryDTO>(`/categories/${id}`),
+  createCategory: (input: CreateCategoryInput) =>
+    request<CategoryDTO>('/categories', { method: 'POST', body: JSON.stringify(input) }),
+  updateCategory: (id: string, input: UpdateCategoryInput) =>
+    request<CategoryDTO>(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+  deleteCategory: (id: string) => request<void>(`/categories/${id}`, { method: 'DELETE' }),
   getCourse: (id: string) => request<CourseDTO>(`/courses/${id}`),
   createCourse: (input: CreateCourseInput) =>
     request<CourseDTO>('/courses', { method: 'POST', body: JSON.stringify(input) }),

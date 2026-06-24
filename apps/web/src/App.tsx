@@ -1,6 +1,7 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
 import { CourseListPage } from './pages/CourseListPage';
+import { CollectionDetailPage } from './pages/CollectionDetailPage';
 import { TypingPage } from './pages/TypingPage';
 
 export function App() {
@@ -23,6 +24,8 @@ export function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/courses" element={<Navigate to="/" replace />} />
+          <Route path="/courses/short/collections/:collectionId" element={<CollectionDetailPage courseMode="SHORT" />} />
+          <Route path="/courses/article/collections/:collectionId" element={<CollectionDetailPage courseMode="ARTICLE" />} />
           <Route path="/courses/short" element={<CourseListPage courseMode="SHORT" />} />
           <Route path="/courses/article" element={<CourseListPage courseMode="ARTICLE" />} />
           <Route path="/courses/:id/type" element={<TypingPage />} />

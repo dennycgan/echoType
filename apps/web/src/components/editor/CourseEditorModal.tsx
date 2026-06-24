@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ARTICLE_MAX, ARTICLE_MIN, SHORT_MAX, SHORT_MIN, type CourseDTO, type CourseMode } from '@echotype/shared';
 import { api, ApiError } from '../../lib/api';
+import { modeCoursesLabel } from '../../lib/modeCoursesLabel';
 import { AnnotatedText } from '../AnnotatedText';
 import { OptionalDescriptionField } from '../OptionalDescriptionField';
 import { AnnotatedTextEditor, confirmAbandonPick } from './AnnotatedTextEditor';
@@ -28,6 +29,8 @@ interface CourseEditorModalProps {
   course?: CourseDTO; // present when editing
   /** Locks mode for create (from list route) and must match course.mode when editing. */
   presetCourseMode: CourseMode;
+  /** When creating from a collection detail page, assign the new course to this collection. */
+  presetCategoryId?: string;
   onClose: () => void;
   onSaved: (courseId: string) => void;
 }
@@ -36,6 +39,7 @@ export function CourseEditorModal({
   mode,
   course,
   presetCourseMode,
+  presetCategoryId,
   onClose,
   onSaved,
 }: CourseEditorModalProps) {
@@ -46,6 +50,12 @@ export function CourseEditorModal({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [footerHint, setFooterHint] = useState<string | null>(null);
   const [pickState, setPickState] = useState({ active: false, hasUnsavedNote: false });
+  const [step1TitleError, setStep1TitleError] = useState<string | null>(null);
+  const [titleChecking, setTitleChecking] = useState(false);
+
+  useEffect(() => {
+    setStep1TitleError(null);
+  }, [ed.title]);
 
   useEffect(() => {
     if (ed.step !== 3) {
@@ -54,10 +64,15 @@ export function CourseEditorModal({
   }, [ed.step]);
 
   const save = useMutation({
-    mutationFn: () =>
-      mode === 'create'
-        ? api.createCourse(ed.buildPayload())
-        : api.updateCourse(course!.id, ed.buildPayload()),
+    mutationFn: () => {
+      const payload = ed.buildPayload();
+      if (mode === 'create' && presetCategoryId) {
+        return api.createCourse({ ...payload, categoryId: presetCategoryId });
+      }
+      return mode === 'create'
+        ? api.createCourse(payload)
+        : api.updateCourse(course!.id, payload);
+    },
     onSuccess: (saved) => {
       qc.invalidateQueries({ queryKey: ['courses'] });
       onSaved(saved.id);
@@ -72,6 +87,17 @@ export function CourseEditorModal({
   });
 
   function handleApiError(e: ApiError) {
+    const body = e.courseBody;
+    if (e.status === 409 && body?.error === 'duplicate_course_title') {
+      setSubmitError(
+        `A course titled "${ed.title.trim()}" already exists in ${modeCoursesLabel(lockedCourseMode)} courses.`,
+      );
+      return;
+    }
+    if (e.status === 404) {
+      setSubmitError('Course not found — it may have been deleted.');
+      return;
+    }
     if (e.status === 422) {
       const body = e.courseBody;
       if (body?.error === 'annotation_validation_error' && body.issues) {
@@ -135,6 +161,10 @@ export function CourseEditorModal({
   }
 
   function handleNext() {
+    void runHandleNext();
+  }
+
+  async function runHandleNext() {
     setFooterHint(null);
     if (ed.step === 3) {
       if (pickState.active) {
@@ -151,7 +181,39 @@ export function CourseEditorModal({
       }
       ed.clearSubmitFeedback();
     }
-    if (!ed.canProceed) return;
+    if (!ed.canProceed || titleChecking) return;
+
+    if (ed.step === 1) {
+      setStep1TitleError(null);
+      const trimmedTitle = ed.title.trim();
+      const titleUnchanged = mode === 'edit' && trimmedTitle === (course?.title ?? '');
+      if (!titleUnchanged) {
+        setTitleChecking(true);
+        try {
+          const { available } = await api.checkCourseTitleAvailable(
+            lockedCourseMode,
+            trimmedTitle,
+            mode === 'edit' ? course!.id : undefined,
+          );
+          if (!available) {
+            setStep1TitleError(
+              `A course titled "${trimmedTitle}" already exists in ${modeCoursesLabel(lockedCourseMode)} courses.`,
+            );
+            return;
+          }
+        } catch (e: unknown) {
+          if (e instanceof ApiError && e.status === 0) {
+            setStep1TitleError(MSG_NETWORK_ERROR);
+          } else {
+            setStep1TitleError(MSG_SERVER_ERROR);
+          }
+          return;
+        } finally {
+          setTitleChecking(false);
+        }
+      }
+    }
+
     const effect = ed.goNext();
     if (effect && effect.purgedAnnotations > 0) {
       setToast(formatPurgedAnnotationsMessage(effect.purgedAnnotations));
@@ -177,7 +239,7 @@ export function CourseEditorModal({
   const nextPrimaryEnabled =
     ed.step === 4
       ? !save.isPending && !reviewBlocked
-      : ed.canProceed && !pickState.active;
+      : ed.canProceed && !pickState.active && !titleChecking;
 
   return (
     <div
@@ -218,7 +280,7 @@ export function CourseEditorModal({
         )}
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {ed.step === 1 && <Step1 ed={ed} />}
+          {ed.step === 1 && <Step1 ed={ed} titleAvailabilityError={step1TitleError} />}
           {ed.step === 2 && <Step2 ed={ed} />}
           {ed.step === 3 && <Step3 ed={ed} onPickStateChange={setPickState} />}
           {ed.step === 4 && <Step4Review ed={ed} />}
@@ -272,7 +334,7 @@ export function CourseEditorModal({
                     : 'cursor-not-allowed bg-slate-400 opacity-80'
                 }`}
               >
-                Next
+                {titleChecking ? 'Checking…' : 'Next'}
               </button>
             )}
           </div>
@@ -282,7 +344,13 @@ export function CourseEditorModal({
   );
 }
 
-function Step1({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
+function Step1({
+  ed,
+  titleAvailabilityError,
+}: {
+  ed: ReturnType<typeof useCourseEditor>;
+  titleAvailabilityError: string | null;
+}) {
   const len = ed.content.length;
   const modeLabel = ed.courseMode === 'SHORT' ? 'Short mode' : 'Article mode';
   const modeRange =
@@ -336,6 +404,9 @@ function Step1({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
         </p>
       )}
       {ed.step1Error && <p className="text-sm text-amber-600">{ed.step1Error}</p>}
+      {titleAvailabilityError && (
+        <p className="text-sm text-amber-600">{titleAvailabilityError}</p>
+      )}
     </div>
   );
 }

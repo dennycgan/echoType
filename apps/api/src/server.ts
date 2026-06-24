@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import { ZodError } from 'zod';
 import { prisma } from './prisma.js';
 import { registerCourseRoutes } from './routes/courses.js';
+import { registerCategoryRoutes } from './routes/categories.js';
 import { registerSessionRoutes } from './routes/sessions.js';
 
 const PORT = Number(process.env.API_PORT ?? 3001);
@@ -49,6 +50,7 @@ await app.register(
   async (api) => {
     api.get('/health', async () => ({ ok: true, demoUser: DEMO_USER_ID }));
     await registerCourseRoutes(api);
+    await registerCategoryRoutes(api);
     await registerSessionRoutes(api);
   },
   { prefix: '/api' },

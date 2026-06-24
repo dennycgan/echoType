@@ -93,7 +93,7 @@ async function upsertAnnotatedCourse(
   annotations: ReturnType<typeof buildAnnotations>,
   description?: string | null,
 ) {
-  let course = await prisma.course.findFirst({ where: { userId, title } });
+  let course = await prisma.course.findFirst({ where: { userId, mode, title } });
   if (!course) {
     course = await prisma.course.create({
       data: {
@@ -157,7 +157,7 @@ async function main() {
   });
 
   let shortCourse = await prisma.course.findFirst({
-    where: { userId: user.id, title: 'Stray Birds - 49' },
+    where: { userId: user.id, mode: CourseMode.SHORT, title: 'Stray Birds - 49' },
   });
   if (!shortCourse) {
     shortCourse = await prisma.course.create({
@@ -200,7 +200,7 @@ async function main() {
   );
 
   const existingArticle = await prisma.course.findFirst({
-    where: { userId: user.id, title: 'What I Have Lived For (excerpt)' },
+    where: { userId: user.id, mode: CourseMode.ARTICLE, title: 'What I Have Lived For (excerpt)' },
   });
   if (!existingArticle) {
     await prisma.course.create({

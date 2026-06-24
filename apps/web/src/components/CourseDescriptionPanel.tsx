@@ -28,6 +28,7 @@ export function CourseDescriptionPanel({ description }: CourseDescriptionPanelPr
           expanded ? 'whitespace-pre-wrap' : 'line-clamp-1 overflow-hidden'
         }`}
       >
+        <span className="text-slate-400">Description: </span>
         {linkifyPlainText(trimmed)}
       </div>
       {overflows && (

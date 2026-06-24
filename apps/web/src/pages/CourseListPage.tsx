@@ -1,12 +1,18 @@
-import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { CourseDTO, CourseListSort, CourseMode } from '@echotype/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { CategoryDTO, CourseDTO, CourseListSort, CourseMode } from '@echotype/shared';
 import { SEARCH_Q_MAX } from '@echotype/shared';
-import { api, ApiError, isCourseNotFoundError } from '../lib/api';
+import { api, isCourseNotFoundError } from '../lib/api';
+import { BulkActionBar } from '../components/BulkActionBar';
+import { CollectionCard } from '../components/collection/CollectionCard';
+import { CollectionEditorModal } from '../components/collection/CollectionEditorModal';
+import { CollectionPickerModal } from '../components/collection/CollectionPickerModal';
+import { CourseListCard } from '../components/course/CourseListCard';
 import { CourseEditorModal } from '../components/editor/CourseEditorModal';
-import { toCardPreviewLine } from '../lib/courseCard';
+import { DEFAULT_SORT, SORT_OPTIONS } from '../lib/courseListSort';
 import { useImeAwareDebouncedSearch } from '../lib/useImeAwareDebouncedSearch';
+import type { OverflowMenuItem } from '../components/CardOverflowMenu';
 
 type EditorTarget =
   | { mode: 'create' }
@@ -14,15 +20,6 @@ type EditorTarget =
   | null;
 
 const HIGHLIGHT_MS = 2000;
-
-const DEFAULT_SORT: CourseListSort = 'createdAt_desc';
-
-const SORT_OPTIONS: { value: CourseListSort; label: string }[] = [
-  { value: 'createdAt_desc', label: 'Newest first' },
-  { value: 'createdAt_asc', label: 'Oldest first' },
-  { value: 'updatedAt_desc', label: 'Recently updated' },
-  { value: 'title_asc', label: 'Title A–Z' },
-];
 
 const MODE_COPY: Record<
   CourseMode,
@@ -47,55 +44,231 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
   const qc = useQueryClient();
   const search = useImeAwareDebouncedSearch();
   const [sort, setSort] = useState<CourseListSort>(DEFAULT_SORT);
-
-  const { data: courses, isLoading } = useQuery({
-    queryKey: ['courses', courseMode, search.query, sort],
-    queryFn: () =>
-      api.listCourses(courseMode, {
-        q: search.query || undefined,
-        sort,
-      }),
-  });
-
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [editor, setEditor] = useState<EditorTarget>(null);
   const [highlightCourseId, setHighlightCourseId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [collectionEditor, setCollectionEditor] = useState<'create' | { mode: 'edit'; category: CategoryDTO } | null>(
+    null,
+  );
+  const [moveToCollectionOpen, setMoveToCollectionOpen] = useState(false);
+  const [pickerCourseIds, setPickerCourseIds] = useState<string[] | null>(null);
+  const [pendingNewCollectionCourseIds, setPendingNewCollectionCourseIds] = useState<string[] | null>(null);
 
-  const deleteMutation = useMutation({
-    mutationFn: (courseId: string) => api.deleteCourse(courseId),
-    onSuccess: (_data, courseId) => {
-      setDeleteError(null);
-      qc.invalidateQueries({ queryKey: ['courses', courseMode] });
-      qc.removeQueries({ queryKey: ['course', courseId] });
-      setDeletingId(null);
-    },
-    onError: (e: unknown) => {
-      setDeletingId(null);
-      if (isCourseNotFoundError(e)) {
-        setDeleteError('Course not found — it may have already been deleted.');
-        qc.invalidateQueries({ queryKey: ['courses', courseMode] });
-        return;
-      }
-      setDeleteError('Failed to delete course. Please try again.');
-    },
+  const hasQuery = !!search.query;
+  const listOpts = { q: search.query || undefined, sort };
+  const courseScope = hasQuery ? 'global' : 'null';
+
+  const { data: categories, isLoading: categoriesLoading } = useQuery({
+    queryKey: ['categories', courseMode, search.query, sort],
+    queryFn: () => api.listCategories(courseMode, listOpts),
   });
 
-  function handleDelete(course: CourseDTO) {
-    const ok = window.confirm(
-      `Delete "${course.title}"? This cannot be undone. All annotations and typing sessions for this course will be removed.`,
-    );
-    if (!ok) return;
-    setDeleteError(null);
-    setDeletingId(course.id);
-    deleteMutation.mutate(course.id);
-  }
+  const { data: courses, isLoading: coursesLoading } = useQuery({
+    queryKey: ['courses', courseMode, courseScope, search.query, sort],
+    queryFn: () =>
+      api.listCourses(
+        courseMode,
+        hasQuery ? listOpts : { ...listOpts, categoryId: 'null' },
+      ),
+  });
+
+  useEffect(() => {
+    setSelected(new Set());
+  }, [courses, search.query]);
 
   useEffect(() => {
     if (!highlightCourseId) return;
     const t = setTimeout(() => setHighlightCourseId(null), HIGHLIGHT_MS);
     return () => clearTimeout(t);
   }, [highlightCourseId]);
+
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ['categories', courseMode] });
+    qc.invalidateQueries({ queryKey: ['courses', courseMode] });
+  };
+
+  function exitBulkMode() {
+    setBulkMode(false);
+    setSelected(new Set());
+    setMoveToCollectionOpen(false);
+    setPickerCourseIds(null);
+  }
+
+  const deleteMutation = useMutation({
+    mutationFn: (courseId: string) => api.deleteCourse(courseId),
+    onSuccess: (_data, courseId) => {
+      setActionError(null);
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(courseId);
+        return next;
+      });
+      qc.removeQueries({ queryKey: ['course', courseId] });
+      invalidateAll();
+      setDeletingId(null);
+    },
+    onError: (e: unknown) => {
+      setDeletingId(null);
+      if (isCourseNotFoundError(e)) {
+        setActionError('Course not found — it may have already been deleted.');
+        invalidateAll();
+        return;
+      }
+      setActionError('Failed to delete course. Please try again.');
+    },
+  });
+
+  const patchCategory = useMutation({
+    mutationFn: ({ courseIds, categoryId }: { courseIds: string[]; categoryId: string | null }) =>
+      api.patchCoursesCategory(courseIds, categoryId),
+    onSuccess: () => {
+      setActionError(null);
+      setSelected(new Set());
+      setMoveToCollectionOpen(false);
+      setPickerCourseIds(null);
+      invalidateAll();
+    },
+    onError: () => setActionError('Failed to update courses. Please try again.'),
+  });
+
+  const deleteCollection = useMutation({
+    mutationFn: (id: string) => api.deleteCategory(id),
+    onSuccess: () => {
+      setActionError(null);
+      invalidateAll();
+    },
+    onError: () => setActionError('Failed to delete collection. Please try again.'),
+  });
+
+  const selectedIds = useMemo(() => [...selected], [selected]);
+
+  const selectedInCollectionIds = useMemo(() => {
+    if (!courses) return [];
+    const idSet = new Set(selectedIds);
+    return courses.filter((c) => idSet.has(c.id) && c.categoryId).map((c) => c.id);
+  }, [courses, selectedIds]);
+
+  const isLoading = categoriesLoading || coursesLoading;
+  const isEmpty = !categories?.length && !courses?.length;
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleDelete(course: CourseDTO) {
+    const ok = window.confirm(
+      `Delete "${course.title}"? This cannot be undone. All annotations and typing sessions for this course will be removed.`,
+    );
+    if (!ok) return;
+    setActionError(null);
+    setDeletingId(course.id);
+    deleteMutation.mutate(course.id);
+  }
+
+  function handleRemoveOne(course: CourseDTO) {
+    const name = course.categoryName ?? 'collection';
+    const ok = window.confirm(
+      `Remove "${course.title}" from "${name}"? It will return to the main course list.`,
+    );
+    if (!ok) return;
+    patchCategory.mutate({ courseIds: [course.id], categoryId: null });
+  }
+
+  function handleRemoveSelected() {
+    if (selectedInCollectionIds.length === 0) return;
+    const ok = window.confirm(
+      `Remove ${selectedInCollectionIds.length} course${selectedInCollectionIds.length === 1 ? '' : 's'} from their collection${selectedInCollectionIds.length === 1 ? '' : 's'}? They will return to the main course list.`,
+    );
+    if (!ok) return;
+    patchCategory.mutate({ courseIds: selectedInCollectionIds, categoryId: null });
+  }
+
+  function handleDeleteSelected() {
+    if (selectedIds.length === 0) return;
+    const ok = window.confirm(
+      `Delete ${selectedIds.length} course${selectedIds.length === 1 ? '' : 's'}? This cannot be undone. All annotations and typing sessions will be removed.`,
+    );
+    if (!ok) return;
+    void Promise.all(selectedIds.map((id) => api.deleteCourse(id)))
+      .then(() => {
+        setActionError(null);
+        setSelected(new Set());
+        invalidateAll();
+      })
+      .catch(() =>
+        setActionError('Failed to delete one or more courses. Please refresh and try again.'),
+      );
+  }
+
+  function handleDeleteCollection(cat: CategoryDTO) {
+    const ok = window.confirm(
+      `Delete collection "${cat.name}" and all ${cat.courseCount} course${cat.courseCount === 1 ? '' : 's'} inside? This cannot be undone.`,
+    );
+    if (!ok) return;
+    deleteCollection.mutate(cat.id);
+  }
+
+  function openMovePicker(courseIds: string[]) {
+    setPickerCourseIds(courseIds);
+    setMoveToCollectionOpen(true);
+  }
+
+  function assignToCollection(courseIds: string[], target: CategoryDTO) {
+    patchCategory.mutate({ courseIds, categoryId: target.id });
+  }
+
+  function courseMenuItems(course: CourseDTO): OverflowMenuItem[] {
+    const items: OverflowMenuItem[] = [
+      {
+        label: 'Delete',
+        variant: 'danger',
+        disabled: deletingId === course.id,
+        onClick: () => handleDelete(course),
+      },
+    ];
+    if (course.categoryId) {
+      items.push(
+        {
+          label: 'Move to collection…',
+          onClick: () => openMovePicker([course.id]),
+        },
+        {
+          label: 'Remove from collection',
+          onClick: () => handleRemoveOne(course),
+        },
+      );
+    } else {
+      items.push({
+        label: 'Add to collection…',
+        onClick: () => openMovePicker([course.id]),
+      });
+    }
+    return items;
+  }
+
+  function collectionMenuItems(cat: CategoryDTO): OverflowMenuItem[] {
+    return [
+      {
+        label: 'Edit collection',
+        onClick: () => setCollectionEditor({ mode: 'edit', category: cat }),
+      },
+      {
+        label: 'Delete collection',
+        variant: 'danger',
+        onClick: () => handleDeleteCollection(cat),
+      },
+    ];
+  }
+
+  const pickerIds = pickerCourseIds ?? selectedIds;
 
   return (
     <div className="space-y-6">
@@ -107,17 +280,26 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
               Switch to {copy.otherLabel.toLowerCase()} →
             </Link>
           </div>
-          <button
-            onClick={() => setEditor({ mode: 'create' })}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            New course
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setCollectionEditor('create')}
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              New collection
+            </button>
+            <button
+              onClick={() => setEditor({ mode: 'create' })}
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              New course
+            </button>
+          </div>
         </div>
 
-        {deleteError && (
+        {actionError && (
           <p className="mb-3 text-sm text-red-600" role="alert">
-            {deleteError}
+            {actionError}
           </p>
         )}
 
@@ -131,9 +313,9 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
               onCompositionStart={search.onCompositionStart}
               onCompositionEnd={(e) => search.onCompositionEnd(e.currentTarget.value)}
               maxLength={SEARCH_Q_MAX}
-              placeholder="Search title, content, notes, or description…"
+              placeholder="Search collections, courses, notes, or description…"
               className="w-full rounded-md border px-3 py-2 pr-9 text-sm"
-              aria-label="Search courses"
+              aria-label="Search collections and courses"
             />
             {search.showClear && (
               <button
@@ -152,7 +334,7 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
               value={sort}
               onChange={(e) => setSort(e.target.value as CourseListSort)}
               className="rounded-md border px-2 py-2 text-sm"
-              aria-label="Sort courses"
+              aria-label="Sort collections and courses"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -163,64 +345,88 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
           </label>
         </div>
 
+        <BulkActionBar
+          bulkMode={bulkMode}
+          onEnterBulkMode={() => setBulkMode(true)}
+          onCancelBulkMode={exitBulkMode}
+          selectedCount={selectedIds.length}
+        >
+          <button
+            type="button"
+            onClick={() => openMovePicker(selectedIds)}
+            className="rounded border bg-white px-3 py-1 text-sm hover:bg-slate-50"
+          >
+            Move to collection…
+          </button>
+          {selectedInCollectionIds.length > 0 && (
+            <button
+              type="button"
+              onClick={handleRemoveSelected}
+              className="rounded border bg-white px-3 py-1 text-sm hover:bg-slate-50"
+            >
+              Remove from collection
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleDeleteSelected}
+            className="rounded border border-red-200 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-50"
+          >
+            Delete selected
+          </button>
+        </BulkActionBar>
+
         {isLoading ? (
           <p className="text-slate-500">Loading…</p>
-        ) : !courses?.length ? (
+        ) : isEmpty ? (
           <p className="text-slate-500">
-            {search.query ? 'No courses match your search.' : copy.empty}
+            {hasQuery ? 'No collections or courses match your search.' : copy.empty}
           </p>
         ) : (
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {courses.map((c) => (
-              <li
-                key={c.id}
-                className={`flex min-h-40 flex-col rounded-md border bg-white p-4 transition-shadow ${
-                  highlightCourseId === c.id ? 'ring-2 ring-emerald-400' : ''
-                }`}
-              >
-                <h3 className="line-clamp-1 overflow-hidden font-medium">{c.title}</h3>
-                <p
-                  className={`mt-1 line-clamp-1 overflow-hidden text-sm leading-5 ${
-                    c.description?.trim() ? 'text-slate-500' : 'text-slate-300'
+          <div className="space-y-6">
+            {!!categories?.length && (
+              <div>
+                <h3 className="mb-2 text-sm font-medium text-slate-500">Collections</h3>
+                <ul
+                  className={`flex flex-col gap-2 ${
+                    categories.length > 3 ? 'max-h-[18.5rem] overflow-y-auto pr-1' : ''
                   }`}
                 >
-                  {c.description?.trim() ? toCardPreviewLine(c.description) : '—'}
-                </p>
-                <div className="h-5 shrink-0" aria-hidden />
-                <p className="line-clamp-1 overflow-hidden text-sm leading-5 text-slate-500">
-                  <span className="text-slate-400">Content: </span>
-                  {toCardPreviewLine(c.content)}
-                </p>
-                <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
-                  <Link
-                    to={`/courses/${c.id}/type`}
-                    className="rounded bg-slate-900 px-3 py-1 text-sm text-white hover:bg-slate-800"
-                  >
-                    Type this
-                  </Link>
-                  <button
-                    onClick={() => setEditor({ mode: 'edit', course: c })}
-                    className="rounded border px-3 py-1 text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(c)}
-                    disabled={deletingId === c.id}
-                    className="rounded border border-red-200 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {deletingId === c.id ? 'Deleting…' : 'Delete'}
-                  </button>
-                  {c.annotations.length > 0 && (
-                    <span className="text-xs text-slate-400">
-                      {c.annotations.length} annotation{c.annotations.length > 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+                  {categories.map((cat) => (
+                    <CollectionCard
+                      key={cat.id}
+                      category={cat}
+                      courseMode={courseMode}
+                      menuItems={collectionMenuItems(cat)}
+                    />
+                  ))}
+                </ul>
+              </div>
+            )}
+            {!!courses?.length && (
+              <div>
+                {(!!categories?.length || hasQuery) && (
+                  <h3 className="mb-2 text-sm font-medium text-slate-500">Courses</h3>
+                )}
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {courses.map((c) => (
+                    <CourseListCard
+                      key={c.id}
+                      course={c}
+                      highlight={highlightCourseId === c.id}
+                      bulkMode={bulkMode}
+                      selected={selected.has(c.id)}
+                      onToggleSelect={() => toggleSelect(c.id)}
+                      deleting={deletingId === c.id}
+                      menuItems={courseMenuItems(c)}
+                      onEdit={() => setEditor({ mode: 'edit', course: c })}
+                      showInCollectionLabel={hasQuery}
+                    />
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         )}
       </section>
 
@@ -234,6 +440,58 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
           onSaved={(courseId) => {
             setEditor(null);
             setHighlightCourseId(courseId);
+            invalidateAll();
+          }}
+        />
+      )}
+
+      {collectionEditor === 'create' && (
+        <CollectionEditorModal
+          mode="create"
+          courseMode={courseMode}
+          onClose={() => {
+            setCollectionEditor(null);
+            setPendingNewCollectionCourseIds(null);
+          }}
+          onSaved={(saved) => {
+            setCollectionEditor(null);
+            if (pendingNewCollectionCourseIds?.length) {
+              assignToCollection(pendingNewCollectionCourseIds, saved);
+              setPendingNewCollectionCourseIds(null);
+            } else {
+              invalidateAll();
+            }
+          }}
+        />
+      )}
+
+      {collectionEditor && collectionEditor !== 'create' && (
+        <CollectionEditorModal
+          mode="edit"
+          courseMode={courseMode}
+          category={collectionEditor.category}
+          onClose={() => setCollectionEditor(null)}
+          onSaved={() => {
+            setCollectionEditor(null);
+            invalidateAll();
+          }}
+        />
+      )}
+
+      {moveToCollectionOpen && (
+        <CollectionPickerModal
+          courseMode={courseMode}
+          title="Move to collection"
+          onClose={() => {
+            setMoveToCollectionOpen(false);
+            setPickerCourseIds(null);
+          }}
+          onPick={(target) => assignToCollection(pickerIds, target)}
+          onNewCollection={() => {
+            setPendingNewCollectionCourseIds(pickerIds);
+            setMoveToCollectionOpen(false);
+            setPickerCourseIds(null);
+            setCollectionEditor('create');
           }}
         />
       )}
