@@ -670,8 +670,8 @@ function TypingSession({
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-700">Immersive mode</p>
             <p className="text-xs text-slate-400">
-              Immersive mode hides the box. Best with English or non-IME input — IME candidate
-              windows may appear off-screen.
+              Hides the typing box so you can focus on the passage. Works best when your keyboard
+              matches the passage language. Floating word suggestions may appear off-screen.
             </p>
           </div>
         </div>
@@ -776,7 +776,7 @@ function StatsBar({
   return (
     <div className="grid grid-cols-2 gap-2 rounded-md border bg-white p-3 text-sm sm:grid-cols-6">
       <Stat label="time" value={formatTypingDuration(durationSec)} />
-      <Stat label="wpm" value={wpm.toFixed(1)} />
+      <Stat label="wpm" labelNote="(words per minute)" value={wpm.toFixed(1)} />
       <Stat label="accuracy" value={`${(accuracy * 100).toFixed(1)}%`} />
       <Stat label="progress" value={`${(progress * 100).toFixed(0)}%`} />
       <Stat label="errors" value={String(errors)} />
@@ -785,10 +785,21 @@ function StatsBar({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  labelNote,
+  value,
+}: {
+  label: string;
+  labelNote?: string;
+  value: string;
+}) {
   return (
-    <div>
-      <div className="text-xs uppercase text-slate-400">{label}</div>
+    <div className="flex flex-col">
+      <div className="grid min-h-8 grid-rows-2 content-start text-xs leading-tight text-slate-400">
+        <span className="uppercase">{label}</span>
+        <span className="normal-case">{labelNote ?? '\u00A0'}</span>
+      </div>
       <div className="font-mono text-base">{value}</div>
     </div>
   );
