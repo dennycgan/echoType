@@ -34,6 +34,8 @@ import {
 const IDLE_MS = 5000;
 const TICK_MS = 100;
 const COURSE_NOT_FOUND_REDIRECT_SEC = 5;
+const SESSION_ACTION_BTN_BASE =
+  'flex-1 rounded-md px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40';
 
 declare global {
   interface Window {
@@ -42,6 +44,11 @@ declare global {
       getRemainingSec: () => number | null;
       /** DEV: open config, set preset, and confirm armed duration. */
       armTimed: (minutes: number) => void;
+    };
+    __phase7Pause?: {
+      pauseSession: () => void;
+      isPaused: () => boolean;
+      getActiveMs: () => number;
     };
   }
 }
@@ -177,8 +184,11 @@ function TypingSession({
   const [remainingSec, setRemainingSec] = useState<number | null>(null);
   const [timerEndOpen, setTimerEndOpen] = useState(false);
   const [timerEndSaveError, setTimerEndSaveError] = useState<string | null>(null);
+  const [paused, setPaused] = useState(false);
 
   const armedMinutesRef = useRef<number | null>(null);
+  const pausedRef = useRef(false);
+  const activeMsRef = useRef(0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastActivityAtRef = useRef<number | null>(null);
@@ -207,6 +217,14 @@ function TypingSession({
     armedMinutesRef.current = armedMinutes;
   }, [armedMinutes]);
 
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
+  useEffect(() => {
+    activeMsRef.current = activeMs;
+  }, [activeMs]);
+
   const timerStripPhase: SessionTimerStripPhase = countdownStarted
     ? 'running'
     : armedMinutes != null
@@ -231,8 +249,17 @@ function TypingSession({
         setDurationError(null);
       },
     };
+    window.__phase7Pause = {
+      pauseSession: () => {
+        setPaused(true);
+        pausedRef.current = true;
+      },
+      isPaused: () => pausedRef.current,
+      getActiveMs: () => activeMsRef.current,
+    };
     return () => {
       delete window.__phase6Timer;
+      delete window.__phase7Pause;
     };
   }, []);
 
@@ -253,6 +280,7 @@ function TypingSession({
   useEffect(() => {
     if (!startedAt) return;
     const id = window.setInterval(() => {
+      if (pausedRef.current) return;
       const last = lastActivityAtRef.current;
       if (last === null) return;
       if (Date.now() - last < IDLE_MS) {
@@ -277,6 +305,21 @@ function TypingSession({
   /** Completed passes in the current unsaved segment (see docs/STATS.md §3). */
   const completedLoops = startedAt !== null ? loopCount : null;
 
+  function clearPaused() {
+    setPaused(false);
+    pausedRef.current = false;
+  }
+
+  function resumeFromPause() {
+    if (!pausedRef.current) return;
+    if (countdownStarted && remainingSecRef.current != null) {
+      const now = Date.now();
+      countdownStartedAtRef.current = now;
+      countdownTotalSecRef.current = remainingSecRef.current;
+    }
+    clearPaused();
+  }
+
   function beginFreshSession() {
     setTyped('');
     setDraft('');
@@ -287,6 +330,7 @@ function TypingSession({
     setPasteRanges([]);
     setActiveMs(0);
     lastActivityAtRef.current = null;
+    clearPaused();
   }
 
   function startCountdown(minutes: number) {
@@ -309,6 +353,7 @@ function TypingSession({
     setRemainingSec(null);
     countdownStartedAtRef.current = null;
     countdownTotalSecRef.current = null;
+    clearPaused();
   }
 
   function completeTimerBlock() {
@@ -326,6 +371,7 @@ function TypingSession({
   useEffect(() => {
     if (!countdownStarted || timerEndOpen || timerVisitDone) return;
     const tick = () => {
+      if (pausedRef.current) return;
       const startAt = countdownStartedAtRef.current;
       const total = countdownTotalSecRef.current;
       if (startAt == null || total == null) return;
@@ -473,6 +519,7 @@ function TypingSession({
   }
 
   function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    resumeFromPause();
     touchActivity();
     const el = e.currentTarget;
     pasteMetaRef.current = {
@@ -480,6 +527,17 @@ function TypingSession({
       end: el.selectionEnd ?? typed.length,
       clipLen: e.clipboardData.getData('text').length,
     };
+  }
+
+  function handleKeyDown(_e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    resumeFromPause();
+    touchActivity();
+  }
+
+  function handlePause() {
+    if (!startedAt || timerEndOpen || showLeaveDialog || paused) return;
+    setPaused(true);
+    pausedRef.current = true;
   }
 
   function handleFinish() {
@@ -615,6 +673,7 @@ function TypingSession({
             durationError={durationError}
             armedMinutes={armedMinutes}
             remainingSec={remainingSec}
+            paused={paused}
             onOpenConfig={handleTimerOpenConfig}
             onHideIdle={handleTimerHideIdle}
             onShowIdle={handleTimerShowIdle}
@@ -687,7 +746,7 @@ function TypingSession({
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           onPaste={handlePaste}
-          onKeyDown={touchActivity}
+          onKeyDown={handleKeyDown}
           className={immersiveMode ? TYPING_TEXTAREA_IMMERSIVE_CLASS : TYPING_TEXTAREA_CLASS}
           placeholder={immersiveMode ? undefined : 'Type here…'}
           spellCheck={false}
@@ -715,19 +774,33 @@ function TypingSession({
       <div className="space-y-2">
         <div className="flex gap-2">
           <button
+            type="button"
+            data-testid="pause-session"
+            onClick={handlePause}
+            disabled={!startedAt || paused || submitMutation.isPending || timerEndOpen || showLeaveDialog}
+            className={`${SESSION_ACTION_BTN_BASE} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
+          >
+            Pause
+          </button>
+          <button
             onClick={handleFinish}
             disabled={!startedAt || submitMutation.isPending || timerEndOpen}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className={`${SESSION_ACTION_BTN_BASE} bg-slate-900 text-white hover:bg-slate-800`}
           >
             {submitMutation.isPending ? 'Saving…' : 'Save session'}
           </button>
           <button
             onClick={handleReset}
-            className="rounded-md border bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className={`${SESSION_ACTION_BTN_BASE} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
           >
             Start over
           </button>
         </div>
+        {paused && (
+          <p data-testid="pause-hint" className="text-sm text-amber-800">
+            Paused — type to resume
+          </p>
+        )}
         <p className="text-sm text-slate-500">
           Course statistics update only when you save this session.
         </p>
@@ -775,7 +848,7 @@ function StatsBar({
 }) {
   return (
     <div className="grid grid-cols-2 gap-2 rounded-md border bg-white p-3 text-sm sm:grid-cols-6">
-      <Stat label="time" value={formatTypingDuration(durationSec)} />
+      <Stat label="time" value={formatTypingDuration(durationSec)} valueTestId="stats-time" />
       <Stat label="wpm" labelNote="(words per minute)" value={wpm.toFixed(1)} />
       <Stat label="accuracy" value={`${(accuracy * 100).toFixed(1)}%`} />
       <Stat label="progress" value={`${(progress * 100).toFixed(0)}%`} />
@@ -789,10 +862,12 @@ function Stat({
   label,
   labelNote,
   value,
+  valueTestId,
 }: {
   label: string;
   labelNote?: string;
   value: string;
+  valueTestId?: string;
 }) {
   return (
     <div className="flex flex-col">
@@ -800,7 +875,9 @@ function Stat({
         <span className="uppercase">{label}</span>
         <span className="normal-case">{labelNote ?? '\u00A0'}</span>
       </div>
-      <div className="font-mono text-base">{value}</div>
+      <div className="font-mono text-base" data-testid={valueTestId}>
+        {value}
+      </div>
     </div>
   );
 }

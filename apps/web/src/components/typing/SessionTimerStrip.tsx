@@ -14,6 +14,7 @@ type SessionTimerStripProps = {
   durationError: string | null;
   armedMinutes: number | null;
   remainingSec: number | null;
+  paused: boolean;
   onOpenConfig: () => void;
   onHideIdle: () => void;
   onShowIdle: () => void;
@@ -42,6 +43,7 @@ export function SessionTimerStrip({
   durationError,
   armedMinutes,
   remainingSec,
+  paused,
   onOpenConfig,
   onHideIdle,
   onShowIdle,
@@ -101,6 +103,12 @@ export function SessionTimerStrip({
           <p className="text-center text-slate-600" aria-live="polite">
             <span aria-hidden>⏱ </span>
             <span className="font-mono">{formatCountdown(remainingSec)}</span> left
+            {paused && (
+              <>
+                <span className="text-slate-400"> · </span>
+                <span>Paused</span>
+              </>
+            )}
           </p>
           <ExitCountdownHint />
         </>
