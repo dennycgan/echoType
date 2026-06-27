@@ -11,8 +11,8 @@
 - [x] Cloud deploy (CloudFront cutover; live at *.cloudfront.net + post-deploy fixes)
 - [x] Typing experience (auto-loop, newline skip, session flow, IME composition; ADR-0006/0007/0008)
 - [x] Course management (mode routes, card list, DELETE, description, search/sort, collections; ADR-0009–0013)
-- [ ] Course stats (per-session + cumulative; STATS.md contract; phases below)    <-- YOU ARE HERE
-- [ ] Auth (Cognito; replaces demo-user shim; required before sharing externally)
+- [x] Course stats (per-session + cumulative; STATS.md contract; ADR-0014 phases 1–7)
+- [ ] Auth (Cognito; replaces demo-user shim; required before sharing externally)    <-- YOU ARE HERE
 - [ ] Custom domain (purchase + ACM cert + CloudFront alias; deferred until self-testing settles)
 - [ ] Ops & safety (Sentry, CloudWatch, rate limiting, disclaimer, error/empty states)
 
@@ -23,24 +23,18 @@
 > Top-to-bottom = current execution order. Reorder if priorities change; never leave it unordered.
 
 ## Phase Roadmap (active capability only)
-Active capability: Course stats
-- [x] Phase 1 — `docs/STATS.md` metrics reference + stats bar completed-loops display fix
-- [x] Phase 2 — Manual Save → `TypingSession` + course cumulative columns + Save copy + in-app leave guard (3-button)
-- [x] Phase 3 — Collection rollup fields on categories API (`CategoryDTO.rollup`; read-time from members)
-- [x] Phase 4 — Course/collection card stats UI + `lastPracticeHere` tags (`d58ed9b`)
-- [x] Phase 5 — List sort modes 4/5/7 + per-mode sort preference in localStorage (`691e0a1`)
-- [x] Phase 6 — Session timer strip (10min–2h) + countdown-end modal + segment Save rules (`0aa8ebb`)
-- [ ] Phase 7 — Pause/resume (freezes active time + countdown; resume on keystroke)
+Active capability: Auth
+- [ ] Phase 1 — Cognito integration (replaces demo-user shim; design TBD)
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Course stats Phase 7 — pause/resume on typing page.
-- Sub-steps done: Phase 6 shipped (`0aa8ebb`): session timer strip, countdown-end modal, segment Save semantics (STATS.md §2.2), hide/show preference, collection-aware Back
-- Next step: Pause freezes active time + wall-clock countdown; resume on keystroke (ADR-0014 §11)
-- Related decisions: ADR-0014 §11
+- Goal (one line): Auth — replace demo-user shim with Cognito.
+- Sub-steps done: Course stats capability complete (`17a450f` Phase 7 pause/resume; STATS.md §1.4)
+- Next step: Auth capability design / Phase 1 scope
+- Related decisions: (Cognito ADR TBD)
 
 ## Contract pointers (don't memorize, go read the source)
 - Stats metrics (definitions/formulas only): docs/STATS.md
@@ -52,7 +46,7 @@ Active capability: Course stats
 - Types/validation: packages/shared/course.ts, packages/shared/category.ts
 - Course + collection routes: apps/api/src/routes/courses.ts, apps/api/src/routes/categories.ts
 - Typing UI: apps/web/src/pages/TypingPage.tsx
-- Session timer: apps/web/src/components/typing/SessionTimerStrip.tsx, TimerEndDialog.tsx, apps/web/src/lib/sessionTimer.ts
+- Session timer + pause: apps/web/src/components/typing/SessionTimerStrip.tsx, TimerEndDialog.tsx, apps/web/src/lib/sessionTimer.ts; probe `apps/web/scripts/phase7-pause-probe.mjs`
 - Typing Back paths: apps/web/src/lib/collectionPaths.ts
 - Mode list + collections UI: apps/web/src/pages/CourseListPage.tsx, CollectionDetailPage.tsx
 - List sort options + localStorage: apps/web/src/lib/courseListSort.ts

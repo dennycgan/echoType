@@ -36,6 +36,17 @@ API/DB field name: `loopCount`. UI label: **loops**.
 `activeMs` — milliseconds counted toward session duration on the typing page. Increments in fixed ticks only while the user is **active** (no keystroke/paste for ≥ 5s stops the clock).  
 `durationSec = max(0, round(activeMs / 1000))`.
 
+### 1.4 Manual pause
+
+**Pause** (typing page control) is a stronger freeze than idle (§1.3):
+
+- While paused, `activeMs` does **not** increment (even if the user would otherwise be “active”).
+- While paused, the session timer **countdown** (wall clock) does **not** decrement; on resume, countdown continues from the displayed remaining time (re-anchor).
+- **Resume** on keystroke or paste (IME: resume on `keydown`, before `compositionstart`).
+- Persisted `durationSec` includes only non-paused active time; formulas in §2 are unchanged.
+
+Flow details: ADR-0014 §11.
+
 ## 2. `TypingSession` row (per persisted session)
 
 One DB row per persisted session. Field definitions at persist time:
