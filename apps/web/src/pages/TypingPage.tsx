@@ -928,7 +928,7 @@ function StatsBar({
   return (
     <div className="grid grid-cols-2 gap-2 rounded-md border bg-white p-3 text-sm sm:grid-cols-6">
       <Stat label="time" value={formatTypingDuration(durationSec)} valueTestId="stats-time" />
-      <Stat label="wpm" labelNote="(words per minute)" value={wpm.toFixed(1)} />
+      <Stat label="wpm" value={wpm.toFixed(1)} wpmInfo />
       <Stat label="accuracy" value={`${(accuracy * 100).toFixed(1)}%`} />
       <Stat label="progress" value={`${(progress * 100).toFixed(0)}%`} />
       <Stat label="errors" value={String(errors)} />
@@ -937,24 +937,78 @@ function StatsBar({
   );
 }
 
+const WPM_TOOLTIP = (
+  <>
+    <p className="font-medium text-slate-700">Words per minute (WPM)</p>
+    <p className="mt-1">
+      Characters you type, divided by 5, divided by active typing minutes. This is the usual rule from
+      English typing tests.
+    </p>
+    <p className="mt-1">
+      EchoType uses that same rule for every course language. For passages that are not written as
+      spaced words (Chinese, Japanese, symbol-heavy text, logographic writing, and similar), the score may
+      not match a words-per-minute you would estimate by reading the passage.
+    </p>
+    <p className="mt-1">This is the speed figure stored when you save your session.</p>
+  </>
+);
+
+function CircleInfoIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 12 12" className={className}>
+      <circle cx="6" cy="6" r="5.25" fill="none" stroke="currentColor" strokeWidth="1.25" />
+      <text
+        x="6"
+        y="6"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize="7"
+        fontWeight="600"
+        fill="currentColor"
+        fontFamily="system-ui, -apple-system, sans-serif"
+      >
+        i
+      </text>
+    </svg>
+  );
+}
+
 function Stat({
   label,
-  labelNote,
   value,
   valueTestId,
+  wpmInfo,
 }: {
   label: string;
-  labelNote?: string;
   value: string;
   valueTestId?: string;
+  wpmInfo?: boolean;
 }) {
   return (
-    <div className="flex flex-col">
-      <div className="grid min-h-8 grid-rows-2 content-start text-xs leading-tight text-slate-400">
-        <span className="uppercase">{label}</span>
-        <span className="normal-case">{labelNote ?? '\u00A0'}</span>
-      </div>
-      <div className="font-mono text-base" data-testid={valueTestId}>
+    <div className="flex flex-col gap-0.5">
+      {wpmInfo ? (
+        <span className="inline-flex items-center gap-1 text-sm leading-tight text-slate-400">
+          <span className="uppercase">{label}</span>
+          <span className="group/wpm-info relative inline-flex">
+            <button
+              type="button"
+              aria-label="About words per minute"
+              className="inline-flex h-[1em] w-[1em] min-h-[14px] min-w-[14px] items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            >
+              <CircleInfoIcon className="h-[0.85em] w-[0.85em] shrink-0 text-slate-500" />
+            </button>
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 hidden w-72 -translate-x-1/2 rounded-md border border-slate-200 bg-white p-2 text-xs font-normal leading-snug text-slate-500 shadow-md group-hover/wpm-info:block group-focus-within/wpm-info:block"
+            >
+              {WPM_TOOLTIP}
+            </span>
+          </span>
+        </span>
+      ) : (
+        <span className="text-sm leading-tight text-slate-400 uppercase">{label}</span>
+      )}
+      <div className="font-mono text-sm text-slate-900" data-testid={valueTestId}>
         {value}
       </div>
     </div>
