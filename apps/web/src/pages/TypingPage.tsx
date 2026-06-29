@@ -742,40 +742,15 @@ function TypingSession({
               }`}
             />
           </button>
-          <span className="relative inline-block pr-3.5 text-sm font-medium leading-none text-slate-700">
+          <span className="inline-flex items-center gap-1 text-sm font-medium leading-tight text-slate-700">
             Immersive mode
-            <span className="group/help absolute -right-0.5 -top-1.5">
+            <span className="group/help relative inline-flex">
               <button
                 type="button"
                 aria-label="About immersive mode"
-                className="flex h-3.5 w-3.5 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                className="inline-flex h-[1em] w-[1em] min-h-[14px] min-w-[14px] items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
               >
-                <svg
-                  aria-hidden
-                  viewBox="0 0 12 12"
-                  className="h-[7px] w-[7px] shrink-0 text-slate-500"
-                >
-                  <circle
-                    cx="6"
-                    cy="6"
-                    r="5.25"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.25"
-                  />
-                  <text
-                    x="6"
-                    y="6"
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize="7"
-                    fontWeight="600"
-                    fill="currentColor"
-                    fontFamily="system-ui, -apple-system, sans-serif"
-                  >
-                    i
-                  </text>
-                </svg>
+                <CircleInfoIcon className="h-[0.85em] w-[0.85em] shrink-0 text-slate-500" />
               </button>
               <span
                 role="tooltip"
