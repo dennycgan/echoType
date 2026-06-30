@@ -630,3 +630,60 @@
   - Timer/pause behavior does not change metric formulas in STATS.md; timed-block
     segment rules in STATS.md §2.2; pause timing in STATS.md §1.4.
 - Supersedes / superseded-by: none (extends ADR-0012 deferred sorts; extends ADR-0013 with rollup UI)
+
+---
+
+## ADR-0015 — Auth: Cognito email/password, sub-as-PK, six phases
+- Status: Accepted (2026-06-30)
+- Commit/PR anchor: b2a226a (Phase 1 pool + SSM); `0018106` (EC2 AMI lifecycle ignore — ops, not auth)
+- Plain summary (owner reads this): EchoType replaces the demo-user shim with **AWS Cognito**
+  email+password auth. `users.id` stores Cognito **sub** (UUID). Register collects email,
+  password, and **nickname in one form**; email must be verified before login. Access token
+  1h / refresh 30d (MAU billing only — token lifetimes have no extra Cognito metered fee).
+  All URLs (callbacks, logout, Phase 5 email links) derive from `WEB_ORIGIN`/env/SSM — never
+  hardcode `*.cloudfront.net`. Google sign-in waits for Custom domain capability.
+- Context: Walking-skeleton API pins every request to `DEMO_USER_ID`. Auth is required
+  before external sharing. Future Google login needs account linking; Custom domain will
+  change the public hostname — infra and callbacks must be config-driven from day one.
+- Decision:
+  1. **Six phases** (STATE Phase Roadmap): (1) Cognito pool + SSM; (2) User model + seed
+     split; (3) API JWT; (4) Web auth core; (5) Account management; (6) Onboarding seed hook.
+  2. **Sign-in scope (MVP)**: email + password only; no custom username login; no Google IdP
+     until Custom domain capability (Known debt).
+  3. **User identity**: Postgres `User.id` = Cognito `sub`; `email` unique, not primary key.
+  4. **Nickname**: required on the **registration form** (no post-login “fill nickname” modal).
+  5. **Email verification**: required before login; `CONFIRM_WITH_CODE`; pool
+     `auto_verified_attributes = [email]`.
+  6. **Tokens**: access 1 hour, refresh 30 days on the SPA app client.
+  7. **URL config**: `WEB_ORIGIN` SSM (`/${project}/WEB_ORIGIN`) is the single public-origin
+     source; Cognito `callback_urls` / `logout_urls` derived from it plus `dev_web_origin`
+     (`http://localhost:5173`). Phase 5 forgot-password / email-change links must use the
+     same env-derived URLs (Custom domain = update SSM + re-apply, no app hardcoding).
+  8. **Callback path placeholder**: `/auth/callback` until Auth Phase 4; change Terraform
+     + re-apply if routes differ (low cost).
+  9. **Email sending**: `COGNITO_DEFAULT` for MVP. AWS caps at ~50 emails/day on the default
+     account — sufficient at current volume; hitting the cap is the trigger to evaluate SES
+     (may affect Phase 5 email-change cost gate).
+  10. **Account management (Phase 5)**: forgot password, change password, delete account
+      (email immediately re-registerable, no cooldown). Email change only if zero new
+      cloud cost beyond existing Cognito verify path; else Known debt.
+  11. **Seed (Phases 2 + 6)**: remove monolithic `prisma/seed.ts` demo content; prod deploy
+      skips seed; local dev seed separate; onboarding hook on `courseCount === 0` with owner-
+      supplied course/collection content before Phase 6 ships.
+  12. **Phase 1 shipped** (`b2a226a`): `infra/cognito.tf` User Pool + public SPA client;
+      SSM `/echotype/COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_REGION`; app
+      code still uses demo-user shim until Phase 3.
+- Rejected alternatives:
+  - email as `users` PK — blocks future Google account linking.
+  - Post-login nickname modal — extra “verified but incomplete profile” state complicates
+    onboarding trigger and list UX.
+  - Cognito Hosted UI as primary UX — SPA owns forms; pool client still env-configured.
+  - Pinning or auto-replacing EC2 on every AL2023 AMI publish — accidental instance
+    replacement during Phase 1 apply; addressed by `lifecycle { ignore_changes = [ami] }`
+    (`0018106`); OS updates are deliberate maintainer actions.
+- Consequences:
+  - Auth capability active; Phase 2 next (schema + seed split).
+  - Phase 6 blocked on owner onboarding seed content (STATE reminder).
+  - Unrelated `terraform apply` should use `-target` for Cognito-only changes until AMI
+    lock is on all environments, or rely on `0018106` lifecycle on `aws_instance.app`.
+- Supersedes / superseded-by: none

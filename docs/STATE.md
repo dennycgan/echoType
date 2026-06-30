@@ -24,17 +24,22 @@
 
 ## Phase Roadmap (active capability only)
 Active capability: Auth
-- [ ] Phase 1 — Cognito integration (replaces demo-user shim; design TBD)
+- [x] Phase 1 — Cognito pool + SSM (email/password pool; email verification required; access 1h / refresh 30d; callback/logout URLs from WEB_ORIGIN / env — no hardcoded cloudfront.net)
+- [ ] Phase 2 — User model + seed split (users.id = Cognito sub UUID; nickname required; purge demo-user from prod; clear monolithic seed.ts; local-only dev seed, prod deploy skips seed)
+- [ ] Phase 3 — API JWT auth (replace demo-user shim; verify tokens; upsert User by sub; 401 without valid session)
+- [ ] Phase 4 — Web auth core (register form: email + password + nickname all required; email verification gate before login; login/logout/refresh; route guards; Cognito config from env)
+- [ ] Phase 5 — Account management (forgot password; change password; delete account — email re-registerable; email change only if zero new cloud cost, else Known debt; all Cognito email links/callbacks from WEB_ORIGIN / env — no hardcoded domain)
+- [ ] Phase 6 — Onboarding seed hook (courseCount===0 triggers seed call; framework + empty stub — **owner must supply course/collection seed content before this phase ships**)
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Auth — replace demo-user shim with Cognito.
-- Sub-steps done: Course stats capability complete (`17a450f` Phase 7 pause/resume; STATS.md §1.4)
-- Next step: Auth capability design / Phase 1 scope
-- Related decisions: (Cognito ADR TBD)
+- Goal (one line): Auth Phase 2 — User model + seed split (sub-as-PK; purge demo-user from prod).
+- Sub-steps done: Phase 1 Cognito pool + SSM (`b2a226a`; owner apply +验收); AMI drift lock (`0018106`)
+- Next step: Phase 2 design / Prisma migration + prod seed removal
+- Related decisions: ADR-0015
 
 ## Contract pointers (don't memorize, go read the source)
 - Stats metrics (definitions/formulas only): docs/STATS.md
@@ -71,3 +76,5 @@ Active capability: Auth
 | Typing | English course + accidental IME shows red diff only, no explicit "switch to English" guidance | Phase 3 chose IME-as-valid-input (ADR-0008) over kickoff #7 banner/pause; red diff implies the error | future polish / real-usage feedback | ADR-0008 |
 | Annotation | false-green (duplicate substring, no index shift) | MVP skips index shift | user reanchor | — |
 | Annotation | Overlay measurement = mirror offsetTop (lines) + per-glyph getBoundingClientRect (charEdges); NOT Range.getClientRects() | Phase 2 deliberate | do not revert without ADR | ADR-0002 |
+| Auth | Google sign-in | Needs custom domain capability first; account linking prep via sub-as-PK | Custom domain capability, then Auth follow-up | ADR-0015 |
+| Auth | Email change | Deferred if implementation requires extra SES/Lambda cost beyond existing Cognito verify path | Auth Phase 5 cost check, or post-MVP | ADR-0015 |
