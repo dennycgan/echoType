@@ -19,9 +19,42 @@ resource "aws_ssm_parameter" "web_origin" {
   name        = "/${var.project}/WEB_ORIGIN"
   description = "CloudFront HTTPS URL; API CORS allow-origin and CI health-check base."
   type        = "String"
-  value       = "https://${aws_cloudfront_distribution.web.domain_name}"
+  value       = local.web_origin
 
   tags = {
     Name = "${var.project}-web-origin"
+  }
+}
+
+resource "aws_ssm_parameter" "cognito_user_pool_id" {
+  name        = "/${var.project}/COGNITO_USER_POOL_ID"
+  description = "Cognito User Pool ID for EchoType auth (API + web build)."
+  type        = "String"
+  value       = aws_cognito_user_pool.main.id
+
+  tags = {
+    Name = "${var.project}-cognito-user-pool-id"
+  }
+}
+
+resource "aws_ssm_parameter" "cognito_client_id" {
+  name        = "/${var.project}/COGNITO_CLIENT_ID"
+  description = "Cognito app client ID (public SPA client, no secret)."
+  type        = "String"
+  value       = aws_cognito_user_pool_client.web.id
+
+  tags = {
+    Name = "${var.project}-cognito-client-id"
+  }
+}
+
+resource "aws_ssm_parameter" "cognito_region" {
+  name        = "/${var.project}/COGNITO_REGION"
+  description = "AWS region hosting the Cognito User Pool."
+  type        = "String"
+  value       = var.region
+
+  tags = {
+    Name = "${var.project}-cognito-region"
   }
 }

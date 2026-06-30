@@ -58,3 +58,18 @@ output "database_url" {
   description = "DATABASE_URL to put in the EC2 deploy/.env."
   sensitive   = true
 }
+
+output "cognito_user_pool_id" {
+  value       = aws_cognito_user_pool.main.id
+  description = "Cognito User Pool ID (also in SSM /echotype/COGNITO_USER_POOL_ID)."
+}
+
+output "cognito_client_id" {
+  value       = aws_cognito_user_pool_client.web.id
+  description = "Cognito SPA app client ID (also in SSM /echotype/COGNITO_CLIENT_ID)."
+}
+
+output "cognito_region" {
+  value       = var.region
+  description = "Region of the Cognito User Pool (also in SSM /echotype/COGNITO_REGION)."
+}

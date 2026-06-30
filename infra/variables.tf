@@ -81,3 +81,9 @@ variable "db_password" {
   sensitive   = true
   description = "Master password for RDS. Provide via terraform.tfvars (gitignored)."
 }
+
+variable "dev_web_origin" {
+  type        = string
+  default     = "http://localhost:5173"
+  description = "Local Vite dev origin; included in Cognito callback/logout URLs alongside WEB_ORIGIN."
+}
