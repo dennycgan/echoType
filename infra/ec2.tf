@@ -29,4 +29,11 @@ resource "aws_instance" "app" {
   tags = {
     Name = "${var.project}-app"
   }
+
+  # AMI comes from the rolling AL2023 SSM parameter; AWS publishes new AMIs often.
+  # Ignore drift so unrelated applies (e.g. Cognito) do not replace the instance.
+  # To patch OS: remove this block temporarily, plan, apply, redeploy API, restore.
+  lifecycle {
+    ignore_changes = [ami]
+  }
 }
