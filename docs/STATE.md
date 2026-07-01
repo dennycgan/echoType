@@ -27,7 +27,7 @@ Active capability: Auth
 - [x] Phase 1 — Cognito pool + SSM (email/password pool; email verification required; access 1h / refresh 30d; callback/logout URLs from WEB_ORIGIN / env — no hardcoded cloudfront.net)
 - [x] Phase 2 — User model + seed split (users.id = Cognito sub UUID; nickname required; purge demo-user from prod; clear monolithic seed.ts; local-only dev seed, prod deploy skips seed)
 - [x] Phase 3 — API JWT auth (replace demo-user shim; verify tokens; upsert User by sub; 401 without valid session)
-- [ ] Phase 4 — Web auth core (register form: email + password + nickname all required; email verification gate before login; login/logout/refresh; route guards; Cognito config from env)
+- [x] Phase 4 — Web auth + guest browse (Cognito SRP register/login/verify-email; guest localStorage catalog + onboarding samples; open browse routes; Bearer + 401 refresh; guest save disabled; post-login next guard for guest temp courses; probe)
 - [ ] Phase 5 — Account management (forgot password; change password; delete account — email re-registerable; email change only if zero new cloud cost, else Known debt; all Cognito email links/callbacks from WEB_ORIGIN / env — no hardcoded domain)
 - [ ] Phase 6 — Onboarding seed hook (courseCount===0 triggers seed call; framework + empty stub — **owner must supply course/collection seed content before this phase ships**)
 
@@ -36,11 +36,11 @@ Active capability: Auth
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Auth Phase 4 — Web auth core (register/login/refresh; route guards; Cognito from env).
-- Sub-steps done: Phase 3 API JWT (`962d2a4`; probe + manual curl 验收); Phase 2 (`43ae465`); Phase 1 (`b2a226a`); admin password auth on app client (`f215575`)
-- Next step: Phase 4 design / web login + Bearer on API calls
-- Related decisions: ADR-0015
-- Deploy gate: first prod deploy after Auth Phase 4 (Phases 2–4 bundle)
+- Goal (one line): Auth Phase 5 — Account management (forgot/change password; delete account).
+- Sub-steps done: Phase 4 web auth + guest browse (`7786f03`; probe Part A+C + owner 验收); Phase 3 (`962d2a4`); Phase 2 (`43ae465`); Phase 1 (`b2a226a`)
+- Next step: Phase 5 design / forgot-password + change-password flows
+- Related decisions: ADR-0015 §15–16
+- Deploy gate: Phases 2–4 bundle ready; awaiting owner decision (recommend after Phase 5 account management for complete auth UX)
 
 ## Contract pointers (don't memorize, go read the source)
 - Stats metrics (definitions/formulas only): docs/STATS.md
@@ -61,6 +61,9 @@ Active capability: Auth
 - Editor + review: apps/web/src/components/editor/useCourseEditor.ts, reviewUtils.ts, AnnotatedTextEditor.tsx
 - Deploy: deploy/README.md, .github/workflows/deploy.yml, .github/workflows/deploy-web.yml
 - API JWT auth: apps/api/src/auth/, probe `apps/api/scripts/auth-phase3-jwt-probe.mjs`
+- Web auth (Cognito SPA): apps/web/src/auth/, apps/web/.env.example, probe `apps/web/scripts/auth-phase4-probe.mjs`
+- Guest course catalog (local): apps/web/src/guest/guestCoursesStore.ts, apps/web/src/guest/useCourseCatalog.ts
+- Onboarding catalog (shared): packages/shared/src/onboardingCatalog.ts (re-exported in apps/api/prisma/fixtures/courseCatalog.ts)
 - Onboarding course catalog (fixtures): apps/api/prisma/fixtures/courseCatalog.ts, materializeCourse.ts
 
 ## Do NOT touch (unless explicitly opening a new phase)
@@ -79,6 +82,7 @@ Active capability: Auth
 | Typing | English course + accidental IME shows red diff only, no explicit "switch to English" guidance | Phase 3 chose IME-as-valid-input (ADR-0008) over kickoff #7 banner/pause; red diff implies the error | future polish / real-usage feedback | ADR-0008 |
 | Annotation | false-green (duplicate substring, no index shift) | MVP skips index shift | user reanchor | — |
 | Annotation | Overlay measurement = mirror offsetTop (lines) + per-glyph getBoundingClientRect (charEdges); NOT Range.getClientRects() | Phase 2 deliberate | do not revert without ADR | ADR-0002 |
-| Auth | Local web UI 401 until Phase 4 ships Bearer tokens | API JWT active; browser has no login yet | Auth Phase 4 | ADR-0015 |
+| Auth | Guest typing progress not restored after login | In-memory session only; sign in before starting a session you intend to save | intentional (ADR-0015 §16) | ADR-0015 |
+| Auth | Onboarding sample courses missing from API until Phase 6 seed | Guest reads shared onboarding catalog in localStorage; authed `GET /courses/:onboardingId` 404 until DB seed | Auth Phase 6 | ADR-0015 |
 | Auth | Google sign-in | Needs custom domain capability first; account linking prep via sub-as-PK | Custom domain capability, then Auth follow-up | ADR-0015 |
 | Auth | Email change | Deferred if implementation requires extra SES/Lambda cost beyond existing Cognito verify path | Auth Phase 5 cost check, or post-MVP | ADR-0015 |

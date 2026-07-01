@@ -687,6 +687,35 @@
       access token omits `name`. `deploy/remote-deploy.sh` injects Cognito SSM into API env.
       Probe `apps/api/scripts/auth-phase3-jwt-probe.mjs` (Part A 401 matrix + optional Part B
       with `TEST_ACCESS_TOKEN` or `PROBE_COGNITO_AUTH=1`).
+  15. **Phase 4 shipped** (`7786f03`, Accepted 2026-07-01): Web Cognito SRP
+      (`amazon-cognito-identity-js`); `AuthProvider` + `localStorage` session; register
+      (email + password + nickname), verify-email gate, login/logout; Bearer on API
+      calls with 401 refresh retry. **Guest browse** replaces pre-Phase-4 full-site
+      `RequireAuth` (see §16). Routes under `AppLayout` are public; write actions that
+      need an account call `useRequireAuthAction` or header **Log in**. Deploy:
+      `VITE_COGNITO_*` from SSM in `deploy-web.yml`; `vite.config.ts` `global:
+      globalThis` for cognito SDK. Probe `apps/web/scripts/auth-phase4-probe.mjs`
+      (Part C unit tests + Part A guest browse + optional Part B Cognito login).
+      Catalog hooks defer until `auth status !== 'loading'`; API `401` hard-redirect
+      to `/login` only when a stored session existed (fixes guest reload kick).
+  16. **Guest browse semantics** (kickoff authentication §1; ADR-0015 §15):
+      - **Storage**: `echotype-guest-courses` in `localStorage`; seeds onboarding from
+        `packages/shared/onboardingCatalog.ts` (stable IDs namespace `8001`);
+        **logout does not clear** guest store; clear site data resets it.
+      - **Guest may**: browse onboarding Samples + standalone samples; create/edit/delete
+        **temporary** courses (`source: 'guest'`, `categoryId: null` only); type with
+        live stats.
+      - **Guest may not**: save typing sessions; collection writes; edit/delete
+        onboarding read-only courses/collections. Save UI is disabled
+        **Saving requires sign-in** (main button + timer-end dialog); login entry is
+        header **Log in** only.
+      - **Leave UX**: guest typing has **no** leave confirmation on ← Back; authed
+        users keep `useBlocker` leave dialog.
+      - **Post-login `next`**: if `next` is `/courses/:id/type` and `id` is a guest
+        **temp** course (`source === 'guest'` in guest store), redirect to
+        `/courses/short` (+ optional flash toast) — temp IDs do not exist in API.
+      - **Facade**: `useCourseCatalog` switches guest store vs API; pages stay unaware.
+      - **Not in scope (permanent)**: restore guest in-progress typing after login.
 - Rejected alternatives:
   - email as `users` PK — blocks future Google account linking.
   - Post-login nickname modal — extra “verified but incomplete profile” state complicates
@@ -702,4 +731,7 @@
   - Do not deploy Phases 2–3 to prod without Phase 4 Web auth (401 wall for browser).
   - Unrelated `terraform apply` should use `-target` for Cognito-only changes until AMI
     lock is on all environments, or rely on `0018106` lifecycle on `aws_instance.app`.
+  - Phase 4 shipped (`7786f03`): browser can browse without login; Phases 2–4 bundle
+    ready for prod when owner chooses (STATE recommends after Phase 5 for complete auth
+    UX). Phase 5 next. Phase 6 still blocked on owner seed content.
 - Supersedes / superseded-by: none
