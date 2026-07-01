@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { AnnotationDTO, CourseDTO, CourseMode, CreateSessionInput, PasteRange } from '@echotype/shared';
 import { api, isCourseNotFoundError } from '../lib/api';
+import { useAuth } from '../auth/AuthProvider';
+import { useCourseById } from '../guest/useCourseCatalog';
 import { CourseDescriptionPanel } from '../components/CourseDescriptionPanel';
 import { AnnotatedText } from '../components/AnnotatedText';
 import { TypingLeaveDialog } from '../components/typing/TypingLeaveDialog';
@@ -90,15 +92,9 @@ function CourseNotFoundPanel() {
 
 export function TypingPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: course, isLoading, isError, error } = useQuery({
-    queryKey: ['course', id],
-    queryFn: () => api.getCourse(id!),
-    enabled: !!id,
-    retry: (failureCount, err) => {
-      if (isCourseNotFoundError(err)) return false;
-      return failureCount < 3;
-    },
-  });
+  const { status } = useAuth();
+  const isGuest = status === 'guest';
+  const { data: course, isLoading, isError, error } = useCourseById(id);
 
   if (isLoading) {
     return <p className="text-slate-500">Loading…</p>;
@@ -125,6 +121,7 @@ export function TypingPage() {
       title={course.title}
       description={course.description}
       annotations={course.annotations}
+      isGuest={isGuest}
     />
   );
 }
@@ -142,6 +139,7 @@ function TypingSession({
   title,
   description,
   annotations,
+  isGuest,
 }: {
   courseId: string;
   courseMode: CourseMode;
@@ -150,6 +148,7 @@ function TypingSession({
   title: string;
   description: string | null;
   annotations: AnnotationDTO[];
+  isGuest: boolean;
 }) {
   const queryClient = useQueryClient();
   const [typed, setTyped] = useState('');
@@ -202,7 +201,7 @@ function TypingSession({
   const remainingSecRef = useRef<number | null>(null);
 
   const hasUnsavedProgress = startedAt !== null;
-  const shouldBlockNavigation = hasUnsavedProgress || timerEndOpen;
+  const shouldBlockNavigation = !isGuest && (hasUnsavedProgress || timerEndOpen);
 
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
@@ -557,12 +556,12 @@ function TypingSession({
   }
 
   function handleFinish() {
-    if (!startedAt || timerEndOpen) return;
+    if (!startedAt || timerEndOpen || isGuest) return;
     submitMutation.mutate(buildSessionPayload());
   }
 
   async function handleTimerEndSave() {
-    if (!startedAt) return;
+    if (!startedAt || isGuest) return;
     setTimerEndSaveError(null);
     try {
       await submitMutation.mutateAsync(buildSessionPayload());
@@ -617,7 +616,7 @@ function TypingSession({
   }
 
   async function handleSaveAndLeave() {
-    if (!startedAt) return;
+    if (!startedAt || isGuest) return;
     setLeaveSaveError(null);
     try {
       await submitMutation.mutateAsync(buildSessionPayload());
@@ -648,6 +647,7 @@ function TypingSession({
         <TypingLeaveDialog
           saving={submitMutation.isPending}
           saveError={leaveSaveError}
+          loginToSave={isGuest}
           onStay={() => blocker.reset()}
           onLeave={() => blocker.proceed()}
           onSaveAndLeave={() => void handleSaveAndLeave()}
@@ -659,6 +659,7 @@ function TypingSession({
           saving={submitMutation.isPending}
           saveError={timerEndSaveError}
           canSave={startedAt !== null}
+          loginToSave={isGuest}
           onSave={() => void handleTimerEndSave()}
           onDontSave={handleTimerEndDontSave}
         />
@@ -837,11 +838,16 @@ function TypingSession({
             Pause
           </button>
           <button
+            type="button"
             onClick={handleFinish}
-            disabled={!startedAt || submitMutation.isPending || timerEndOpen}
-            className={`${SESSION_ACTION_BTN_BASE} bg-slate-900 text-white hover:bg-slate-800`}
+            disabled={isGuest || !startedAt || submitMutation.isPending || timerEndOpen}
+            className={`${SESSION_ACTION_BTN_BASE} ${
+              isGuest
+                ? 'cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400'
+                : 'bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50'
+            }`}
           >
-            {submitMutation.isPending ? 'Saving…' : 'Save session'}
+            {isGuest ? 'Saving requires sign-in' : submitMutation.isPending ? 'Saving…' : 'Save session'}
           </button>
           <button
             onClick={handleReset}

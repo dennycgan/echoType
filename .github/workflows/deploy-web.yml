@@ -31,14 +31,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build frontend
-        run: pnpm --filter @echotype/web build
-
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve Cognito env for Vite build
+        id: cognito
+        run: |
+          echo "pool_id=$(aws ssm get-parameter --name /echotype/COGNITO_USER_POOL_ID --query Parameter.Value --output text)" >> "$GITHUB_OUTPUT"
+          echo "client_id=$(aws ssm get-parameter --name /echotype/COGNITO_CLIENT_ID --query Parameter.Value --output text)" >> "$GITHUB_OUTPUT"
+          echo "region=$(aws ssm get-parameter --name /echotype/COGNITO_REGION --query Parameter.Value --output text)" >> "$GITHUB_OUTPUT"
+
+      - name: Build frontend
+        env:
+          VITE_COGNITO_USER_POOL_ID: ${{ steps.cognito.outputs.pool_id }}
+          VITE_COGNITO_CLIENT_ID: ${{ steps.cognito.outputs.client_id }}
+          VITE_COGNITO_REGION: ${{ steps.cognito.outputs.region }}
+        run: pnpm --filter @echotype/web build
 
       - name: Upload build to S3
         run: aws s3 sync apps/web/dist "s3://${{ vars.WEB_BUCKET }}" --delete

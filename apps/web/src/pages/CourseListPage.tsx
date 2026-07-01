@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
 import type { CategoryDTO, CourseDTO, CourseListSort, CourseMode } from '@echotype/shared';
 import { SEARCH_Q_MAX } from '@echotype/shared';
 import { api, isCourseNotFoundError } from '../lib/api';
+import { useRequireAuthAction } from '../auth/useRequireAuthAction';
+import {
+  invalidateCourseQueries,
+  useCategoryList,
+  useCourseList,
+  useDeleteCourse,
+  useIsGuest,
+} from '../guest/useCourseCatalog';
+import { isGuestReadOnlyCourse } from '../guest/guestCoursesStore';
 import { BulkActionBar } from '../components/BulkActionBar';
 import { CollectionCard } from '../components/collection/CollectionCard';
 import { CollectionEditorModal } from '../components/collection/CollectionEditorModal';
@@ -42,6 +51,8 @@ const MODE_COPY: Record<
 export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
   const copy = MODE_COPY[courseMode];
   const qc = useQueryClient();
+  const isGuest = useIsGuest();
+  const requireAuth = useRequireAuthAction();
   const search = useImeAwareDebouncedSearch();
   const [sort, setSort] = useState<CourseListSort>(() => readStoredSort(courseMode, 'list'));
   const [bulkMode, setBulkMode] = useState(false);
@@ -64,19 +75,12 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
   const listOpts = { q: search.query || undefined, sort };
   const courseScope = hasQuery ? 'global' : 'null';
 
-  const { data: categories, isLoading: categoriesLoading } = useQuery({
-    queryKey: ['categories', courseMode, search.query, sort],
-    queryFn: () => api.listCategories(courseMode, listOpts),
-  });
+  const { data: categories, isLoading: categoriesLoading } = useCategoryList(courseMode, listOpts);
 
-  const { data: courses, isLoading: coursesLoading } = useQuery({
-    queryKey: ['courses', courseMode, courseScope, search.query, sort],
-    queryFn: () =>
-      api.listCourses(
-        courseMode,
-        hasQuery ? listOpts : { ...listOpts, categoryId: 'null' },
-      ),
-  });
+  const { data: courses, isLoading: coursesLoading } = useCourseList(
+    courseMode,
+    hasQuery ? listOpts : { ...listOpts, categoryId: 'null' },
+  );
 
   useEffect(() => {
     setSelected(new Set());
@@ -88,10 +92,17 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
     return () => clearTimeout(t);
   }, [highlightCourseId]);
 
-  const invalidateAll = () => {
-    qc.invalidateQueries({ queryKey: ['categories', courseMode] });
-    qc.invalidateQueries({ queryKey: ['courses', courseMode] });
-  };
+  useEffect(() => {
+    const flash = sessionStorage.getItem('echotype.auth.flash');
+    if (flash) {
+      sessionStorage.removeItem('echotype.auth.flash');
+      setActionError(flash);
+      const t = window.setTimeout(() => setActionError(null), 8000);
+      return () => window.clearTimeout(t);
+    }
+  }, []);
+
+  const invalidateAll = () => invalidateCourseQueries(qc, isGuest);
 
   function exitBulkMode() {
     setBulkMode(false);
@@ -100,29 +111,7 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
     setPickerCourseIds(null);
   }
 
-  const deleteMutation = useMutation({
-    mutationFn: (courseId: string) => api.deleteCourse(courseId),
-    onSuccess: (_data, courseId) => {
-      setActionError(null);
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.delete(courseId);
-        return next;
-      });
-      qc.removeQueries({ queryKey: ['course', courseId] });
-      invalidateAll();
-      setDeletingId(null);
-    },
-    onError: (e: unknown) => {
-      setDeletingId(null);
-      if (isCourseNotFoundError(e)) {
-        setActionError('Course not found — it may have already been deleted.');
-        invalidateAll();
-        return;
-      }
-      setActionError('Failed to delete course. Please try again.');
-    },
-  });
+  const deleteMutation = useDeleteCourse();
 
   const patchCategory = useMutation({
     mutationFn: ({ courseIds, categoryId }: { courseIds: string[]; categoryId: string | null }) =>
@@ -167,13 +156,34 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
   }
 
   function handleDelete(course: CourseDTO) {
+    if (isGuestReadOnlyCourse(course.id)) return;
     const ok = window.confirm(
       `Delete "${course.title}"? This cannot be undone. All annotations and typing sessions for this course will be removed.`,
     );
     if (!ok) return;
     setActionError(null);
     setDeletingId(course.id);
-    deleteMutation.mutate(course.id);
+    deleteMutation.mutate(course.id, {
+      onSuccess: () => {
+        setActionError(null);
+        setSelected((prev) => {
+          const next = new Set(prev);
+          next.delete(course.id);
+          return next;
+        });
+        invalidateAll();
+        setDeletingId(null);
+      },
+      onError: (e: unknown) => {
+        setDeletingId(null);
+        if (isCourseNotFoundError(e)) {
+          setActionError('Course not found — it may have already been deleted.');
+          invalidateAll();
+          return;
+        }
+        setActionError('Failed to delete course. Please try again.');
+      },
+    });
   }
 
   function handleRemoveOne(course: CourseDTO) {
@@ -196,11 +206,23 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
 
   function handleDeleteSelected() {
     if (selectedIds.length === 0) return;
+    const deletable = selectedIds.filter((id) => !isGuestReadOnlyCourse(id));
+    if (deletable.length === 0) return;
     const ok = window.confirm(
-      `Delete ${selectedIds.length} course${selectedIds.length === 1 ? '' : 's'}? This cannot be undone. All annotations and typing sessions will be removed.`,
+      `Delete ${deletable.length} course${deletable.length === 1 ? '' : 's'}? This cannot be undone. All annotations and typing sessions will be removed.`,
     );
     if (!ok) return;
-    void Promise.all(selectedIds.map((id) => api.deleteCourse(id)))
+    void Promise.all(
+      deletable.map(
+        (id) =>
+          new Promise<void>((resolve, reject) => {
+            deleteMutation.mutate(id, {
+              onSuccess: () => resolve(),
+              onError: (e) => reject(e),
+            });
+          }),
+      ),
+    )
       .then(() => {
         setActionError(null);
         setSelected(new Set());
@@ -242,6 +264,7 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
   }
 
   function courseMenuItems(course: CourseDTO): OverflowMenuItem[] {
+    if (isGuestReadOnlyCourse(course.id)) return [];
     const items: OverflowMenuItem[] = [
       {
         label: 'Delete',
@@ -251,19 +274,21 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
       },
     ];
     if (course.categoryId) {
-      items.push(
-        {
-          label: 'Move to collection…',
-          onClick: (ctx) => {
-            if (ctx?.trigger) openMovePicker([course.id], { menuTrigger: ctx.trigger });
+      if (!isGuest) {
+        items.push(
+          {
+            label: 'Move to collection…',
+            onClick: (ctx) => {
+              if (ctx?.trigger) openMovePicker([course.id], { menuTrigger: ctx.trigger });
+            },
           },
-        },
-        {
-          label: 'Remove from collection',
-          onClick: () => handleRemoveOne(course),
-        },
-      );
-    } else {
+          {
+            label: 'Remove from collection',
+            onClick: () => handleRemoveOne(course),
+          },
+        );
+      }
+    } else if (!isGuest) {
       items.push({
         label: 'Add to collection…',
         onClick: (ctx) => {
@@ -275,6 +300,7 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
   }
 
   function collectionMenuItems(cat: CategoryDTO): OverflowMenuItem[] {
+    if (isGuest) return [];
     return [
       {
         label: 'Edit collection',
@@ -301,13 +327,23 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
             </Link>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setCollectionEditor('create')}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              New collection
-            </button>
+            {isGuest ? (
+              <button
+                type="button"
+                onClick={() => requireAuth()}
+                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                New collection
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCollectionEditor('create')}
+                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                New collection
+              </button>
+            )}
             <button
               onClick={() => setEditor({ mode: 'create' })}
               className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
@@ -399,49 +435,53 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
             {!!courses?.length && (
               <div>
                 <h3 className="mb-2 text-xl font-semibold">Courses</h3>
-                <BulkActionBar
-                  bulkMode={bulkMode}
-                  onEnterBulkMode={() => setBulkMode(true)}
-                  onCancelBulkMode={exitBulkMode}
-                  selectedCount={selectedIds.length}
-                  barRef={bulkBarRef}
-                >
-                  <button
-                    type="button"
-                    onClick={() => openMovePicker(selectedIds, { anchorToBulkBar: true })}
-                    className="rounded border bg-white px-3 py-1 text-sm hover:bg-slate-50"
+                {!isGuest && (
+                  <BulkActionBar
+                    bulkMode={bulkMode}
+                    onEnterBulkMode={() => setBulkMode(true)}
+                    onCancelBulkMode={exitBulkMode}
+                    selectedCount={selectedIds.length}
+                    barRef={bulkBarRef}
                   >
-                    Move to collection…
-                  </button>
-                  {selectedInCollectionIds.length > 0 && (
                     <button
                       type="button"
-                      onClick={handleRemoveSelected}
+                      onClick={() => openMovePicker(selectedIds, { anchorToBulkBar: true })}
                       className="rounded border bg-white px-3 py-1 text-sm hover:bg-slate-50"
                     >
-                      Remove from collection
+                      Move to collection…
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleDeleteSelected}
-                    className="rounded border border-red-200 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-50"
-                  >
-                    Delete selected
-                  </button>
-                </BulkActionBar>
+                    {selectedInCollectionIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveSelected}
+                        className="rounded border bg-white px-3 py-1 text-sm hover:bg-slate-50"
+                      >
+                        Remove from collection
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleDeleteSelected}
+                      className="rounded border border-red-200 bg-white px-3 py-1 text-sm text-red-700 hover:bg-red-50"
+                    >
+                      Delete selected
+                    </button>
+                  </BulkActionBar>
+                )}
                 <ul className="grid gap-3 sm:grid-cols-2">
                   {courses.map((c) => (
                     <CourseListCard
                       key={c.id}
                       course={c}
                       highlight={highlightCourseId === c.id}
-                      bulkMode={bulkMode}
+                      bulkMode={isGuest ? false : bulkMode}
                       selected={selected.has(c.id)}
                       onToggleSelect={() => toggleSelect(c.id)}
                       deleting={deletingId === c.id}
                       menuItems={courseMenuItems(c)}
-                      onEdit={() => setEditor({ mode: 'edit', course: c })}
+                      onEdit={
+                        isGuestReadOnlyCourse(c.id) ? undefined : () => setEditor({ mode: 'edit', course: c })
+                      }
                       showInCollectionLabel={hasQuery}
                     />
                   ))}

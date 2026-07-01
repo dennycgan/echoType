@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 type TypingLeaveDialogProps = {
   saving: boolean;
   saveError: string | null;
+  loginToSave?: boolean;
   onStay: () => void;
   onLeave: () => void;
   onSaveAndLeave: () => void;
@@ -11,6 +12,7 @@ type TypingLeaveDialogProps = {
 export function TypingLeaveDialog({
   saving,
   saveError,
+  loginToSave = false,
   onStay,
   onLeave,
   onSaveAndLeave,
@@ -61,7 +63,7 @@ export function TypingLeaveDialog({
             disabled={saving}
             className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
           >
-            {saving ? 'Saving…' : 'Save and leave'}
+            {saving ? 'Saving…' : loginToSave ? 'Log in to save' : 'Save and leave'}
           </button>
         </div>
       </div>

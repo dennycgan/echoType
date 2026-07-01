@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ARTICLE_MAX, ARTICLE_MIN, SHORT_MAX, SHORT_MIN, type CourseDTO, type CourseMode } from '@echotype/shared';
-import { api, ApiError } from '../../lib/api';
+import { ApiError } from '../../lib/api';
+import { useCheckTitleAvailable, useSaveCourse } from '../../guest/useCourseCatalog';
 import { modeCoursesLabel } from '../../lib/modeCoursesLabel';
 import { AnnotatedText } from '../AnnotatedText';
 import { OptionalDescriptionField } from '../OptionalDescriptionField';
@@ -63,28 +64,8 @@ export function CourseEditorModal({
     }
   }, [ed.step]);
 
-  const save = useMutation({
-    mutationFn: () => {
-      const payload = ed.buildPayload();
-      if (mode === 'create' && presetCategoryId) {
-        return api.createCourse({ ...payload, categoryId: presetCategoryId });
-      }
-      return mode === 'create'
-        ? api.createCourse(payload)
-        : api.updateCourse(course!.id, payload);
-    },
-    onSuccess: (saved) => {
-      qc.invalidateQueries({ queryKey: ['courses'] });
-      onSaved(saved.id);
-    },
-    onError: (e: unknown) => {
-      if (e instanceof ApiError) {
-        handleApiError(e);
-        return;
-      }
-      setSubmitError(MSG_NETWORK_ERROR);
-    },
-  });
+  const save = useSaveCourse();
+  const checkTitleAvailable = useCheckTitleAvailable();
 
   function handleApiError(e: ApiError) {
     const body = e.courseBody;
@@ -157,7 +138,26 @@ export function CourseEditorModal({
       }
     }
 
-    save.mutate();
+    const payload = ed.buildPayload();
+    const withCategory =
+      mode === 'create' && presetCategoryId ? { ...payload, categoryId: presetCategoryId } : payload;
+    save.mutate(
+      {
+        mode,
+        payload: withCategory,
+        courseId: mode === 'edit' ? course!.id : undefined,
+      },
+      {
+        onSuccess: (saved) => onSaved(saved.id),
+        onError: (e: unknown) => {
+          if (e instanceof ApiError) {
+            handleApiError(e);
+            return;
+          }
+          setSubmitError(MSG_NETWORK_ERROR);
+        },
+      },
+    );
   }
 
   function handleNext() {
@@ -190,7 +190,7 @@ export function CourseEditorModal({
       if (!titleUnchanged) {
         setTitleChecking(true);
         try {
-          const { available } = await api.checkCourseTitleAvailable(
+          const { available } = await checkTitleAvailable(
             lockedCourseMode,
             trimmedTitle,
             mode === 'edit' ? course!.id : undefined,

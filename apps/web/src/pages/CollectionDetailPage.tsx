@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { CategoryDTO, CourseDTO, CourseListSort, CourseMode } from '@echotype/shared';
 import { api, isCourseNotFoundError } from '../lib/api';
+import {
+  invalidateCourseQueries,
+  useCategoryById,
+  useCourseList,
+  useDeleteCourse,
+  useIsGuest,
+} from '../guest/useCourseCatalog';
+import { isGuestReadOnlyCourse } from '../guest/guestCoursesStore';
 import { modeListPath } from '../lib/collectionPaths';
 import { readStoredSort, SORT_OPTIONS, writeStoredSort } from '../lib/courseListSort';
 import { BulkActionBar } from '../components/BulkActionBar';
@@ -30,6 +38,7 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
   const { collectionId } = useParams<{ collectionId: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const isGuest = useIsGuest();
   const [sort, setSort] = useState<CourseListSort>(() => readStoredSort(courseMode, 'detail'));
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -48,18 +57,13 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
     data: category,
     isLoading: categoryLoading,
     error: categoryError,
-  } = useQuery({
-    queryKey: ['category', collectionId],
-    queryFn: () => api.getCategory(collectionId!),
-    enabled: !!collectionId,
-  });
+  } = useCategoryById(collectionId);
 
-  const { data: courses, isLoading: coursesLoading } = useQuery({
-    queryKey: ['courses', courseMode, collectionId, '', sort],
-    queryFn: () =>
-      api.listCourses(courseMode, { categoryId: collectionId!, sort }),
-    enabled: !!collectionId,
-  });
+  const { data: courses, isLoading: coursesLoading } = useCourseList(
+    courseMode,
+    { categoryId: collectionId!, sort },
+    !!collectionId,
+  );
 
   useEffect(() => {
     setSelected(new Set());
@@ -72,9 +76,10 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
   }, [highlightCourseId]);
 
   const invalidateAll = () => {
-    qc.invalidateQueries({ queryKey: ['categories', courseMode] });
-    qc.invalidateQueries({ queryKey: ['courses', courseMode] });
-    qc.invalidateQueries({ queryKey: ['category', collectionId] });
+    invalidateCourseQueries(qc, isGuest);
+    if (!isGuest) {
+      void qc.invalidateQueries({ queryKey: ['category', collectionId] });
+    }
   };
 
   function exitBulkMode() {
@@ -95,28 +100,7 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
     onError: () => setActionError('Failed to update courses. Please try again.'),
   });
 
-  const deleteCourse = useMutation({
-    mutationFn: (courseId: string) => api.deleteCourse(courseId),
-    onSuccess: (_data, courseId) => {
-      setActionError(null);
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.delete(courseId);
-        return next;
-      });
-      qc.removeQueries({ queryKey: ['course', courseId] });
-      invalidateAll();
-      setDeletingId(null);
-    },
-    onError: (e: unknown) => {
-      setDeletingId(null);
-      if (isCourseNotFoundError(e)) {
-        invalidateAll();
-        return;
-      }
-      setActionError('Failed to delete course. Please try again.');
-    },
-  });
+  const deleteCourse = useDeleteCourse();
 
   const deleteCollection = useMutation({
     mutationFn: () => api.deleteCategory(collectionId!),
@@ -139,12 +123,32 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
   }
 
   function handleDeleteCourse(course: CourseDTO) {
+    if (isGuestReadOnlyCourse(course.id)) return;
     const ok = window.confirm(
       `Delete "${course.title}"? This cannot be undone. All annotations and typing sessions for this course will be removed.`,
     );
     if (!ok) return;
     setDeletingId(course.id);
-    deleteCourse.mutate(course.id);
+    deleteCourse.mutate(course.id, {
+      onSuccess: () => {
+        setActionError(null);
+        setSelected((prev) => {
+          const next = new Set(prev);
+          next.delete(course.id);
+          return next;
+        });
+        invalidateAll();
+        setDeletingId(null);
+      },
+      onError: (e: unknown) => {
+        setDeletingId(null);
+        if (isCourseNotFoundError(e)) {
+          invalidateAll();
+          return;
+        }
+        setActionError('Failed to delete course. Please try again.');
+      },
+    });
   }
 
   function handleRemoveOne(course: CourseDTO) {
@@ -177,11 +181,23 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
 
   function handleDeleteSelected() {
     if (selectedIds.length === 0) return;
+    const deletable = selectedIds.filter((id) => !isGuestReadOnlyCourse(id));
+    if (deletable.length === 0) return;
     const ok = window.confirm(
-      `Delete ${selectedIds.length} course${selectedIds.length === 1 ? '' : 's'}? This cannot be undone. All annotations and typing sessions will be removed.`,
+      `Delete ${deletable.length} course${deletable.length === 1 ? '' : 's'}? This cannot be undone. All annotations and typing sessions will be removed.`,
     );
     if (!ok) return;
-    void Promise.all(selectedIds.map((id) => api.deleteCourse(id)))
+    void Promise.all(
+      deletable.map(
+        (id) =>
+          new Promise<void>((resolve, reject) => {
+            deleteCourse.mutate(id, {
+              onSuccess: () => resolve(),
+              onError: (e) => reject(e),
+            });
+          }),
+      ),
+    )
       .then(() => {
         setActionError(null);
         setSelected(new Set());
@@ -201,6 +217,7 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
   }
 
   function buildCourseMenu(course: CourseDTO): OverflowMenuItem[] {
+    if (isGuest || isGuestReadOnlyCourse(course.id)) return [];
     return [
       {
         label: 'Delete',
@@ -258,22 +275,24 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
               />
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setCollectionEditor(true)}
-              className="rounded border px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              Edit collection
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDeleteCollection(category)}
-              className="rounded border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
-            >
-              Delete collection
-            </button>
-          </div>
+          {!isGuest && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setCollectionEditor(true)}
+                className="rounded border px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Edit collection
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteCollection(category)}
+                className="rounded border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
+              >
+                Delete collection
+              </button>
+            </div>
+          )}
         </div>
         {category.description?.trim() && (
           <div className="mt-3">
@@ -289,31 +308,33 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setEditor({ mode: 'create' })}
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            New course
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowAddCourses(true)}
-            className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            Add courses…
-          </button>
-          {!bulkMode && (
+        {!isGuest && (
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => setBulkMode(true)}
+              onClick={() => setEditor({ mode: 'create' })}
+              className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              New course
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAddCourses(true)}
               className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
             >
-              Bulk actions
+              Add courses…
             </button>
-          )}
-        </div>
+            {!bulkMode && (
+              <button
+                type="button"
+                onClick={() => setBulkMode(true)}
+                className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Bulk actions
+              </button>
+            )}
+          </div>
+        )}
         <label className="flex shrink-0 items-center gap-2 text-sm text-slate-600">
           <span className="hidden sm:inline">Sort</span>
           <select
@@ -335,7 +356,7 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
         </label>
       </div>
 
-      {bulkMode && (
+      {bulkMode && !isGuest && (
         <BulkActionBar
           bulkMode
           onEnterBulkMode={() => setBulkMode(true)}
@@ -383,13 +404,17 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
               onToggleSelect={() => toggleSelect(c.id)}
               deleting={deletingId === c.id}
               menuItems={buildCourseMenu(c)}
-              onEdit={() => setEditor({ mode: 'edit', course: c })}
+              onEdit={
+                isGuest || isGuestReadOnlyCourse(c.id)
+                  ? undefined
+                  : () => setEditor({ mode: 'edit', course: c })
+              }
             />
           ))}
         </ul>
       )}
 
-      {editor && (
+      {editor && !isGuest && (
         <CourseEditorModal
           key={editor.mode === 'edit' ? `edit-${editor.course.id}` : `create-${collectionId}`}
           mode={editor.mode}
@@ -405,7 +430,7 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
         />
       )}
 
-      {collectionEditor && (
+      {collectionEditor && !isGuest && (
         <CollectionEditorModal
           mode="edit"
           courseMode={courseMode}
@@ -418,7 +443,7 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
         />
       )}
 
-      {showAddCourses && (
+      {showAddCourses && !isGuest && (
         <AddCoursesModal
           courseMode={courseMode}
           onClose={() => setShowAddCourses(false)}
@@ -429,7 +454,7 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
         />
       )}
 
-      {batchMoveOpen && (
+      {batchMoveOpen && !isGuest && (
         <CollectionPickerModal
           courseMode={courseMode}
           title="Move to collection"
@@ -440,7 +465,7 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
         />
       )}
 
-      {moveOneCourseId && (
+      {moveOneCourseId && !isGuest && (
         <CollectionPickerModal
           courseMode={courseMode}
           title="Move to collection"

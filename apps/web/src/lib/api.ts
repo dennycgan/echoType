@@ -14,6 +14,13 @@ import type {
   UpdateCategoryInput,
   UpdateCourseInput,
 } from '@echotype/shared';
+import {
+  clearAuthSession,
+  forceRefreshAccessToken,
+  getValidAccessToken,
+  loadAuthSession,
+} from '../auth/authSession.js';
+import { loginPathWithNext } from '../auth/publicPaths.js';
 
 const BASE = '/api';
 
@@ -77,20 +84,46 @@ async function parseErrorBody(res: Response): Promise<unknown> {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+function redirectToLogin(): void {
+  // Guest browse: no session — surface 401 to callers without forcing /login.
+  if (!loadAuthSession()) return;
+  const next = window.location.pathname + window.location.search;
+  clearAuthSession();
+  window.location.assign(loginPathWithNext(next));
+}
+
+async function fetchWithAuth(
+  path: string,
+  init: RequestInit | undefined,
+  token: string | null,
+): Promise<Response> {
   const headers = new Headers(init?.headers);
   if (init?.body != null && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
+  if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  let res: Response;
   try {
-    res = await fetch(BASE + path, {
-      ...init,
-      headers,
-    });
+    return await fetch(BASE + path, { ...init, headers });
   } catch {
     throw new ApiError(0, null, 'Network error. Check your connection and try again.');
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit, authRetried = false): Promise<T> {
+  let token = await getValidAccessToken();
+  let res = await fetchWithAuth(path, init, token);
+
+  if (res.status === 401 && !authRetried) {
+    token = await forceRefreshAccessToken();
+    if (token) {
+      res = await fetchWithAuth(path, init, token);
+    }
+  }
+
+  if (res.status === 401) {
+    redirectToLogin();
+    throw new ApiError(401, { error: 'unauthorized' });
   }
 
   if (!res.ok) {
@@ -102,7 +135,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const contentType = res.headers.get('content-type') ?? '';
   if (!contentType.includes('json')) {
     const text = await res.text();
-    // CloudFront custom_error_response maps origin 404 → 200 + index.html for SPA.
     if (looksLikeHtmlDocument(text)) {
       throw new ApiError(410, { error: 'not_found' });
     }

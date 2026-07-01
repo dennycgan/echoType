@@ -4,6 +4,7 @@ type TimerEndDialogProps = {
   saving: boolean;
   saveError: string | null;
   canSave: boolean;
+  loginToSave?: boolean;
   onSave: () => void;
   onDontSave: () => void;
 };
@@ -12,6 +13,7 @@ export function TimerEndDialog({
   saving,
   saveError,
   canSave,
+  loginToSave = false,
   onSave,
   onDontSave,
 }: TimerEndDialogProps) {
@@ -66,14 +68,24 @@ export function TimerEndDialog({
           >
             Don&apos;t save
           </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving || !canSave}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {saving ? 'Saving…' : 'Save session'}
-          </button>
+          {loginToSave ? (
+            <button
+              type="button"
+              disabled
+              className="cursor-not-allowed rounded-md border border-slate-200 bg-slate-100 px-4 py-2 text-sm text-slate-400"
+            >
+              Saving requires sign-in
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving || !canSave}
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {saving ? 'Saving…' : 'Save session'}
+            </button>
+          )}
         </div>
       </div>
     </div>,

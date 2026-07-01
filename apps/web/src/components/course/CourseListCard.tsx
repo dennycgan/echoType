@@ -13,7 +13,7 @@ type CourseListCardProps = {
   onToggleSelect?: () => void;
   deleting?: boolean;
   menuItems: OverflowMenuItem[];
-  onEdit: () => void;
+  onEdit?: () => void;
   /** Show "In: {collection}" badge (mode list search hits only). */
   showInCollectionLabel?: boolean;
 };
@@ -88,12 +88,14 @@ export function CourseListCard({
           >
             Type this
           </Link>
-          <button
-            onClick={onEdit}
-            className="rounded border px-3 py-1 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            Edit
-          </button>
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="rounded border px-3 py-1 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Edit
+            </button>
+          )}
           {deleting && <span className="text-xs text-slate-400">Deleting…</span>}
           <div className="ml-auto">
             <CourseStatsPopover

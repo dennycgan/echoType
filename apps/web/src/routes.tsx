@@ -1,11 +1,35 @@
 import { Navigate } from 'react-router-dom';
 import { AppLayout } from './AppLayout';
+import { GuestOnly } from './auth/GuestOnly';
 import { HomePage } from './pages/HomePage';
 import { CourseListPage } from './pages/CourseListPage';
 import { CollectionDetailPage } from './pages/CollectionDetailPage';
 import { TypingPage } from './pages/TypingPage';
+import { LoginPage } from './pages/auth/LoginPage';
+import { RegisterPage } from './pages/auth/RegisterPage';
+import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
 
 export const router = [
+  {
+    path: '/login',
+    element: (
+      <GuestOnly>
+        <LoginPage />
+      </GuestOnly>
+    ),
+  },
+  {
+    path: '/register',
+    element: (
+      <GuestOnly>
+        <RegisterPage />
+      </GuestOnly>
+    ),
+  },
+  {
+    path: '/verify-email',
+    element: <VerifyEmailPage />,
+  },
   {
     element: <AppLayout />,
     children: [

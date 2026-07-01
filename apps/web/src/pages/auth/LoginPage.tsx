@@ -1,0 +1,87 @@
+import { FormEvent, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { AuthLayout } from '../../auth/AuthLayout';
+import { useAuth } from '../../auth/AuthProvider';
+import { GUEST_LOGIN_TOAST, resolvePostLoginPath } from '../../auth/resolvePostLoginPath';
+
+export function LoginPage() {
+  const { login, mapError, isUserNotConfirmed } = useAuth();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = params.get('next') || '/courses/short';
+  const verified = params.get('verified') === '1';
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(email, password);
+      const destination = resolvePostLoginPath(next);
+      if (destination !== next) {
+        sessionStorage.setItem('echotype.auth.flash', GUEST_LOGIN_TOAST);
+      }
+      navigate(destination, { replace: true });
+    } catch (err) {
+      if (isUserNotConfirmed(err)) {
+        navigate(`/verify-email?email=${encodeURIComponent(email.trim())}`, { replace: true });
+        return;
+      }
+      setError(mapError(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <AuthLayout>
+      <h1 className="text-xl font-semibold">Sign in</h1>
+      {verified && (
+        <p className="mt-2 text-sm text-green-700">Email verified. You can sign in now.</p>
+      )}
+      <form className="mt-4 space-y-4" onSubmit={onSubmit}>
+        <label className="block text-sm">
+          <span className="text-slate-700">Email</span>
+          <input
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="text-slate-700">Password</span>
+          <input
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+          />
+        </label>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+        >
+          {submitting ? 'Signing in…' : 'Sign in'}
+        </button>
+      </form>
+      <p className="mt-4 text-center text-sm text-slate-600">
+        No account?{' '}
+        <Link to="/register" className="text-slate-900 underline">
+          Register
+        </Link>
+      </p>
+    </AuthLayout>
+  );
+}
