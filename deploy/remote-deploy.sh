@@ -31,10 +31,31 @@ WEB_ORIGIN="$(aws ssm get-parameter \
   --query 'Parameter.Value' \
   --output text 2>/dev/null || echo "http://${PUBLIC_IP}")"
 
+COGNITO_USER_POOL_ID="$(aws ssm get-parameter \
+  --name "/echotype/COGNITO_USER_POOL_ID" \
+  --region "$REGION" \
+  --query 'Parameter.Value' \
+  --output text)"
+
+COGNITO_CLIENT_ID="$(aws ssm get-parameter \
+  --name "/echotype/COGNITO_CLIENT_ID" \
+  --region "$REGION" \
+  --query 'Parameter.Value' \
+  --output text)"
+
+COGNITO_REGION="$(aws ssm get-parameter \
+  --name "/echotype/COGNITO_REGION" \
+  --region "$REGION" \
+  --query 'Parameter.Value' \
+  --output text)"
+
 cat > deploy/.env <<ENV
 DATABASE_URL=${DB_URL}
 API_PORT=3001
 WEB_ORIGIN=${WEB_ORIGIN}
+COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
+COGNITO_REGION=${COGNITO_REGION}
 ENV
 
 docker compose -f deploy/docker-compose.cloud.yml --env-file deploy/.env up -d --build

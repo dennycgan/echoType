@@ -1,16 +1,17 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { ZodError } from 'zod';
+import { assertCognitoConfig } from './auth/cognitoConfig.js';
+import { registerAuthHook } from './auth/authHook.js';
 import { prisma } from './prisma.js';
 import { registerCourseRoutes } from './routes/courses.js';
 import { registerCategoryRoutes } from './routes/categories.js';
 import { registerSessionRoutes } from './routes/sessions.js';
 
-import { LOCAL_DEV_USER_ID } from './localDevUser.js';
+assertCognitoConfig();
 
 const PORT = Number(process.env.API_PORT ?? 3001);
 const WEB_ORIGIN = process.env.WEB_ORIGIN ?? 'http://localhost:5173';
-const DEMO_USER_ID = process.env.DEMO_USER_ID ?? LOCAL_DEV_USER_ID;
 
 const app = Fastify({
   logger: {
@@ -28,12 +29,6 @@ declare module 'fastify' {
   }
 }
 
-app.addHook('onRequest', async (req) => {
-  // Walking-skeleton auth: pin every request to the seeded demo user.
-  // Will be replaced by Cognito JWT verification when we move to the cloud stage.
-  req.userId = DEMO_USER_ID;
-});
-
 app.setErrorHandler((error: Error, _req, reply) => {
   if (error instanceof ZodError) {
     return reply.status(400).send({ error: 'validation_error', issues: error.issues });
@@ -43,6 +38,7 @@ app.setErrorHandler((error: Error, _req, reply) => {
 });
 
 await app.register(cors, { origin: WEB_ORIGIN, credentials: true });
+await registerAuthHook(app);
 
 // All application routes live under /api so a single CloudFront behavior
 // (/api/*) can route here while everything else serves the static SPA.
@@ -50,7 +46,7 @@ await app.register(cors, { origin: WEB_ORIGIN, credentials: true });
 //   - Direct on the instance (via SSM session): curl http://localhost/api/health
 await app.register(
   async (api) => {
-    api.get('/health', async () => ({ ok: true, demoUser: DEMO_USER_ID }));
+    api.get('/health', async () => ({ ok: true }));
     await registerCourseRoutes(api);
     await registerCategoryRoutes(api);
     await registerSessionRoutes(api);
