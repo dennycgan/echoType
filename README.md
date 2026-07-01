@@ -85,7 +85,7 @@ docker compose up -d
 cp apps/api/.env.example apps/api/.env
 pnpm --filter @echotype/api prisma:generate
 pnpm --filter @echotype/api prisma:migrate
-pnpm --filter @echotype/api seed
+SEED_ENV=dev pnpm --filter @echotype/api seed
 pnpm dev          # API :3001, web :5173 (proxies /api)
 ```
 
@@ -96,7 +96,7 @@ pnpm run typecheck
 node apps/web/scripts/phase2-probe.mjs   # needs dev servers; expect SUMMARY PASS
 ```
 
-Reset DB: `pnpm --filter @echotype/api prisma:reset` then `seed`.
+Reset DB: `pnpm --filter @echotype/api prisma:reset` then `SEED_ENV=dev pnpm --filter @echotype/api seed`.
 
 I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I run the Playwright probe locally. Project rules in `.cursor/rules/` keep AI-assisted sessions inside phase scope.
 

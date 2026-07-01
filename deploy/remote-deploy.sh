@@ -33,7 +33,6 @@ WEB_ORIGIN="$(aws ssm get-parameter \
 
 cat > deploy/.env <<ENV
 DATABASE_URL=${DB_URL}
-DEMO_USER_ID=demo-user
 API_PORT=3001
 WEB_ORIGIN=${WEB_ORIGIN}
 ENV

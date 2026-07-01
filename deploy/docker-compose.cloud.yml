@@ -19,5 +19,4 @@ services:
       - -c
       - >
         pnpm --filter @echotype/api exec prisma migrate deploy &&
-        pnpm --filter @echotype/api seed &&
         pnpm --filter @echotype/api exec tsx src/server.ts

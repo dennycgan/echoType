@@ -67,7 +67,6 @@ which is what CI reads automatically), e.g.:
 
 ```
 DATABASE_URL=postgresql://echotype:<password>@echotype-db.xxxx.ap-southeast-2.rds.amazonaws.com:5432/echotype
-DEMO_USER_ID=demo-user
 API_PORT=3001
 WEB_ORIGIN=https://<CLOUDFRONT_DOMAIN>
 ```
@@ -81,8 +80,9 @@ WEB_ORIGIN=https://<CLOUDFRONT_DOMAIN>
 docker compose -f deploy/docker-compose.cloud.yml --env-file deploy/.env up -d --build
 ```
 
-On first start the container runs `prisma migrate deploy` + seed, then starts the
-API on container port 3001, published on host port **80**.
+On first start the container runs `prisma migrate deploy`, then starts the
+API on container port 3001, published on host port **80**. Production does not
+run the dev seed (`SEED_ENV=dev` only).
 
 Watch logs:
 

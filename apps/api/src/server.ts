@@ -6,9 +6,11 @@ import { registerCourseRoutes } from './routes/courses.js';
 import { registerCategoryRoutes } from './routes/categories.js';
 import { registerSessionRoutes } from './routes/sessions.js';
 
+import { LOCAL_DEV_USER_ID } from './localDevUser.js';
+
 const PORT = Number(process.env.API_PORT ?? 3001);
 const WEB_ORIGIN = process.env.WEB_ORIGIN ?? 'http://localhost:5173';
-const DEMO_USER_ID = process.env.DEMO_USER_ID ?? 'demo-user';
+const DEMO_USER_ID = process.env.DEMO_USER_ID ?? LOCAL_DEV_USER_ID;
 
 const app = Fastify({
   logger: {
