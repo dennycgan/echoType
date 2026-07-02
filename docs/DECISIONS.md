@@ -718,6 +718,17 @@
         `/courses/short` (+ optional flash toast) — temp IDs do not exist in API.
       - **Facade**: `useCourseCatalog` switches guest store vs API; pages stay unaware.
       - **Not in scope (permanent)**: restore guest in-progress typing after login.
+  17. **Phase 5.1 shipped** (`cea3a62`, Accepted 2026-07-02): Forgot-password and
+      login now surface explicit "account does not exist" UX. Cognito app-client
+      `prevent_user_existence_errors` is set to **LEGACY** (Terraform-supported mode;
+      equivalent to disabling existence masking, while `DISABLED` is not a valid enum)
+      so `UserNotFoundException` is returned. Web behavior:
+      - Forgot-password with unknown email: stay on page, show
+        `No account found for this email.` (do not route to reset page).
+      - Login with unknown email: show
+        `No account found for this email. Sign up instead?` plus register link.
+      - Product trade-off accepted: UX clarity over anti-enumeration hardening under
+        EchoType's current threat model.
 - Rejected alternatives:
   - email as `users` PK — blocks future Google account linking.
   - Post-login nickname modal — extra “verified but incomplete profile” state complicates
