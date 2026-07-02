@@ -5,8 +5,10 @@ import { HomePage } from './pages/HomePage';
 import { CourseListPage } from './pages/CourseListPage';
 import { CollectionDetailPage } from './pages/CollectionDetailPage';
 import { TypingPage } from './pages/TypingPage';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
 
 export const router = [
@@ -29,6 +31,22 @@ export const router = [
   {
     path: '/verify-email',
     element: <VerifyEmailPage />,
+  },
+  {
+    path: '/forgot-password',
+    element: (
+      <GuestOnly>
+        <ForgotPasswordPage />
+      </GuestOnly>
+    ),
+  },
+  {
+    path: '/reset-password',
+    element: (
+      <GuestOnly>
+        <ResetPasswordPage />
+      </GuestOnly>
+    ),
   },
   {
     element: <AppLayout />,

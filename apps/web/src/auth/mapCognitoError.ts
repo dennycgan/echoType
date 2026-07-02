@@ -14,9 +14,12 @@ export function mapCognitoError(err: unknown): string {
   switch (errorCode(err)) {
     case 'UserNotConfirmedException':
       return 'Confirm your email before signing in.';
+    case 'UserNotFoundException':
+      return 'No account found for this email.';
     case 'NotAuthorizedException':
-    case 'InvalidPasswordException':
       return 'Incorrect email or password.';
+    case 'InvalidPasswordException':
+      return 'Password does not meet requirements.';
     case 'UsernameExistsException':
       return 'An account with this email already exists.';
     case 'CodeMismatchException':
@@ -37,4 +40,8 @@ export function mapCognitoError(err: unknown): string {
 
 export function isUserNotConfirmed(err: unknown): boolean {
   return errorCode(err) === 'UserNotConfirmedException';
+}
+
+export function isUserNotFound(err: unknown): boolean {
+  return errorCode(err) === 'UserNotFoundException';
 }

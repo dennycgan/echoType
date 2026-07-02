@@ -83,6 +83,28 @@ export function signOutCognitoUser(email: string): void {
   createCognitoUser(email).signOut();
 }
 
+export function forgotPassword(email: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    createCognitoUser(email).forgotPassword({
+      onSuccess: () => resolve(),
+      onFailure: (err) => reject(err),
+    });
+  });
+}
+
+export function confirmForgotPassword(
+  email: string,
+  code: string,
+  newPassword: string,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    createCognitoUser(email).confirmPassword(code.trim(), newPassword, {
+      onSuccess: () => resolve(),
+      onFailure: (err) => reject(err),
+    });
+  });
+}
+
 export function sessionToTokens(session: CognitoUserSession) {
   return {
     accessToken: session.getAccessToken().getJwtToken(),

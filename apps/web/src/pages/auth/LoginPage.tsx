@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthLayout } from '../../auth/AuthLayout';
 import { useAuth } from '../../auth/AuthProvider';
+import { isUserNotFound } from '../../auth/mapCognitoError';
 import { GUEST_LOGIN_TOAST, resolvePostLoginPath } from '../../auth/resolvePostLoginPath';
 
 export function LoginPage() {
@@ -10,15 +11,18 @@ export function LoginPage() {
   const [params] = useSearchParams();
   const next = params.get('next') || '/courses/short';
   const verified = params.get('verified') === '1';
+  const reset = params.get('reset') === '1';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showSignUpLink, setShowSignUpLink] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setShowSignUpLink(false);
     setSubmitting(true);
     try {
       await login(email, password);
@@ -32,6 +36,11 @@ export function LoginPage() {
         navigate(`/verify-email?email=${encodeURIComponent(email.trim())}`, { replace: true });
         return;
       }
+      if (isUserNotFound(err)) {
+        setShowSignUpLink(true);
+        setError('No account found for this email. Sign up instead?');
+        return;
+      }
       setError(mapError(err));
     } finally {
       setSubmitting(false);
@@ -43,6 +52,9 @@ export function LoginPage() {
       <h1 className="text-xl font-semibold">Sign in</h1>
       {verified && (
         <p className="mt-2 text-sm text-green-700">Email verified. You can sign in now.</p>
+      )}
+      {reset && (
+        <p className="mt-2 text-sm text-green-700">Password updated. You can sign in now.</p>
       )}
       <form className="mt-4 space-y-4" onSubmit={onSubmit}>
         <label className="block text-sm">
@@ -68,6 +80,18 @@ export function LoginPage() {
           />
         </label>
         {error && <p className="text-sm text-red-600">{error}</p>}
+        {showSignUpLink && (
+          <p className="text-sm text-slate-600">
+            <Link to="/register" className="text-slate-900 underline">
+              Create an account
+            </Link>
+          </p>
+        )}
+        <p className="text-right text-sm">
+          <Link to="/forgot-password" className="text-slate-600 underline hover:text-slate-900">
+            Forgot password?
+          </Link>
+        </p>
         <button
           type="submit"
           disabled={submitting}

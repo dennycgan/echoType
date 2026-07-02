@@ -10,6 +10,8 @@ import {
 } from './authSession.js';
 import {
   confirmSignUp,
+  confirmForgotPassword,
+  forgotPassword,
   resendConfirmationCode,
   signIn,
   signUp,
@@ -29,6 +31,8 @@ export type AuthContextValue = {
   register: (email: string, password: string, nickname: string) => Promise<void>;
   confirmEmail: (email: string, code: string) => Promise<void>;
   resendCode: (email: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  confirmPasswordReset: (email: string, code: string, newPassword: string) => Promise<void>;
   mapError: (err: unknown) => string;
   isUserNotConfirmed: (err: unknown) => boolean;
 };
@@ -111,6 +115,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await resendConfirmationCode(resendEmail);
   }, []);
 
+  const requestPasswordReset = useCallback(async (resetEmail: string) => {
+    await forgotPassword(resetEmail);
+  }, []);
+
+  const confirmPasswordReset = useCallback(
+    async (resetEmail: string, code: string, newPassword: string) => {
+      await confirmForgotPassword(resetEmail, code, newPassword);
+    },
+    [],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
@@ -121,10 +136,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       register,
       confirmEmail,
       resendCode,
+      requestPasswordReset,
+      confirmPasswordReset,
       mapError: mapCognitoError,
       isUserNotConfirmed,
     }),
-    [status, displayName, email, login, logout, register, confirmEmail, resendCode],
+    [
+      status,
+      displayName,
+      email,
+      login,
+      logout,
+      register,
+      confirmEmail,
+      resendCode,
+      requestPasswordReset,
+      confirmPasswordReset,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
