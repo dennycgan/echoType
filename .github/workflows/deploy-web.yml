@@ -40,9 +40,17 @@ jobs:
       - name: Resolve Cognito env for Vite build
         id: cognito
         run: |
-          echo "pool_id=$(aws ssm get-parameter --name /echotype/COGNITO_USER_POOL_ID --query Parameter.Value --output text)" >> "$GITHUB_OUTPUT"
-          echo "client_id=$(aws ssm get-parameter --name /echotype/COGNITO_CLIENT_ID --query Parameter.Value --output text)" >> "$GITHUB_OUTPUT"
-          echo "region=$(aws ssm get-parameter --name /echotype/COGNITO_REGION --query Parameter.Value --output text)" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          POOL_ID=$(aws ssm get-parameter --name /echotype/COGNITO_USER_POOL_ID --query Parameter.Value --output text)
+          CLIENT_ID=$(aws ssm get-parameter --name /echotype/COGNITO_CLIENT_ID --query Parameter.Value --output text)
+          REGION=$(aws ssm get-parameter --name /echotype/COGNITO_REGION --query Parameter.Value --output text)
+          if [ -z "$POOL_ID" ] || [ -z "$CLIENT_ID" ]; then
+            echo "COGNITO SSM params empty — check github-deploy IAM ssm:GetParameter on /echotype/COGNITO_*"
+            exit 1
+          fi
+          echo "pool_id=$POOL_ID" >> "$GITHUB_OUTPUT"
+          echo "client_id=$CLIENT_ID" >> "$GITHUB_OUTPUT"
+          echo "region=$REGION" >> "$GITHUB_OUTPUT"
 
       - name: Build frontend
         env:
