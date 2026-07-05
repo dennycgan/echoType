@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
 import { useOnboardingSeed } from './auth/useOnboardingSeed';
 import { loginPathWithNext } from './auth/publicPaths';
+import { SiteHeader } from './components/SiteHeader';
 import { logRouteScrollMonitor, scrollRouteToTop } from './lib/routeScroll';
 
 export function AppLayout() {
@@ -45,50 +46,39 @@ export function AppLayout() {
 
   return (
     <div className="min-h-full">
-      <header className="border-b bg-white">
-        <nav className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-3">
-          <Link to="/" className="text-lg font-semibold">
-            EchoType
-          </Link>
-          <Link to="/courses/short" className="text-sm text-slate-600 hover:text-slate-900">
-            Short
-          </Link>
-          <Link to="/courses/article" className="text-sm text-slate-600 hover:text-slate-900">
-            Article
-          </Link>
-          <div className="ml-auto flex items-center gap-3">
-            {status === 'authed' ? (
-              <>
-                {displayName && (
-                  <Link
-                    to="/account"
-                    className="text-sm text-slate-600 underline hover:text-slate-900"
-                    data-testid="auth-display-name"
-                  >
-                    {displayName}
-                  </Link>
-                )}
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="text-sm text-slate-600 hover:text-slate-900"
-                  data-testid="auth-logout"
+      <SiteHeader
+        trailing={
+          status === 'authed' ? (
+            <>
+              {displayName && (
+                <Link
+                  to="/account"
+                  className="text-sm text-slate-600 underline hover:text-slate-900"
+                  data-testid="auth-display-name"
                 >
-                  Log out
-                </button>
-              </>
-            ) : (
-              <Link
-                to={loginPathWithNext(location.pathname + location.search)}
-                className="text-sm font-medium text-slate-900 hover:underline"
-                data-testid="auth-login"
+                  {displayName}
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={onLogout}
+                className="text-sm text-slate-600 hover:text-slate-900"
+                data-testid="auth-logout"
               >
-                Log in
-              </Link>
-            )}
-          </div>
-        </nav>
-      </header>
+                Log out
+              </button>
+            </>
+          ) : (
+            <Link
+              to={loginPathWithNext(location.pathname + location.search)}
+              className="text-sm font-medium text-slate-900 hover:underline"
+              data-testid="auth-login"
+            >
+              Log in
+            </Link>
+          )
+        }
+      />
       <main className="mx-auto max-w-4xl px-4 py-6">
         <Outlet />
       </main>
