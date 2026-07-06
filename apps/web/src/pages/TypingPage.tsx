@@ -895,17 +895,9 @@ function TypingSession({
             onChange={handleForgivingModeChange}
             tooltip={
               <>
-                <p className="font-medium text-slate-700">Forgiving mode</p>
-                <p className="mt-1">
-                  Type through the passage one character at a time, same as normal mode. At spaces
-                  and punctuation, any keystroke counts as correct (shown green). Latin letters are
-                  case-insensitive. Letters and numbers must still match.
-                </p>
-                <p className="mt-1">
-                  Line breaks still auto-skip when you don&apos;t press Enter. Saved sessions use
-                  the same rules while this mode is on. Toggling mid-session only affects later
-                  keystrokes.
-                </p>
+                A lower-pressure way to practice. Accuracy ignores spaces, punctuation, and English
+                letter case. You still need to get the letters and numbers right. Saved sessions use
+                the same relaxed rules while this mode is on.
               </>
             }
           />
