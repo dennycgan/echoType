@@ -897,14 +897,14 @@ function TypingSession({
               <>
                 <p className="font-medium text-slate-700">Forgiving mode</p>
                 <p className="mt-1">
-                  Accuracy ignores spaces, line breaks, and punctuation. Latin letters are
-                  case-insensitive. Letters and numbers in the passage must still match. The
-                  cursor still moves one character at a time; non-core characters turn green when
-                  you type at that position.
+                  Type through the passage one character at a time, same as normal mode. At spaces
+                  and punctuation, any keystroke counts as correct (shown green). Latin letters are
+                  case-insensitive. Letters and numbers must still match.
                 </p>
                 <p className="mt-1">
-                  Saved sessions use the same rules while this mode is on. Toggling mid-session
-                  only affects later keystrokes.
+                  Line breaks still auto-skip when you don&apos;t press Enter. Saved sessions use
+                  the same rules while this mode is on. Toggling mid-session only affects later
+                  keystrokes.
                 </p>
               </>
             }
