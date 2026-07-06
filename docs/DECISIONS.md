@@ -860,3 +860,57 @@
     algorithm changes.
   - Future editor parity requires an explicit opt-in (same prop or separate ADR).
 - Supersedes / superseded-by: none
+
+---
+
+## ADR-0017 — Typing-page vertical layout: viewport-anchored passage max-height
+- Status: Accepted (2026-07-06)
+- Commit/PR anchor: 48bd5b3 (`7ad406c` introduced viewport-height shell; `48bd5b3` final auto-fit formula)
+- Plain summary: The typing page sizes the passage scroll box from the viewport
+  minus measured input and stats panels so short courses keep passage tight to the
+  input while long courses scroll inside the box with stats/buttons visible on
+  first paint—no sticky footer and no flex-grown empty gap between passage and input.
+- Context: Long passages pushed the input and stats off-screen. An interim fix
+  (`7ad406c`) locked the route to `h-dvh`, gave the passage container `flex-1`,
+  and scrolled inside it—restoring input visibility for long text but leaving a
+  large empty flex gap between a short passage and the input on tall displays.
+  Guest browse and short poems made a sticky stats footer feel wrong; product
+  accepted normal document flow for stats with first-screen visibility on long
+  passages instead of a global “stats always pinned” rule.
+- Decision:
+  1. **Passage cap** — `usePassageMaxHeight` sets `max-height` on the passage
+     scroll container (content-sized below the cap, `overflow-y-auto` at cap).
+     Formula (viewport-anchored):
+     `innerHeight − passageTop − inputPanelHeight − statsPanelHeight − 24px`
+     where `24px` is inter-region spacing (`gap-2` + `gap-3`, rounded up)—not
+     reserved Stats space; Stats height is measured separately.
+  2. **ResizeObserver** — Observe `inputPanel`, `statsPanel`, and layout root;
+     recompute on window resize and when description/timer/stats expand or
+     collapse changes chrome height.
+  3. **Stats placement** — Normal flow directly under the input workspace; not
+     `position: sticky`. Short passages: stats follow input with only page
+     `gap-3`; extra whitespace may sit below stats. Long passages: cap keeps
+     stats/buttons in the viewport without page scroll on entry.
+  4. **Route shell** — Typing route uses `min-h-dvh` and `main { overflow-y-auto }`
+     instead of locking `html/body` overflow; page scroll remains available when
+     content exceeds the viewport (e.g. `lastSaved` banner).
+  5. **Passage cursor scroll** — Existing `scrollPassageToTypingCursor` unchanged;
+     scrolls inside the capped passage box.
+  6. **Info tooltips** — Shared `InfoTooltip` with `placement: 'top' | 'bottom'`;
+     WPM help in the stats bar uses `top` (opens upward near viewport bottom);
+     Immersive help keeps `bottom`.
+- Rejected alternatives:
+  - Passage `flex-1` fill — fixes long text but blows vertical gap on short text.
+  - `flex-1` spacer between input and stats — pushes stats to viewport bottom on
+    short courses; conflicts with “stats follow input”.
+  - Sticky stats footer — rejected for guest/short-course UX.
+  - `max-height` without stats reservation — long text hid stats below fold.
+  - Portal/auto-flip tooltips for WPM — fixed `placement="top"` sufficient.
+- Consequences:
+  - Implementation: `apps/web/src/lib/usePassageMaxHeight.ts`, `TypingPage.tsx`,
+    `AppLayout.tsx`, `InfoTooltip.tsx`.
+  - `statsPanel` ref must wrap the full stats/buttons/`lastSaved` block so height
+    changes trigger recalculation.
+  - Very short viewports still clamp at `min 120px` passage height; edge layouts
+    may need minor scroll.
+- Supersedes / superseded-by: none (refines interim `7ad406c` layout approach in code only; no prior ADR flipped)
