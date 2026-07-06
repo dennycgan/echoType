@@ -23,6 +23,7 @@ Since I am a Chinese native speaker, I can also pin native-language annotations 
 - **Notes survive edits** — If you change the source text later, your notes are not silently wiped. The app shows you which notes still align and which need your attention before saving.
 - **Your courses are portable plain text** — Import a `.txt` with inline `{phrase}{annotation}` markers to create a fully annotated course in one step (parse errors point at the offending line); export any course back to the same format for local backup. The parser and serializer are shared, round-trip-tested pure functions that run entirely in the browser — no upload, no extra cloud cost.
 - **Honest practice stats** — Manual saves write per-session rows (WPM, accuracy, loops, active time); courses keep materialized cumulative stats and collections roll them up. One written contract (`docs/STATS.md`) defines every formula.
+- **Try before sign-up** — Guests browse and type sample courses from a local catalog; sign in to persist courses, collections, and saved practice sessions in PostgreSQL.
 
 ---
 
@@ -39,7 +40,7 @@ The stack is conventional React/Node/Postgres. The interesting choices are aroun
 | Overlay layout | **Mirror measurement + global indices** | A hidden mirror measures per-character `offsetTop` for visual-line breaks and per-glyph `getBoundingClientRect` for horizontal edges (charEdges); annotations are stored as global indices. Post-layout width rules widen note labels and separate touching highlight bands without re-measuring on each keystroke. |
 | Frontend | **React 18 + Vite + Tailwind** | Component model fits a measurement-heavy overlay; utilities keep the typing surface simple without a heavy design system. |
 | State | **Zustand + TanStack Query** | Local typing UI state vs server-backed course list and mutations. |
-| Auth | **AWS Cognito (SRP) + JWT verification in Fastify** | SPA signs in against a Cognito user pool; the API verifies access tokens per request. Cognito `sub` is the user primary key; new accounts get a seeded onboarding catalog. Guests can browse and type sample courses locally without an account. |
+| Auth | **AWS Cognito (SRP) + JWT verification in Fastify** | Email/password sign-in (MVP); Cognito `sub` is the user primary key. Guests browse and type read-only sample courses from `localStorage`; signed-in users persist data in PostgreSQL. New accounts with zero courses receive a one-time onboarding seed from a shared catalog (`POST /api/onboarding/seed`). Google sign-in waits for a custom domain. |
 | Regression guard | **Playwright probes (local) + unit tests** | Stop-loss scripts after overlay/layout/auth changes: zero measure-on-typing, stable line ranges, bounded DOM mutations per keystroke. Alignment and stats helpers are unit-tested (`node:test`). |
 | Cloud | **EC2 + RDS + S3 + CloudFront + SSM + GitHub Actions OIDC** | API on EC2 against RDS; static build to S3/CloudFront; deploy via OIDC-assumed role and SSM Run Command — no long-lived AWS keys in CI. |
 
@@ -99,7 +100,7 @@ SEED_ENV=dev pnpm --filter @echotype/api seed
 pnpm dev          # API :3001, web :5173 (proxies /api)
 ```
 
-Open `http://localhost:5173`. Guest mode lets you browse and type the sample catalog without an account; sign in (Cognito) to create courses and save sessions.
+Open `http://localhost:5173`. Guest mode lets you browse and type the sample catalog without an account; sign in (Cognito email/password) to create courses, collections, and save sessions.
 
 ```bash
 pnpm run typecheck
@@ -124,8 +125,8 @@ I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I ru
 | ✅ | **Typing experience** — Auto-loop, newline auto-skip, IME composition, session timer with pause, immersive & forgiving modes, .txt import/export |
 | ✅ | **Course management** — Short/Article mode routes, search/sort, descriptions, collections with batch add and stats rollup |
 | ✅ | **Course stats** — Per-session rows + materialized course cumulative; formulas contracted in `docs/STATS.md` |
-| ✅ | **Auth** — Cognito sign-in/up (SRP), JWT-verified API, account page, guest mode, onboarding seed for new users |
-| 🚧 | **Custom domain** — Domain + ACM cert + CloudFront alias (also unblocks Google sign-in) |
+| ✅ | **Auth** — Cognito email/password (SRP), JWT-verified API, guest sample catalog, account page (nickname, password change, delete), onboarding seed for new users; **live on production CloudFront** |
+| 🚧 | **Custom domain** — Domain + ACM cert + CloudFront alias (next after self-testing; also unblocks Google sign-in) |
 | 📋 | **Ops & safety** — Sentry, CloudWatch, rate limiting, error/empty states |
 
 ---
