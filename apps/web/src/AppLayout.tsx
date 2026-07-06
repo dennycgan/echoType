@@ -46,20 +46,8 @@ export function AppLayout() {
 
   const isTypingPage = /\/type$/.test(location.pathname);
 
-  useLayoutEffect(() => {
-    if (!isTypingPage) return;
-    const prevHtml = document.documentElement.style.overflow;
-    const prevBody = document.body.style.overflow;
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.documentElement.style.overflow = prevHtml;
-      document.body.style.overflow = prevBody;
-    };
-  }, [isTypingPage]);
-
   return (
-    <div className={isTypingPage ? 'flex h-dvh flex-col overflow-hidden' : 'min-h-full'}>
+    <div className={isTypingPage ? 'flex min-h-dvh flex-col' : 'min-h-full'}>
       <SiteHeader
         className={isTypingPage ? 'shrink-0' : undefined}
         trailing={
@@ -97,7 +85,7 @@ export function AppLayout() {
       <main
         className={
           isTypingPage
-            ? 'mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col overflow-hidden px-4 py-4'
+            ? 'mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col overflow-y-auto px-4 py-4'
             : 'mx-auto max-w-4xl px-4 py-6'
         }
       >

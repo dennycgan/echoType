@@ -5,6 +5,7 @@ import type { AnnotationDTO, CourseDTO, CourseMode, CreateSessionInput, PasteRan
 import { api, isCourseNotFoundError } from '../lib/api';
 import { useAuth } from '../auth/AuthProvider';
 import { useCourseById } from '../guest/useCourseCatalog';
+import { InfoTooltip } from '../components/InfoTooltip';
 import { CourseDescriptionPanel } from '../components/CourseDescriptionPanel';
 import { AnnotatedText } from '../components/AnnotatedText';
 import { TypingLeaveDialog } from '../components/typing/TypingLeaveDialog';
@@ -33,6 +34,7 @@ import {
   formatTypingDuration,
 } from '../lib/typingSurface';
 import { scrollPassageToTypingCursor, scrollTextareaToCaret } from '../lib/typingScroll';
+import { usePassageMaxHeight } from '../lib/usePassageMaxHeight';
 
 const IDLE_MS = 5000;
 const TICK_MS = 100;
@@ -193,6 +195,15 @@ function TypingSession({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const passageScrollRef = useRef<HTMLDivElement>(null);
+  const inputPanelRef = useRef<HTMLDivElement>(null);
+  const statsPanelRef = useRef<HTMLDivElement>(null);
+  const layoutRootRef = useRef<HTMLDivElement>(null);
+  const passageMaxHeight = usePassageMaxHeight(
+    passageScrollRef,
+    inputPanelRef,
+    statsPanelRef,
+    layoutRootRef,
+  );
   const pendingScrollRestoreRef = useRef<{ x: number; y: number } | null>(null);
   const lastActivityAtRef = useRef<number | null>(null);
   const pasteMetaRef = useRef<{ start: number; end: number; clipLen: number } | null>(null);
@@ -644,7 +655,7 @@ function TypingSession({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+    <div ref={layoutRootRef} className="flex flex-col gap-3">
       {showLeaveDialog && (
         <TypingLeaveDialog
           saving={submitMutation.isPending}
@@ -711,11 +722,12 @@ function TypingSession({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex shrink-0 flex-col gap-2">
         <div
           ref={passageScrollRef}
           data-testid="typing-passage-scroll"
-          className={`min-h-0 flex-1 overflow-y-auto overscroll-y-contain ${
+          style={passageMaxHeight != null ? { maxHeight: passageMaxHeight } : undefined}
+          className={`shrink-0 overflow-y-auto overscroll-y-contain ${
             immersiveMode ? 'cursor-text' : ''
           }`}
           onMouseDown={
@@ -736,7 +748,7 @@ function TypingSession({
           />
         </div>
 
-        <div className="shrink-0 space-y-2">
+        <div ref={inputPanelRef} className="shrink-0 space-y-2">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -757,22 +769,10 @@ function TypingSession({
           </button>
           <span className="inline-flex items-center gap-1 text-sm font-medium leading-tight text-slate-700">
             Immersive mode
-            <span className="group/help relative inline-flex">
-              <button
-                type="button"
-                aria-label="About immersive mode"
-                className="inline-flex h-[1em] w-[1em] min-h-[14px] min-w-[14px] items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-              >
-                <CircleInfoIcon className="h-[0.85em] w-[0.85em] shrink-0 text-slate-500" />
-              </button>
-              <span
-                role="tooltip"
-                className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 hidden w-64 -translate-x-1/2 rounded-md border border-slate-200 bg-white p-2 text-xs font-normal leading-snug text-slate-500 shadow-md group-hover/help:block group-focus-within/help:block"
-              >
-                Hides the typing box so you can focus on the passage. Works best when your keyboard
-                matches the passage language. Floating word suggestions may appear off-screen.
-              </span>
-            </span>
+            <InfoTooltip ariaLabel="About immersive mode" placement="bottom">
+              Hides the typing box so you can focus on the passage. Works best when your keyboard
+              matches the passage language. Floating word suggestions may appear off-screen.
+            </InfoTooltip>
           </span>
         </div>
 
@@ -804,7 +804,7 @@ function TypingSession({
         </div>
       </div>
 
-      <div className="shrink-0 space-y-3">
+      <div ref={statsPanelRef} className="space-y-3">
         {statsHidden ? (
         <button
           type="button"
@@ -949,26 +949,6 @@ const WPM_TOOLTIP = (
   </>
 );
 
-function CircleInfoIcon({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden viewBox="0 0 12 12" className={className}>
-      <circle cx="6" cy="6" r="5.25" fill="none" stroke="currentColor" strokeWidth="1.25" />
-      <text
-        x="6"
-        y="6"
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize="7"
-        fontWeight="600"
-        fill="currentColor"
-        fontFamily="system-ui, -apple-system, sans-serif"
-      >
-        i
-      </text>
-    </svg>
-  );
-}
-
 function Stat({
   label,
   value,
@@ -985,21 +965,9 @@ function Stat({
       {wpmInfo ? (
         <span className="inline-flex items-center gap-1 text-sm leading-tight text-slate-400">
           <span className="uppercase">{label}</span>
-          <span className="group/wpm-info relative inline-flex">
-            <button
-              type="button"
-              aria-label="About words per minute"
-              className="inline-flex h-[1em] w-[1em] min-h-[14px] min-w-[14px] items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-            >
-              <CircleInfoIcon className="h-[0.85em] w-[0.85em] shrink-0 text-slate-500" />
-            </button>
-            <span
-              role="tooltip"
-              className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 hidden w-72 -translate-x-1/2 rounded-md border border-slate-200 bg-white p-2 text-xs font-normal leading-snug text-slate-500 shadow-md group-hover/wpm-info:block group-focus-within/wpm-info:block"
-            >
-              {WPM_TOOLTIP}
-            </span>
-          </span>
+          <InfoTooltip ariaLabel="About words per minute" placement="top" panelClassName="w-72">
+            {WPM_TOOLTIP}
+          </InfoTooltip>
         </span>
       ) : (
         <span className="text-sm leading-tight text-slate-400 uppercase">{label}</span>
