@@ -967,3 +967,52 @@
   - Plain-text import still runs mode-length validation; authors cannot import
     text that violates the locked course mode without fixing the file or mode.
 - Supersedes / superseded-by: none
+
+---
+
+## ADR-0019 — Typing page: client-side Export .txt backup (inverse of ADR-0018)
+- Status: Accepted (2026-07-06)
+- Commit/PR anchor: a0cbf80
+- Plain summary: On the typing page, users can download a local `.txt` backup of the
+  current course; annotations appear as `{phrase}{annotation}` pairs in the file
+  body, with title and description in a fixed two-line header — all in the
+  browser, no upload.
+- Context: Import (ADR-0018) lets authors load marked text into the editor; users
+  also need the reverse path to back up courses they already saved. The typing
+  page already holds `title`, `description`, `content`, and `annotations` from
+  the existing course fetch — serializing locally avoids new API routes and AWS
+  cost.
+- Decision:
+  1. **Pure client export** — Typing page "Export .txt" builds text in memory and
+     triggers download via `Blob` + `URL.createObjectURL`; no server write.
+  2. **Shared serializer** — `serializeAnnotatedTxt` in
+     `packages/shared/src/serializeTxtExport.ts` is the inverse of
+     `parseAnnotatedTxt`: sort annotations by `startIndex`, emit
+     `{slice}{noteText}` for each range, then append trailing plain text.
+     Round-trip property: body (after header) re-parses to identical
+     `content` + `AnnotationInput[]` (unit-tested).
+  3. **Fixed header (v1)** — Always exactly two lines plus a blank separator:
+     `title: …`, `description: …` (empty value when none), then body. Newlines
+     inside `description` collapse to spaces so the header stays two lines.
+     Header is backup metadata only — the importer (ADR-0018) does not read it;
+     re-import requires manually deleting the first two header lines (v1).
+  4. **Filename** — `sanitizeTxtFilename(title)` → `{title}.txt`, replacing
+     filesystem-illegal characters; fallback `course.txt` when title cleans empty.
+  5. **UI** — Button on typing page header (opposite `← Back`), text-link style
+     with underline; compact `InfoTooltip` (`size="sm"`) explains marker format
+     and re-import steps.
+- Rejected alternatives:
+  - Server-side export endpoint or S3 — unnecessary for backup; same zero-cost
+    rationale as ADR-0018 import.
+  - Importer auto-strips `title:`/`description:` header — deferred; keeps import
+    parser single-purpose and header format free to evolve.
+  - Omit empty `description:` line — rejected; fixed two-line header is easier
+    to scan and document.
+- Consequences:
+  - Implementation: `serializeTxtExport.ts`, `TypingPage` export handler,
+     `InfoTooltip` `size` prop.
+  - Courses whose plain `content` contains `{`/`}` export fine for backup but
+    cannot round-trip through import (same v1 limit as ADR-0018).
+  - Future header-aware import or escape syntax needs a new ADR; do not extend
+    the serializer header format without one.
+- Supersedes / superseded-by: none (complements ADR-0018; shared marker syntax)
