@@ -31,11 +31,10 @@ Active capability: Custom domain
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Custom domain — public hostname + ACM + CloudFront alias; unblock Google sign-in prep.
-- Sub-steps done: Auth complete through Phase 6 onboarding seed (`354c1b7`; probe + owner 验收); Phase 5.3 (`272f222`); Phase 5.2 (`80ddb79`); Phase 5.1 (`cea3a62`); Phase 4 (`7786f03`); Phase 3 (`962d2a4`); Phase 2 (`43ae465`); Phase 1 (`b2a226a`)
-- Next step: Custom domain Phase 1 — purchase domain, ACM cert, CloudFront alias, SSM WEB_ORIGIN update
+- Goal (one line): Self-testing sprint — daily use, collect polish items; then Custom domain Phase 1.
+- Sub-steps done: Auth complete through Phase 6 (`354c1b7`); merged to main + deployed to prod (backend + frontend verified)
+- Next step: buy domain after self-testing settles, Custom domain Phase 1 — purchase domain, ACM cert, CloudFront alias, SSM WEB_ORIGIN update
 - Related decisions: ADR-0015 §20; Custom domain ADR TBD
-- Deploy gate: Auth Phases 2–6 on `feature/auth-phase-6` pending merge + deploy to prod
 
 ## Contract pointers (don't memorize, go read the source)
 - Stats metrics (definitions/formulas only): docs/STATS.md

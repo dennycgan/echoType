@@ -2,7 +2,7 @@
 
 > Static definitions and formulas for statistical fields only.  
 > UX flows, persistence policy, phases, and tags → `docs/STATE.md` / `docs/DECISIONS.md`.  
-> Primitives: ADR-0006 (charCount), ADR-0007 (newline sync). Code: `apps/web/src/lib/typingAlign.ts`.
+> Primitives: ADR-0006 (charCount), ADR-0007 (newline sync), ADR-0020 (forgiving mode). Code: `apps/web/src/lib/typingAlign.ts`.
 
 ## 1. Primitives
 
@@ -13,6 +13,26 @@ Typing stats use **aligned** comparison between user input (`typed`) and course 
 - `syncTypedToTarget(typed, target)` — maps keystrokes to target indices; auto-skips target `\n` when the user did not type Enter (ADR-0007).
 - `countAlignedErrors(typed, target)` — character mismatches under the same skip rules.
 - `alignedProgress(typed, target)` — `targetCursor / target.length` where `targetCursor` comes from sync; `0` if `target.length === 0`.
+
+`AlignMode` is `'strict'` (default) or `'forgiving'` (typing-page toggle, ADR-0020). Sync and progress use the **same** walk in both modes; only error counting and passage coloring differ.
+
+### 1.5 Forgiving mode
+
+Optional client toggle on the typing page (`echotype-forgiving-mode` in `localStorage`; default off). Not stored on `TypingSession` rows.
+
+**Unchanged vs strict:** `syncTypedToTarget`, `alignedProgress`, `isPassComplete`, `charCount`, `wpm`, `durationSec`, `loopCount`, and accuracy **denominators** (`typed.length` live; `charCount` at persist).
+
+**Grading (`countAlignedErrors`, `buildTargetStatuses`):**
+
+| Target character | Forgiving rule |
+|------------------|----------------|
+| Ignorable — whitespace (`\p{Z}`, including space/tab/newline) or punctuation (`\p{P}`) | Any keystroke at that index is correct (not an error). User still advances through each index (no auto-skip of ignorable slots). |
+| Core — letter (`\p{L}`) or number (`\p{N}`) | Must match. Latin script pairs are case-insensitive (`en` locale lower); other scripts exact. |
+| Newline auto-skip | Same as strict (ADR-0007): target `\n` skipped when user did not type Enter. |
+
+**Live vs persist:** §2.1 and §2 formulas apply; plug in `countAlignedErrors(..., mode)` for `errors` / `errorCount`. Each completed pass adds aligned errors using the mode active at that pass’s completion; trailing partial buffer at Save uses the mode active at persist time. Toggling mid-session re-grades the entire current `typed` buffer under the new mode (reactive `alignMode`).
+
+Code: `apps/web/src/lib/typingAlign.ts`, `apps/web/src/lib/typingSurface.ts`, `TypingPage.tsx`.
 
 ### 1.2 Completed pass (loop)
 
@@ -71,9 +91,9 @@ While typing, the stats bar uses the **same formulas** on the current in-memory 
 |------------|---------|-------|
 | time | §1.3 | |
 | wpm | §2 `wpm` | Uses session `charCount` and current `durationSec`. |
-| accuracy | `1 - errors / typed.length` if `typed.length > 0`, else `1` | **Current pass only**; resets each auto-loop. Differs from persisted `accuracy` (§2). |
+| accuracy | `1 - errors / typed.length` if `typed.length > 0`, else `1` | **Current pass only**; resets each auto-loop. Differs from persisted `accuracy` (§2). Denominator unchanged in forgiving mode; numerator uses §1.5 rules. |
 | progress | `alignedProgress(typed, target)` | In-progress attempt only; not a stored field. |
-| errors | `countAlignedErrors(typed, target)` | Current pass only. |
+| errors | `countAlignedErrors(typed, target)` | Current pass only. Uses forgiving rules when forgiving mode is on (§1.5). |
 | loops | `loopCount` | Completed passes only; not `loopCount + 1`. |
 
 Persist snapshots §2 fields into `TypingSession`.
@@ -194,3 +214,4 @@ Collection list card appends rollup to course count: `{courseCount} courses · {
 | `durationSec === 0` at persist | `wpm = 0`. |
 | Multiple session rows per course | Cumulative sums/counts include all rows. |
 | Course deleted | Session rows removed (cascade); cumulative destroyed with course. |
+| Forgiving mode on (§1.5) | `countAlignedErrors` / live errors use forgiving rules; `charCount`, `wpm`, `sync`, and `progress` formulas unchanged. |

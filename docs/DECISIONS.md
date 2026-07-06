@@ -1016,3 +1016,59 @@
   - Future header-aware import or escape syntax needs a new ADR; do not extend
     the serializer header format without one.
 - Supersedes / superseded-by: none (complements ADR-0018; shared marker syntax)
+
+---
+
+## ADR-0020 — Typing page: forgiving mode (relaxed alignment grading)
+- Status: Accepted (2026-07-06)
+- Commit/PR anchor: 53d31c3 (`3ad0bbf` tooltip copy)
+- Plain summary: Optional typing-page toggle relaxes accuracy grading — spaces,
+  punctuation, and Latin letter case do not count as errors — while sync,
+  progress, and char-based metrics stay the same as strict mode; preference is
+  client-only (localStorage), not stored per session row.
+- Context: Learners wanted lower-pressure practice without changing how they
+  move through the passage or how WPM/charCount are defined. Product rejected
+  auto-skipping spaces/punctuation (cursor must still visit every target index)
+  and rejected persisting a per-session mode flag in the DB for MVP.
+- Decision:
+  1. **`AlignMode`** — `'strict'` (default) vs `'forgiving'`. Shared helpers in
+     `apps/web/src/lib/typingAlign.ts` take optional `mode`.
+  2. **Same sync walk** — `syncTypedToTarget`, `alignedProgress`, and
+     `isPassComplete` use the strict index walk in both modes (ADR-0007 newline
+     skip unchanged). Forgiving does **not** auto-advance past ignorable target
+     characters.
+  3. **Grading rules (forgiving only)** — `countAlignedErrors` and
+     `buildTargetStatuses`:
+     - **Ignorable target** — Unicode whitespace (`\p{Z}`, incl. space/tab/CR/LF)
+       or punctuation (`\p{P}`): any typed character at that aligned index is
+       correct.
+     - **Core target** — letter (`\p{L}`) or number (`\p{N}`): must match;
+       Latin↔Latin compares case-insensitively (`toLocaleLowerCase('en')`);
+       other scripts exact.
+     - Typed `\n` when target is not `\n` still counts as an error (same as
+       strict `wrong-enter` display path).
+  4. **Stats contract** — Live and persisted accuracy/error formulas unchanged
+     (STATS.md §1.5, §2): denominators remain `typed.length` / `charCount`;
+     numerators use forgiving `countAlignedErrors` when the toggle is on.
+     Completed-loop `sessionErrorCount` uses mode at pass completion; Save uses
+     mode at persist for the trailing partial buffer.
+  5. **Mid-session toggle** — `alignMode` is reactive React state; switching
+     re-grades the full current `typed` buffer immediately (not forward-only).
+  6. **Persistence of preference** — `FORGIVING_MODE_STORAGE_KEY`
+     (`echotype-forgiving-mode`); no `alignMode` column on `TypingSession`.
+  7. **UI** — `TypingModeSwitch` beside Immersive; user-facing InfoTooltip
+     explains lower-pressure grading (ignores spaces, punctuation, English case).
+- Rejected alternatives:
+  - Auto-skip ignorable target indices — hides punctuation/spacing from practice;
+    rejected after UX review (cursor must type through each index).
+  - Per-keystroke mode snapshot — deferred; reactive full-buffer re-grade is
+    simpler for MVP.
+  - Store forgiving flag on `TypingSession` — unnecessary for MVP analytics.
+  - Course-locale-specific case rules — Latin case fold only; CJK/exact elsewhere.
+- Consequences:
+  - Implementation: `typingAlign.ts`, `typingAlign.test.ts`, `typingSurface.ts`,
+    `TypingPage.tsx`, `AnnotatedText.tsx` (`skipped-ignorable` style reserved).
+  - Saved sessions saved under forgiving mode are not labeled forgiving in the DB;
+    historical rows remain strict-graded.
+  - Toggling before Save can change displayed live accuracy without new keystrokes.
+- Supersedes / superseded-by: none (extends ADR-0006/0007 grading only; sync unchanged)
