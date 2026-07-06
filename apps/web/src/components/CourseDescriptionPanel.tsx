@@ -22,10 +22,11 @@ export function CourseDescriptionPanel({
   const [overflows, setOverflows] = useState(false);
 
   useLayoutEffect(() => {
+    if (hidden) return;
     const el = clampRef.current;
     if (!el || expanded) return;
     setOverflows(el.scrollHeight > el.clientHeight + 1);
-  }, [trimmed, expanded]);
+  }, [trimmed, expanded, hidden]);
 
   if (!trimmed) return null;
 
