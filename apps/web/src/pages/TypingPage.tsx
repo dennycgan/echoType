@@ -732,6 +732,7 @@ function TypingSession({
             annotations={annotations}
             typingStatuses={typingStatuses}
             clickableNotes={!showLeaveDialog && !timerEndOpen}
+            extendNotes
           />
         </div>
 

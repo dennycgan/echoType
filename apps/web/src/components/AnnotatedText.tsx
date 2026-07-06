@@ -20,6 +20,7 @@ import {
   type LineDatum,
   type Note,
 } from './annotated-text/layoutUtils';
+import { createCanvasTextMeasurer, extendNoteWidths } from './annotated-text/noteExtension';
 import { useTextMeasurement } from './annotated-text/useTextMeasurement';
 import type { TargetCharStatus } from '../lib/typingAlign';
 import { TYPING_SURFACE_CLASS } from '../lib/typingSurface';
@@ -60,6 +61,8 @@ interface AnnotatedTextProps {
   typingStatuses?: TargetCharStatus[];
   /** Typing page: click truncated notes to view full text in a popover. */
   clickableNotes?: boolean;
+  /** Typing page: widen note bubbles rightward into free space (noteExtension.ts rules). */
+  extendNotes?: boolean;
   className?: string;
 }
 
@@ -350,30 +353,46 @@ export function AnnotatedText({
   typed = '',
   typingStatuses,
   clickableNotes = false,
+  extendNotes = false,
   className,
 }: AnnotatedTextProps) {
-  const { refs, layout, chars } = useTextMeasurement(content);
+  const { refs, layout, chars, containerWidth } = useTextMeasurement(content);
   const [openNoteId, setOpenNoteId] = useState<string | null>(null);
   const [openNoteAnchorEl, setOpenNoteAnchorEl] = useState<HTMLElement | null>(null);
+  const [noteFontFamily, setNoteFontFamily] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
-  const lineData = useMemo(
-    () =>
-      buildLineData(
-        layout.lines,
-        annotations.map((a) => ({
-          id: a.id,
-          startIndex: a.startIndex,
-          endIndex: a.endIndex,
-          noteText: a.noteText,
-        })),
-        layout.charWidth,
-        layout.charHeight,
-        undefined,
-        layout.charEdges,
-      ),
-    [layout, annotations],
-  );
+  useLayoutEffect(() => {
+    if (!extendNotes) return;
+    const box = refs.boxRef.current;
+    if (!box) return;
+    setNoteFontFamily(getComputedStyle(box).fontFamily);
+  }, [extendNotes, refs.boxRef]);
+
+  const lineData = useMemo(() => {
+    const base = buildLineData(
+      layout.lines,
+      annotations.map((a) => ({
+        id: a.id,
+        startIndex: a.startIndex,
+        endIndex: a.endIndex,
+        noteText: a.noteText,
+      })),
+      layout.charWidth,
+      layout.charHeight,
+      undefined,
+      layout.charEdges,
+    );
+    if (!extendNotes || containerWidth <= 0) return base;
+    const measureNoteText = createCanvasTextMeasurer(
+      `${NOTE_FONT_PX}px ${noteFontFamily ?? 'monospace'}`,
+    );
+    return base.map((datum) =>
+      datum.notes.length > 0
+        ? { ...datum, notes: extendNoteWidths(datum.notes, containerWidth, measureNoteText) }
+        : datum,
+    );
+  }, [layout, annotations, extendNotes, containerWidth, noteFontFamily]);
 
   const openNoteText = useMemo(() => {
     if (!openNoteId) return null;

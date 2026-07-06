@@ -35,6 +35,8 @@ export function useTextMeasurement(content: string): {
   refs: TextMeasurementRefs;
   layout: MeasuredLayout;
   chars: string[];
+  /** Container content width in px (0 before first observe). Read-only expose; not a measurement change. */
+  containerWidth: number;
 } {
   const boxRef = useRef<HTMLDivElement | null>(null);
   const mirrorRef = useRef<HTMLDivElement | null>(null);
@@ -122,5 +124,5 @@ export function useTextMeasurement(content: string): {
     };
   }, []);
 
-  return { refs: { boxRef, mirrorRef }, layout, chars };
+  return { refs: { boxRef, mirrorRef }, layout, chars, containerWidth: width };
 }
