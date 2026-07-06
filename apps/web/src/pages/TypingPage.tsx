@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -28,6 +28,7 @@ import {
   clampTyped,
   countAlignedErrors,
   isPassComplete,
+  type AlignMode,
 } from '../lib/typingAlign';
 import {
   collectionDetailPath,
@@ -35,6 +36,8 @@ import {
 } from '../lib/collectionPaths';
 import {
   IMMERSIVE_MODE_STORAGE_KEY,
+  readForgivingModePreference,
+  writeForgivingModePreference,
   readSessionTimerHiddenPreference,
   writeSessionTimerHiddenPreference,
   TYPING_TEXTAREA_CLASS,
@@ -72,6 +75,54 @@ function readImmersiveModePreference(): boolean {
   } catch {
     return false;
   }
+}
+
+function TypingModeSwitch({
+  checked,
+  disabled,
+  label,
+  ariaLabel,
+  testId,
+  onChange,
+  tooltip,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  ariaLabel: string;
+  testId: string;
+  onChange: (enabled: boolean) => void;
+  tooltip: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={ariaLabel}
+        disabled={disabled}
+        data-testid={testId}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${
+          checked ? 'bg-slate-900' : 'bg-slate-200'
+        }`}
+      >
+        <span
+          aria-hidden
+          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+            checked ? 'translate-x-5' : 'translate-x-0'
+          }`}
+        />
+      </button>
+      <span className="inline-flex items-center gap-1 text-sm font-medium leading-tight text-slate-700">
+        {label}
+        <InfoTooltip ariaLabel={ariaLabel} placement="bottom">
+          {tooltip}
+        </InfoTooltip>
+      </span>
+    </div>
+  );
 }
 
 function CourseNotFoundPanel() {
@@ -181,6 +232,8 @@ function TypingSession({
     loopCount: number;
   }>(null);
   const [immersiveMode, setImmersiveMode] = useState(readImmersiveModePreference);
+  const [forgivingMode, setForgivingMode] = useState(readForgivingModePreference);
+  const alignMode: AlignMode = forgivingMode ? 'forgiving' : 'strict';
   const [sessionTimerHidden, setSessionTimerHidden] = useState(readSessionTimerHiddenPreference);
   const [statsHidden, setStatsHidden] = useState(false);
   const [leaveSaveError, setLeaveSaveError] = useState<string | null>(null);
@@ -312,18 +365,21 @@ function TypingSession({
     return () => window.clearInterval(id);
   }, [startedAt]);
 
-  const typingStatuses = useMemo(() => buildTargetStatuses(typed, target), [typed, target]);
+  const typingStatuses = useMemo(
+    () => buildTargetStatuses(typed, target, alignMode),
+    [typed, target, alignMode],
+  );
 
   const liveStats = useMemo(() => {
-    const errors = countAlignedErrors(typed, target);
+    const errors = countAlignedErrors(typed, target, alignMode);
     const accuracy = typed.length === 0 ? 1 : 1 - errors / typed.length;
     return { errors, accuracy };
-  }, [typed, target]);
+  }, [typed, target, alignMode]);
 
   const elapsedSecWhole = Math.floor(activeMs / 1000);
   const wpm =
     elapsedSecWhole > 0 ? sessionCharCount / 5 / (elapsedSecWhole / 60) : 0;
-  const progress = alignedProgress(typed, target);
+  const progress = alignedProgress(typed, target, alignMode);
   /** Completed passes in the current unsaved segment (see docs/STATS.md §3). */
   const completedLoops = startedAt !== null ? loopCount : null;
 
@@ -417,7 +473,7 @@ function TypingSession({
     }
     const endedAt = new Date();
     const durationSec = Math.max(0, Math.round(activeMs / 1000));
-    const partialErrors = typed.length > 0 ? countAlignedErrors(typed, target) : 0;
+    const partialErrors = typed.length > 0 ? countAlignedErrors(typed, target, alignMode) : 0;
     const errorCount = sessionErrorCount + partialErrors;
     const finalWpm = durationSec > 0 ? sessionCharCount / 5 / (durationSec / 60) : 0;
     const accuracy = sessionCharCount === 0 ? 1 : 1 - errorCount / sessionCharCount;
@@ -456,6 +512,15 @@ function TypingSession({
       queueMicrotask(() => textareaRef.current?.focus());
     },
   });
+
+  function handleForgivingModeChange(enabled: boolean) {
+    setForgivingMode(enabled);
+    try {
+      writeForgivingModePreference(enabled);
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }
 
   function handleImmersiveModeChange(enabled: boolean) {
     pendingScrollRestoreRef.current = { x: window.scrollX, y: window.scrollY };
@@ -499,7 +564,7 @@ function TypingSession({
       startCountdown(armed);
     }
 
-    const normalized = clampTyped(raw, target);
+    const normalized = clampTyped(raw, target, alignMode);
 
     if (pasteMetaRef.current) {
       const { start, end, clipLen } = pasteMetaRef.current;
@@ -522,8 +587,8 @@ function TypingSession({
       setSessionCharCount((c) => c + (normalized.length - typed.length));
     }
 
-    if (isPassComplete(normalized, target)) {
-      setSessionErrorCount((c) => c + countAlignedErrors(normalized, target));
+    if (isPassComplete(normalized, target, alignMode)) {
+      setSessionErrorCount((c) => c + countAlignedErrors(normalized, target, alignMode));
       setLoopCount((n) => n + 1);
       setTyped('');
       setDraft('');
@@ -806,31 +871,44 @@ function TypingSession({
         </div>
 
         <div ref={inputPanelRef} className="shrink-0 space-y-2">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={immersiveMode}
-            aria-label="Immersive mode"
-            onClick={() => handleImmersiveModeChange(!immersiveMode)}
-            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 ${
-              immersiveMode ? 'bg-slate-900' : 'bg-slate-200'
-            }`}
-          >
-            <span
-              aria-hidden
-              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                immersiveMode ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
-          <span className="inline-flex items-center gap-1 text-sm font-medium leading-tight text-slate-700">
-            Immersive mode
-            <InfoTooltip ariaLabel="About immersive mode" placement="bottom">
-              Hides the typing box so you can focus on the passage. Works best when your keyboard
-              matches the passage language. Floating word suggestions may appear off-screen.
-            </InfoTooltip>
-          </span>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <TypingModeSwitch
+            checked={immersiveMode}
+            disabled={timerEndOpen}
+            label="Immersive mode"
+            ariaLabel="About immersive mode"
+            testId="immersive-mode"
+            onChange={handleImmersiveModeChange}
+            tooltip={
+              <>
+                Hides the typing box so you can focus on the passage. Works best when your keyboard
+                matches the passage language. Floating word suggestions may appear off-screen.
+              </>
+            }
+          />
+          <TypingModeSwitch
+            checked={forgivingMode}
+            disabled={timerEndOpen}
+            label="Forgiving mode"
+            ariaLabel="About forgiving mode"
+            testId="forgiving-mode"
+            onChange={handleForgivingModeChange}
+            tooltip={
+              <>
+                <p className="font-medium text-slate-700">Forgiving mode</p>
+                <p className="mt-1">
+                  Accuracy ignores spaces, line breaks, and punctuation. Latin letters are
+                  case-insensitive. Letters and numbers in the passage must still match. The
+                  cursor still moves one character at a time; non-core characters turn green when
+                  you type at that position.
+                </p>
+                <p className="mt-1">
+                  Saved sessions use the same rules while this mode is on. Toggling mid-session
+                  only affects later keystrokes.
+                </p>
+              </>
+            }
+          />
         </div>
 
         <textarea

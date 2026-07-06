@@ -87,6 +87,7 @@ function typingStatusClassName(status: TargetCharStatus): string {
     case 'cursor':
       return 'underline decoration-2 underline-offset-2 text-slate-700';
     case 'skipped-newline':
+    case 'skipped-ignorable':
     case 'untyped':
     default:
       return 'text-slate-400';
@@ -102,8 +103,15 @@ function renderLegacyChar(ch: string, typedCh: string | undefined, isCursor: boo
 }
 
 function renderTypingChar(ch: string, status: TargetCharStatus) {
-  if (status === 'skipped-newline') {
-    return <span className="relative z-[1]" aria-hidden />;
+  if (status === 'skipped-newline' || status === 'skipped-ignorable') {
+    if (ch === '\n') {
+      return <span className="relative z-[1]" aria-hidden />;
+    }
+    return (
+      <span className={`relative z-[1] ${typingStatusClassName(status)}`}>
+        {ch}
+      </span>
+    );
   }
   if (status === 'correct-newline' || status === 'wrong-enter') {
     return (

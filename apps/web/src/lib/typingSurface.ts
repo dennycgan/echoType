@@ -11,6 +11,9 @@ export const TYPING_TEXTAREA_IMMERSIVE_CLASS =
 
 export const IMMERSIVE_MODE_STORAGE_KEY = 'echotype-immersive-mode';
 
+/** When `'1'`, forgiving alignment (ignore space/punct/case) is enabled on the typing page. */
+export const FORGIVING_MODE_STORAGE_KEY = 'echotype-forgiving-mode';
+
 /** When `'1'`, idle session-timer control is hidden until user restores it. */
 export const SESSION_TIMER_HIDDEN_STORAGE_KEY = 'echotype-session-timer-hidden';
 
@@ -28,6 +31,26 @@ export function writeSessionTimerHiddenPreference(hidden: boolean): void {
       localStorage.setItem(SESSION_TIMER_HIDDEN_STORAGE_KEY, '1');
     } else {
       localStorage.removeItem(SESSION_TIMER_HIDDEN_STORAGE_KEY);
+    }
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+export function readForgivingModePreference(): boolean {
+  try {
+    return localStorage.getItem(FORGIVING_MODE_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function writeForgivingModePreference(enabled: boolean): void {
+  try {
+    if (enabled) {
+      localStorage.setItem(FORGIVING_MODE_STORAGE_KEY, '1');
+    } else {
+      localStorage.removeItem(FORGIVING_MODE_STORAGE_KEY);
     }
   } catch {
     /* ignore quota / private mode */
