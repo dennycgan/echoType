@@ -1072,3 +1072,49 @@
     historical rows remain strict-graded.
   - Toggling before Save can change displayed live accuracy without new keystrokes.
 - Supersedes / superseded-by: none (extends ADR-0006/0007 grading only; sync unchanged)
+
+---
+
+## ADR-0021 — Immersive mode: passage refocus and amber unfocused hint
+- Status: Accepted (2026-07-07)
+- Commit/PR anchor: 3d0f3e9
+- Plain summary: When immersive mode hides the typing box, a light amber overlay
+  on the passage shows that the hidden textarea lost focus; clicking the passage
+  refocuses input. Passage drag-select/copy is intentionally disabled in
+  immersive; viewing or copying typed input requires turning immersive off.
+- Context: The hidden textarea (`opacity-0`, `pointer-events-none`) gives no
+  visible caret. Clicks on stats, timer, or mode switches blur the textarea and
+  keystrokes no longer register, with no recovery affordance besides disabling
+  immersive. ADR-0008 already notes IME candidates may render off-screen.
+- Decision:
+  1. **Focus tracking** — Textarea `onFocus` / `onBlur` drive UI state; initial
+     `typingInputFocused = true` to avoid a first-paint hint flash.
+  2. **Unfocused hint** — When immersive and textarea is not focused, render a
+     `pointer-events-none` overlay on the passage (`bg-amber-50/70`, `inset-0`,
+     `rounded-md`). Amber matches annotation palette; avoids error-red typing
+     colors and hard-to-see gray rings (outer rings clip under passage
+     `overflow-y-auto`).
+  3. **Refocus** — Passage `mousedown` (immersive only): skip targets inside
+     `[role="button"]` (annotation notes); `preventDefault()` then
+     `textarea.focus({ preventScroll: true })`.
+  4. **Helper copy** — "click the passage to type"; do not promise "start typing"
+     when unfocused (keys do not reach the textarea without focus).
+  5. **Passage selection** — `preventDefault` on mousedown blocks drag-select and
+     copy of passage text in immersive; product accepts this tradeoff.
+  6. **Immersive off** — No overlay, no passage handler, helper hidden; unchanged
+     from pre-ADR behavior.
+  7. **Deferred** — Global keydown refocus without clicking the passage.
+- Rejected alternatives:
+  - Gray `ring` on passage border — too faint on white; outward ring clipped by
+    scroll container overflow.
+  - Red ring — conflates with wrong-character color; feels punitive for a
+    low-pressure mode.
+  - Remove `preventDefault` to restore passage drag-select — rejected after
+    acceptance; refocus reliability and immersive-as-typing-only scope.
+  - Global keydown refocus — first keystroke often lost on focus swap; deferred.
+- Consequences:
+  - Implementation: `TypingPage.tsx` only; overlay uses
+    `data-testid="immersive-passage-unfocused"` when visible.
+  - Users who need passage copy or visible typed draft must turn immersive off
+    (helper states the latter).
+- Supersedes / superseded-by: none (refines immersive UX noted in ADR-0008; no ADR flip)
