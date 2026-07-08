@@ -1118,3 +1118,52 @@
   - Users who need passage copy or visible typed draft must turn immersive off
     (helper states the latter).
 - Supersedes / superseded-by: none (refines immersive UX noted in ADR-0008; no ADR flip)
+
+---
+
+## ADR-0022 — Custom domain: echotype.ink via ACM (us-east-1) and CloudFront alias
+- Status: Accepted (2026-07-08)
+- Commit/PR anchor: 8cca01c
+- Plain summary (owner reads this): Production is served at **https://echotype.ink**.
+  An ACM certificate in us-east-1 covers the apex and wildcard; Porkbun hosts DNS
+  (validation CNAME + apex ALIAS to CloudFront). Terraform sets CloudFront alternate
+  domain name, SSM `WEB_ORIGIN`, and Cognito callback/logout URLs from `custom_domain`.
+- Context: Auth (ADR-0015) required config-driven public URLs; Google sign-in was
+  blocked until a stable hostname. Cloud deploy (ADR-0003) used `*.cloudfront.net`.
+  Owner purchased **echotype.ink** at Porkbun (Cloudflare-powered DNS, no nameserver
+  migration).
+- Decision:
+  1. **Canonical hostname** — apex `https://echotype.ink` only; no `www` CloudFront
+     alias in Phase 1.
+  2. **ACM** — `aws_acm_certificate` in **us-east-1** (CloudFront requirement);
+     `echotype.ink` + `*.echotype.ink`; DNS validation CNAME added manually in
+     Porkbun (not Route53).
+  3. **Terraform apply order** — two-step: (a) `terraform apply
+     -target=aws_acm_certificate.web`, add validation CNAME, wait until `ISSUED`;
+     (b) full apply for `aws_acm_certificate_validation`, CloudFront alias + ACM
+     viewer certificate, SSM `WEB_ORIGIN`, Cognito app-client URLs.
+  4. **Traffic DNS** — edit existing Porkbun apex **ALIAS** (parking
+     `pixie.porkbun.com` → `d3a9mgremswg7d.cloudfront.net`); add traffic DNS only
+     after CloudFront status `Deployed`. Run `deploy.yml` after DNS cutover (health
+     check uses SSM `WEB_ORIGIN`).
+  5. **Config** — `variable custom_domain` (default `echotype.ink`);
+     `local.web_origin = "https://${var.custom_domain}"` feeds SSM and Cognito;
+     `dev_web_origin` (`http://localhost:5173`) unchanged.
+  6. **Phase 1 shipped** (`8cca01c`): prod verified — site load, `/api/health`,
+     login, logout on https://echotype.ink.
+- Rejected alternatives:
+  - `www` as canonical with apex redirect — deferred; apex only for MVP.
+  - ACM in ap-southeast-2 — invalid for CloudFront custom certificates.
+  - Route53 hosted zone — unnecessary while DNS stays at Porkbun.
+  - Single terraform apply before cert validation completes — two-step apply reduces
+    plan risk and matches manual Porkbun CNAME workflow.
+  - Keeping `*.cloudfront.net` in Cognito callbacks after cutover — removed; old
+     CloudFront URL may still serve the app but is not an authorized callback URL.
+- Consequences:
+  - Custom domain capability Phase 1 complete; Google sign-in unblocked for Auth
+    follow-up (STATE Known debt).
+  - Porkbun `*.echotype.ink` CNAME may still point to parking; only apex is in prod.
+  - Outputs: `site_url` (canonical), `cloudfront_url` (default domain, debug/transition).
+  - Infra: `infra/acm.tf`, provider alias `aws.us_east_1` in `infra/versions.tf`.
+- Supersedes / superseded-by: none (extends ADR-0003 hostname; fulfills ADR-0015 §7
+  prod URL path)

@@ -13,8 +13,8 @@
 - [x] Course management (mode routes, card list, DELETE, description, search/sort, collections; ADR-0009–0013)
 - [x] Course stats (per-session + cumulative; STATS.md contract; ADR-0014 phases 1–7)
 - [x] Auth (Cognito; replaces demo-user shim; required before sharing externally)
-- [ ] Custom domain (purchase + ACM cert + CloudFront alias; deferred until self-testing settles)    <-- YOU ARE HERE
-- [ ] Ops & safety (Sentry, CloudWatch, rate limiting, disclaimer, error/empty states)
+- [x] Custom domain (echotype.ink — ACM + CloudFront alias + Cognito URLs; unblocks Google sign-in → Auth follow-up; ADR-0022)
+- [ ] Ops & safety (Sentry, CloudWatch, rate limiting, disclaimer, error/empty states)    <-- YOU ARE HERE
 
 
 > Each line is a capability, not a sub-step. Completed capabilities stay one line
@@ -23,18 +23,21 @@
 > Top-to-bottom = current execution order. Reorder if priorities change; never leave it unordered.
 
 ## Phase Roadmap (active capability only)
-Active capability: Custom domain
-- [ ] Phase 1 — Purchase domain + ACM certificate + CloudFront alternate domain name (update WEB_ORIGIN SSM; Cognito callback/logout URLs)    <-- YOU ARE HERE
+Active capability: Ops & safety
+- [ ] Phase 1 — Sentry (frontend + API error reporting)    <-- YOU ARE HERE
+- [ ] Phase 2 — CloudWatch (structured logging / alarms)
+- [ ] Phase 3 — API rate limiting
+- [ ] Phase 4 — Disclaimer + error/empty states polish
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Self-testing sprint — daily use, collect polish items; then Custom domain Phase 1.
-- Sub-steps done: Auth complete through Phase 6 (`354c1b7`); merged to main + deployed to prod (backend + frontend verified)
-- Next step: buy domain after self-testing settles, Custom domain Phase 1 — purchase domain, ACM cert, CloudFront alias, SSM WEB_ORIGIN update
-- Related decisions: ADR-0015 §20; Custom domain ADR TBD
+- Goal (one line): Ops & safety — prioritize Phase 1 scope (Sentry vs CloudWatch vs rate limiting).
+- Sub-steps done: Custom domain Phase 1 complete (`8cca01c`); prod verified at https://echotype.ink (login/logout, /api/health)
+- Next step: owner picks Ops Phase 1 entry point; no implementation started
+- Related decisions: ADR-0022 (custom domain); Ops ADR TBD
 
 ## Contract pointers (don't memorize, go read the source)
 - Stats metrics (definitions/formulas only): docs/STATS.md
@@ -54,6 +57,7 @@ Active capability: Custom domain
 - Annotation rendering: apps/web/src/components/AnnotatedText.tsx + apps/web/src/components/annotated-text/useTextMeasurement.ts
 - Editor + review: apps/web/src/components/editor/useCourseEditor.ts, reviewUtils.ts, AnnotatedTextEditor.tsx
 - Deploy: deploy/README.md, .github/workflows/deploy.yml, .github/workflows/deploy-web.yml
+- Custom domain (Terraform): infra/acm.tf, infra/cloudfront.tf, `custom_domain` variable; outputs `site_url`, `acm_validation_records`
 - API JWT auth: apps/api/src/auth/, probe `apps/api/scripts/auth-phase3-jwt-probe.mjs`
 - Web auth (Cognito SPA): apps/web/src/auth/, apps/web/.env.example, probe `apps/web/scripts/auth-phase4-probe.mjs`, `auth-phase5-probe.mjs`, `auth-phase6-probe.mjs`
 - Account API + page: packages/shared/src/account.ts, apps/api/src/routes/account.ts, apps/web/src/pages/AccountPage.tsx
@@ -81,5 +85,6 @@ Active capability: Custom domain
 | Annotation | false-green (duplicate substring, no index shift) | MVP skips index shift | user reanchor | — |
 | Annotation | Overlay measurement = mirror offsetTop (lines) + per-glyph getBoundingClientRect (charEdges); NOT Range.getClientRects() | Phase 2 deliberate | do not revert without ADR | ADR-0002 |
 | Auth | Guest typing progress not restored after login | In-memory session only; sign in before starting a session you intend to save | intentional (ADR-0015 §16) | ADR-0015 |
-| Auth | Google sign-in | Needs custom domain capability first; account linking prep via sub-as-PK | Custom domain capability, then Auth follow-up | ADR-0015 |
+| Auth | Google sign-in | Custom domain shipped; Cognito Hosted UI / Google IdP not wired yet | Auth follow-up | ADR-0015, ADR-0022 |
 | Auth | Email change | Deferred if implementation requires extra SES/Lambda cost beyond existing Cognito verify path | Auth Phase 5 cost check, or post-MVP | ADR-0015 |
+| Custom domain | Wildcard `*.echotype.ink` CNAME still points to Porkbun parking | MVP canonical host is apex only (ADR-0022); ACM cert covers wildcard for future subdomains | future if www or subdomain needed | ADR-0022 |
