@@ -4,6 +4,8 @@
 
 *Practice English typing with your own annotated texts.*
 
+**Live:** [echotype.ink](https://echotype.ink)
+
 I built EchoType because I wanted to revisit English texts I actually care about — poems, quotes, essays — through repetitive typing, until words and rhythm sink in. It is meant to be quiet, focused, and meaningful — not a WPM contest.
 
 The name comes from echo — a voice returning. The texts I choose are usually ones that already feel like my own; typing them is how I make them so.
@@ -40,9 +42,9 @@ The stack is conventional React/Node/Postgres. The interesting choices are aroun
 | Overlay layout | **Mirror measurement + global indices** | A hidden mirror measures per-character `offsetTop` for visual-line breaks and per-glyph `getBoundingClientRect` for horizontal edges (charEdges); annotations are stored as global indices. Post-layout width rules widen note labels and separate touching highlight bands without re-measuring on each keystroke. |
 | Frontend | **React 18 + Vite + Tailwind** | Component model fits a measurement-heavy overlay; utilities keep the typing surface simple without a heavy design system. |
 | State | **Zustand + TanStack Query** | Local typing UI state vs server-backed course list and mutations. |
-| Auth | **AWS Cognito (SRP) + JWT verification in Fastify** | Email/password sign-in (MVP); Cognito `sub` is the user primary key. Guests browse and type read-only sample courses from `localStorage`; signed-in users persist data in PostgreSQL. New accounts with zero courses receive a one-time onboarding seed from a shared catalog (`POST /api/onboarding/seed`). Google sign-in waits for a custom domain. |
+| Auth | **AWS Cognito (SRP) + JWT verification in Fastify** | Email/password sign-in (MVP); Cognito `sub` is the user primary key. Guests browse and type read-only sample courses from `localStorage`; signed-in users persist data in PostgreSQL. New accounts with zero courses receive a one-time onboarding seed from a shared catalog (`POST /api/onboarding/seed`). Google sign-in is deferred (Auth follow-up). |
 | Regression guard | **Playwright probes (local) + unit tests** | Stop-loss scripts after overlay/layout/auth changes: zero measure-on-typing, stable line ranges, bounded DOM mutations per keystroke. Alignment and stats helpers are unit-tested (`node:test`). |
-| Cloud | **EC2 + RDS + S3 + CloudFront + SSM + GitHub Actions OIDC** | API on EC2 against RDS; static build to S3/CloudFront; deploy via OIDC-assumed role and SSM Run Command — no long-lived AWS keys in CI. |
+| Cloud | **EC2 + RDS + S3 + CloudFront + SSM + GitHub Actions OIDC** | One CloudFront distribution serves the SPA (S3/OAC) and `/api/*` (EC2) on **https://echotype.ink** — same-origin HTTPS, no mixed content. ACM certificate (us-east-1) and DNS are Terraform-managed; CI deploys via OIDC-assumed role and SSM Run Command (no long-lived AWS keys). |
 
 ---
 
@@ -81,7 +83,7 @@ One shared overlay component and one measurement hook (mirror spans → `offsetT
 
 ![Deployment architecture](docs/deployment.png)
 
-**Terraform** provisions VPC, EC2, and RDS. The API runs in docker compose on EC2; the Vite build goes to **S3** behind **CloudFront**. **GitHub Actions** uses **OIDC** + **SSM Run Command** for backend deploy and S3 sync for the static bundle. Manual steps: `deploy/README.md`.
+**Terraform** provisions VPC, EC2, RDS, S3, CloudFront, and Cognito. Production runs at **https://echotype.ink**: a single CloudFront distribution terminates TLS (ACM, us-east-1), serves the Vite build from private S3 via OAC, and proxies `/api/*` to the Fastify container on EC2 (port 80 locked to CloudFront origin-facing ranges). `WEB_ORIGIN` and Cognito callback URLs are driven from Terraform (`custom_domain` → SSM), not hardcoded. **GitHub Actions** deploys the API through OIDC + SSM Run Command and syncs the static bundle to S3 with cache invalidation. Manual path: `deploy/README.md`.
 
 ---
 
@@ -121,7 +123,7 @@ I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I ru
 | Status | Capability |
 |--------|------------|
 | ✅ | **Annotation feature** — Shared Zod contracts, overlay rendering (charEdges + post-layout width rules), four-step editor, edit-time review (re-anchor / delete) |
-| ✅ | **Cloud deploy** — Terraform-provisioned EC2/RDS/S3/CloudFront; OIDC + SSM deploys; live on CloudFront |
+| ✅ | **Cloud deploy** — Terraform-provisioned EC2/RDS/S3/CloudFront/Cognito; OIDC + SSM deploys; live at https://echotype.ink |
 | ✅ | **Typing experience** — Auto-loop, newline auto-skip, IME composition, session timer with pause, immersive & forgiving modes, .txt import/export |
 | ✅ | **Course management** — Short/Article mode routes, search/sort, descriptions, collections with batch add and stats rollup |
 | ✅ | **Course stats** — Per-session rows + materialized course cumulative; formulas contracted in `docs/STATS.md` |
