@@ -123,12 +123,12 @@ I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I ru
 | Status | Capability |
 |--------|------------|
 | ✅ | **Annotation feature** — Shared Zod contracts, overlay rendering (charEdges + post-layout width rules), four-step editor, edit-time review (re-anchor / delete) |
-| ✅ | **Cloud deploy** — Terraform-provisioned EC2/RDS/S3/CloudFront/Cognito; OIDC + SSM deploys; live at https://echotype.ink |
+| ✅ | **Cloud deploy** — Terraform-provisioned EC2/RDS/S3/CloudFront; OIDC + SSM deploys; live at https://echotype.ink |
 | ✅ | **Typing experience** — Auto-loop, newline auto-skip, IME composition, session timer with pause, immersive & forgiving modes, .txt import/export |
 | ✅ | **Course management** — Short/Article mode routes, search/sort, descriptions, collections with batch add and stats rollup |
 | ✅ | **Course stats** — Per-session rows + materialized course cumulative; formulas contracted in `docs/STATS.md` |
-| ✅ | **Auth** — Cognito email/password (SRP), JWT-verified API, guest sample catalog, account page (nickname, password change, delete), onboarding seed for new users; **live at https://echotype.ink** |
-| ✅ | **Custom domain** — ACM cert + CloudFront alias; live at https://echotype.ink (ADR-0022) |
+| ✅ | **Auth** — Cognito email/password (SRP), JWT-verified API, guest sample catalog, account page (nickname, password change, delete), onboarding seed for new users |
+| ✅ | **Custom domain** — echotype.ink via ACM + CloudFront alias; HTTPS enforced |
 | 🚧 | **Ops & safety** — Sentry, CloudWatch, rate limiting, error/empty states (active) |
 
 ---
