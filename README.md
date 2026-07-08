@@ -125,16 +125,16 @@ I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I ru
 | ✅ | **Typing experience** — Auto-loop, newline auto-skip, IME composition, session timer with pause, immersive & forgiving modes, .txt import/export |
 | ✅ | **Course management** — Short/Article mode routes, search/sort, descriptions, collections with batch add and stats rollup |
 | ✅ | **Course stats** — Per-session rows + materialized course cumulative; formulas contracted in `docs/STATS.md` |
-| ✅ | **Auth** — Cognito email/password (SRP), JWT-verified API, guest sample catalog, account page (nickname, password change, delete), onboarding seed for new users; **live on production CloudFront** |
-| 🚧 | **Custom domain** — Domain + ACM cert + CloudFront alias (next after self-testing; also unblocks Google sign-in) |
-| 📋 | **Ops & safety** — Sentry, CloudWatch, rate limiting, error/empty states |
+| ✅ | **Auth** — Cognito email/password (SRP), JWT-verified API, guest sample catalog, account page (nickname, password change, delete), onboarding seed for new users; **live at https://echotype.ink** |
+| ✅ | **Custom domain** — ACM cert + CloudFront alias; live at https://echotype.ink (ADR-0022) |
+| 🚧 | **Ops & safety** — Sentry, CloudWatch, rate limiting, error/empty states (active) |
 
 ---
 
 ## Further reading
 
 - **`docs/STATE.md`** — Current engineering snapshot and roadmap.
-- **`docs/DECISIONS.md`** — Decision log (21 ADRs: anchoring, measurement, stats, auth, layout, import/export, forgiving mode, immersive refocus).
+- **`docs/DECISIONS.md`** — Decision log (22 ADRs: anchoring, measurement, stats, auth, layout, import/export, forgiving mode, immersive refocus, custom domain).
 - **`docs/STATS.md`** — Stats field definitions and formulas (the contract).
 - **`deploy/README.md`** — Terraform, SSM access, cloud deploy.
 
