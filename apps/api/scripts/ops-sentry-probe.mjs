@@ -68,7 +68,14 @@ async function partA() {
   assert(unauthorized.status === 401, `unauthenticated courses expected 401, got ${unauthorized.status}`);
 
   const debug = await api('GET', '/debug/sentry');
-  assert(debug.status === 404, `debug route must be hidden without SENTRY_DEBUG=1 (got ${debug.status})`);
+  const partBMode = process.env.PROBE_SENTRY === '1' && process.env.SENTRY_DEBUG === '1';
+  if (!partBMode) {
+    // Route unregistered: auth hook returns 401 (not public). Fastify 404 is also fine.
+    assert(
+      debug.status === 401 || debug.status === 404,
+      `debug route must be hidden without SENTRY_DEBUG=1 (got ${debug.status})`,
+    );
+  }
 
   console.log('Part A OK: health, 401 guard, debug route hidden');
 }
