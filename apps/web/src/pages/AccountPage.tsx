@@ -11,6 +11,8 @@ import { mapChangePasswordError, mapCognitoError } from '../auth/mapCognitoError
 import { validateNickname } from '../auth/nicknamePolicy';
 import { validatePassword } from '../auth/passwordPolicy';
 import { api } from '../lib/api';
+import { PageError } from '../components/page-status/PageError';
+import { PageLoading } from '../components/page-status/PageLoading';
 
 export function AccountPage() {
   const navigate = useNavigate();
@@ -31,6 +33,7 @@ export function AccountPage() {
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [accountLoading, setAccountLoading] = useState(true);
 
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState('');
@@ -45,6 +48,8 @@ export function AccountPage() {
 
     let cancelled = false;
     (async () => {
+      setAccountLoading(true);
+      setLoadError(null);
       try {
         const account = await api.getAccount();
         if (cancelled) return;
@@ -55,6 +60,10 @@ export function AccountPage() {
         if (!cancelled) {
           setLoadError('Could not load account details. Try again later.');
         }
+      } finally {
+        if (!cancelled) {
+          setAccountLoading(false);
+        }
       }
     })();
 
@@ -62,6 +71,24 @@ export function AccountPage() {
       cancelled = true;
     };
   }, [status, applyDisplayName]);
+
+  function retryLoadAccount() {
+    if (status !== 'authed') return;
+    setAccountLoading(true);
+    setLoadError(null);
+    void (async () => {
+      try {
+        const account = await api.getAccount();
+        setEmail(account.email);
+        setNickname(account.name);
+        applyDisplayName(account.name);
+      } catch {
+        setLoadError('Could not load account details. Try again later.');
+      } finally {
+        setAccountLoading(false);
+      }
+    })();
+  }
 
   async function onNicknameSubmit(e: FormEvent) {
     e.preventDefault();
@@ -146,8 +173,18 @@ export function AccountPage() {
     }
   }
 
+  if (accountLoading) {
+    return <PageLoading label="Loading account…" />;
+  }
+
   if (loadError) {
-    return <p className="text-sm text-red-600">{loadError}</p>;
+    return (
+      <PageError
+        title="Could not load account"
+        description={loadError}
+        onRetry={retryLoadAccount}
+      />
+    );
   }
 
   return (

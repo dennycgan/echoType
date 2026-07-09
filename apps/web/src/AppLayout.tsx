@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth/AuthProvider';
 import { useOnboardingSeed } from './auth/useOnboardingSeed';
 import { loginPathWithNext } from './auth/publicPaths';
+import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
 import { logRouteScrollMonitor, scrollRouteToTop } from './lib/routeScroll';
 
@@ -47,10 +48,8 @@ export function AppLayout() {
   const isTypingPage = /\/type$/.test(location.pathname);
 
   return (
-    <div className={isTypingPage ? 'flex min-h-dvh flex-col' : 'min-h-full'}>
-      <SiteHeader
-        className={isTypingPage ? 'shrink-0' : undefined}
-        trailing={
+    <div className="flex min-h-dvh flex-col">
+      <SiteHeader className="shrink-0" trailing={
           status === 'authed' ? (
             <>
               {displayName && (
@@ -86,11 +85,12 @@ export function AppLayout() {
         className={
           isTypingPage
             ? 'mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col overflow-y-auto px-4 py-4'
-            : 'mx-auto max-w-4xl px-4 py-6'
+            : 'mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-6'
         }
       >
         <Outlet />
       </main>
+      {!isTypingPage && <SiteFooter />}
     </div>
   );
 }

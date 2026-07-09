@@ -14,6 +14,10 @@ import {
 } from '../guest/useCourseCatalog';
 import { isGuestReadOnlyCourse } from '../guest/guestCoursesStore';
 import { BulkActionBar } from '../components/BulkActionBar';
+import { PageEmpty } from '../components/page-status/PageEmpty';
+import { PageError } from '../components/page-status/PageError';
+import { PageLoading } from '../components/page-status/PageLoading';
+import { describeQueryError } from '../lib/apiErrors';
 import { CollectionCard } from '../components/collection/CollectionCard';
 import { CollectionEditorModal } from '../components/collection/CollectionEditorModal';
 import { CollectionPickerModal } from '../components/collection/CollectionPickerModal';
@@ -75,12 +79,17 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
   const listOpts = { q: search.query || undefined, sort };
   const courseScope = hasQuery ? 'global' : 'null';
 
-  const { data: categories, isLoading: categoriesLoading } = useCategoryList(courseMode, listOpts);
+  const categoriesQuery = useCategoryList(courseMode, listOpts);
 
-  const { data: courses, isLoading: coursesLoading } = useCourseList(
+  const coursesQuery = useCourseList(
     courseMode,
     hasQuery ? listOpts : { ...listOpts, categoryId: 'null' },
   );
+
+  const { data: categories, isLoading: categoriesLoading, isError: categoriesError, error: categoriesErr, refetch: refetchCategories } =
+    categoriesQuery;
+  const { data: courses, isLoading: coursesLoading, isError: coursesError, error: coursesErr, refetch: refetchCourses } =
+    coursesQuery;
 
   useEffect(() => {
     setSelected(new Set());
@@ -144,7 +153,14 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
   }, [courses, selectedIds]);
 
   const isLoading = categoriesLoading || coursesLoading;
-  const isEmpty = !categories?.length && !courses?.length;
+  const isError = categoriesError || coursesError;
+  const queryError = categoriesErr ?? coursesErr;
+  const isEmpty = !isError && !categories?.length && !courses?.length;
+
+  function retryList() {
+    void refetchCategories();
+    void refetchCourses();
+  }
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -406,11 +422,25 @@ export function CourseListPage({ courseMode }: { courseMode: CourseMode }) {
         </div>
 
         {isLoading ? (
-          <p className="text-slate-500">Loading…</p>
+          <PageLoading />
+        ) : isError ? (
+          (() => {
+            const copy = describeQueryError(queryError);
+            return (
+              <PageError
+                title={copy.title}
+                description={copy.description}
+                onRetry={copy.retryable ? retryList : undefined}
+              />
+            );
+          })()
         ) : isEmpty ? (
-          <p className="text-slate-500">
-            {hasQuery ? 'No collections or courses match your search.' : copy.empty}
-          </p>
+          <PageEmpty
+            title={hasQuery ? 'No matches' : 'Nothing here yet'}
+            description={
+              hasQuery ? 'No collections or courses match your search.' : copy.empty
+            }
+          />
         ) : (
           <div className="space-y-6">
             {!!categories?.length && (

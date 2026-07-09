@@ -12,7 +12,9 @@ import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
 import { RequireAuth } from './auth/RequireAuth';
 import { AccountPage } from './pages/AccountPage';
+import { NotFoundPage } from './components/page-status/NotFoundPage';
 import { SentryRouteError } from './components/SentryRouteError';
+import { PrivacyPage } from './pages/legal/PrivacyPage';
 
 export const router = [
   {
@@ -76,6 +78,8 @@ export const router = [
           </RequireAuth>
         ),
       },
+      { path: '/privacy', element: <PrivacyPage /> },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ];

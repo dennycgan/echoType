@@ -15,7 +15,9 @@
     "probe:auth5": "node scripts/auth-phase5-probe.mjs",
     "probe:auth6": "node scripts/auth-phase6-probe.mjs",
     "test:sentry": "node --import tsx --test src/lib/sentry.test.ts",
-    "probe:ops-sentry": "node scripts/ops-sentry-probe.mjs"
+    "probe:ops-sentry": "node scripts/ops-sentry-probe.mjs",
+    "test:ops-phase2": "node --import tsx --test src/lib/apiErrors.test.ts src/content/legal/privacy.test.ts",
+    "probe:ops-phase2": "node scripts/ops-phase2-probe.mjs"
   },
   "dependencies": {
     "@echotype/shared": "workspace:*",

@@ -83,6 +83,13 @@ export function RegisterPage() {
           </span>
         </label>
         {error && <p className="text-sm text-red-600">{error}</p>}
+        <p className="text-xs text-slate-500">
+          By creating an account, you agree to our{' '}
+          <Link to="/privacy" className="text-slate-700 underline hover:text-slate-900">
+            Privacy Policy
+          </Link>
+          .
+        </p>
         <button
           type="submit"
           disabled={submitting}

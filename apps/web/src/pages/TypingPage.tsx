@@ -11,6 +11,9 @@ import {
   type PasteRange,
 } from '@echotype/shared';
 import { api, isCourseNotFoundError } from '../lib/api';
+import { describeQueryError } from '../lib/apiErrors';
+import { PageError } from '../components/page-status/PageError';
+import { PageLoading } from '../components/page-status/PageLoading';
 import { useAuth } from '../auth/AuthProvider';
 import { useCourseById } from '../guest/useCourseCatalog';
 import { InfoTooltip } from '../components/InfoTooltip';
@@ -156,17 +159,24 @@ export function TypingPage() {
   const { id } = useParams<{ id: string }>();
   const { status } = useAuth();
   const isGuest = status === 'guest';
-  const { data: course, isLoading, isError, error } = useCourseById(id);
+  const { data: course, isLoading, isError, error, refetch } = useCourseById(id);
 
   if (isLoading) {
-    return <p className="text-slate-500">Loading…</p>;
+    return <PageLoading />;
   }
 
   if (isError) {
     if (isCourseNotFoundError(error)) {
       return <CourseNotFoundPanel />;
     }
-    return <p className="text-slate-500">Failed to load course.</p>;
+    const copy = describeQueryError(error);
+    return (
+      <PageError
+        title={copy.title}
+        description={copy.description}
+        onRetry={copy.retryable ? () => void refetch() : undefined}
+      />
+    );
   }
 
   if (!course) {

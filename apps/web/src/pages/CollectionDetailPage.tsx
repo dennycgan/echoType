@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { CategoryDTO, CourseDTO, CourseListSort, CourseMode } from '@echotype/shared';
-import { api, isCourseNotFoundError } from '../lib/api';
+import { api, getApiErrorStatus, isCourseNotFoundError } from '../lib/api';
+import { describeQueryError } from '../lib/apiErrors';
+import { PageEmpty } from '../components/page-status/PageEmpty';
+import { PageError } from '../components/page-status/PageError';
+import { PageLoading } from '../components/page-status/PageLoading';
 import {
   invalidateCourseQueries,
   useCategoryById,
@@ -56,14 +60,18 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
   const {
     data: category,
     isLoading: categoryLoading,
+    isError: categoryIsError,
     error: categoryError,
+    refetch: refetchCategory,
   } = useCategoryById(collectionId);
 
-  const { data: courses, isLoading: coursesLoading } = useCourseList(
-    courseMode,
-    { categoryId: collectionId!, sort },
-    !!collectionId,
-  );
+  const {
+    data: courses,
+    isLoading: coursesLoading,
+    isError: coursesIsError,
+    error: coursesError,
+    refetch: refetchCourses,
+  } = useCourseList(courseMode, { categoryId: collectionId!, sort }, !!collectionId);
 
   useEffect(() => {
     setSelected(new Set());
@@ -240,16 +248,48 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
   }
 
   if (categoryLoading) {
-    return <p className="text-slate-500">Loading…</p>;
+    return <PageLoading />;
   }
 
-  if (categoryError || !category || category.mode !== courseMode) {
+  if (categoryIsError) {
+    const copy = describeQueryError(categoryError);
+    const status = getApiErrorStatus(categoryError);
+    if (!copy.retryable && (status === 404 || status === 410)) {
+      return (
+        <div className="space-y-3">
+          <PageEmpty
+            title="Collection not found"
+            description="This collection was deleted or is no longer available."
+            action={
+              <Link to={modeListPath(courseMode)} className="text-sm text-slate-700 underline hover:text-slate-900">
+                ← Back to {courseMode === 'SHORT' ? 'short' : 'article'} courses
+              </Link>
+            }
+          />
+        </div>
+      );
+    }
+    return (
+      <PageError
+        title={copy.title}
+        description={copy.description}
+        onRetry={copy.retryable ? () => void refetchCategory() : undefined}
+      />
+    );
+  }
+
+  if (!category || category.mode !== courseMode) {
     return (
       <div className="space-y-3">
-        <p className="text-slate-600">Collection not found.</p>
-        <Link to={modeListPath(courseMode)} className="text-sm text-slate-500 hover:text-slate-800">
-          ← Back to {courseMode === 'SHORT' ? 'short' : 'article'} courses
-        </Link>
+        <PageEmpty
+          title="Collection not found"
+          description="This collection was deleted or is no longer available."
+          action={
+            <Link to={modeListPath(courseMode)} className="text-sm text-slate-700 underline hover:text-slate-900">
+              ← Back to {courseMode === 'SHORT' ? 'short' : 'article'} courses
+            </Link>
+          }
+        />
       </div>
     );
   }
@@ -389,9 +429,23 @@ export function CollectionDetailPage({ courseMode }: CollectionDetailPageProps) 
       )}
 
       {coursesLoading ? (
-        <p className="text-slate-500">Loading courses…</p>
+        <PageLoading label="Loading courses…" />
+      ) : coursesIsError ? (
+        (() => {
+          const copy = describeQueryError(coursesError);
+          return (
+            <PageError
+              title={copy.title}
+              description={copy.description}
+              onRetry={copy.retryable ? () => void refetchCourses() : undefined}
+            />
+          );
+        })()
       ) : !courses?.length ? (
-        <p className="text-slate-500">No courses in this collection yet.</p>
+        <PageEmpty
+          title="No courses yet"
+          description="No courses in this collection yet."
+        />
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {courses.map((c) => (
