@@ -49,6 +49,15 @@ COGNITO_REGION="$(aws ssm get-parameter \
   --query 'Parameter.Value' \
   --output text)"
 
+SENTRY_DSN="$(aws ssm get-parameter \
+  --name "/echotype/SENTRY_DSN_API" \
+  --with-decryption \
+  --region "$REGION" \
+  --query 'Parameter.Value' \
+  --output text)"
+
+SENTRY_RELEASE="$(git -C "$(dirname "$0")/.." rev-parse HEAD)"
+
 cat > deploy/.env <<ENV
 DATABASE_URL=${DB_URL}
 API_PORT=3001
@@ -56,6 +65,9 @@ WEB_ORIGIN=${WEB_ORIGIN}
 COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
 COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
 COGNITO_REGION=${COGNITO_REGION}
+SENTRY_DSN=${SENTRY_DSN}
+SENTRY_ENVIRONMENT=production
+SENTRY_RELEASE=${SENTRY_RELEASE}
 ENV
 
 docker compose -f deploy/docker-compose.cloud.yml --env-file deploy/.env up -d --build

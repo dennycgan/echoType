@@ -93,3 +93,15 @@ variable "custom_domain" {
   default     = "echotype.ink"
   description = "Canonical public hostname (apex). ACM cert + CloudFront alternate domain name."
 }
+
+variable "sentry_dsn_web" {
+  type        = string
+  sensitive   = true
+  description = "Sentry DSN for echotype-web; read by deploy-web.yml and baked into the Vite build."
+}
+
+variable "sentry_dsn_api" {
+  type        = string
+  sensitive   = true
+  description = "Sentry DSN for echotype-api; read by EC2 at deploy time (SecureString in SSM)."
+}

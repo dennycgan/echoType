@@ -11,3 +11,7 @@ db_password = "change-me-to-a-strong-password"
 # instance_type     = "t4g.micro"
 # db_instance_class = "db.t4g.micro"
 # public_key_path   = "~/.ssh/echotype_ec2.pub"
+
+# Sentry (required on first apply after Ops Phase 1 — from Sentry project settings)
+# sentry_dsn_web = "https://<key>@<org>.ingest.sentry.io/<project-id>"
+# sentry_dsn_api = "https://<key>@<org>.ingest.sentry.io/<project-id>"

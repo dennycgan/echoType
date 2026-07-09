@@ -58,3 +58,25 @@ resource "aws_ssm_parameter" "cognito_region" {
     Name = "${var.project}-cognito-region"
   }
 }
+
+resource "aws_ssm_parameter" "sentry_dsn_web" {
+  name        = "/${var.project}/SENTRY_DSN_WEB"
+  description = "Sentry DSN for echotype-web; baked into Vite build via deploy-web.yml."
+  type        = "String"
+  value       = var.sentry_dsn_web
+
+  tags = {
+    Name = "${var.project}-sentry-dsn-web"
+  }
+}
+
+resource "aws_ssm_parameter" "sentry_dsn_api" {
+  name        = "/${var.project}/SENTRY_DSN_API"
+  description = "Sentry DSN for echotype-api; read by EC2 at deploy time."
+  type        = "SecureString"
+  value       = var.sentry_dsn_api
+
+  tags = {
+    Name = "${var.project}-sentry-dsn-api"
+  }
+}

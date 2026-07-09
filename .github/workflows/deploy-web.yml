@@ -14,6 +14,7 @@ permissions:
 
 env:
   AWS_REGION: ap-southeast-2
+  SENTRY_ORG: echotype
 
 jobs:
   deploy-web:
@@ -52,15 +53,38 @@ jobs:
           echo "client_id=$CLIENT_ID" >> "$GITHUB_OUTPUT"
           echo "region=$REGION" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve Sentry DSN for Vite build
+        id: sentry
+        run: |
+          set -euo pipefail
+          SENTRY_DSN=$(aws ssm get-parameter --name /echotype/SENTRY_DSN_WEB --query Parameter.Value --output text)
+          if [ -z "$SENTRY_DSN" ]; then
+            echo "SENTRY_DSN_WEB SSM param empty — check github-deploy IAM ssm:GetParameter on /echotype/SENTRY_DSN_WEB"
+            exit 1
+          fi
+          echo "dsn=$SENTRY_DSN" >> "$GITHUB_OUTPUT"
+
       - name: Build frontend
         env:
           VITE_COGNITO_USER_POOL_ID: ${{ steps.cognito.outputs.pool_id }}
           VITE_COGNITO_CLIENT_ID: ${{ steps.cognito.outputs.client_id }}
           VITE_COGNITO_REGION: ${{ steps.cognito.outputs.region }}
+          VITE_SENTRY_DSN: ${{ steps.sentry.outputs.dsn }}
+          VITE_SENTRY_RELEASE: ${{ github.sha }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_RELEASE: ${{ github.sha }}
         run: pnpm --filter @echotype/web build
 
+      - name: Verify no source maps in dist
+        run: |
+          set -euo pipefail
+          if find apps/web/dist -name '*.map' | grep -q .; then
+            echo "Source maps must not be published to S3"
+            exit 1
+          fi
+
       - name: Upload build to S3
-        run: aws s3 sync apps/web/dist "s3://${{ vars.WEB_BUCKET }}" --delete
+        run: aws s3 sync apps/web/dist "s3://${{ vars.WEB_BUCKET }}" --delete --exclude "*.map"
 
       - name: Invalidate CloudFront cache
         run: |

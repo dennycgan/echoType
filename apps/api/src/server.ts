@@ -1,3 +1,4 @@
+import { captureApiException, initSentry, Sentry } from './sentry.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { ZodError } from 'zod';
@@ -9,7 +10,9 @@ import { registerCategoryRoutes } from './routes/categories.js';
 import { registerSessionRoutes } from './routes/sessions.js';
 import { registerAccountRoutes } from './routes/account.js';
 import { registerOnboardingRoutes } from './routes/onboarding.js';
+import { registerDebugRoutes } from './routes/debug.js';
 
+initSentry();
 assertCognitoConfig();
 
 const PORT = Number(process.env.API_PORT ?? 3001);
@@ -31,16 +34,27 @@ declare module 'fastify' {
   }
 }
 
+app.addHook('onRequest', async (request) => {
+  Sentry.getIsolationScope().setTag('request_id', request.id);
+});
+
 app.setErrorHandler((error: Error, _req, reply) => {
   if (error instanceof ZodError) {
     return reply.status(400).send({ error: 'validation_error', issues: error.issues });
   }
+  captureApiException(error);
   app.log.error(error);
   return reply.status(500).send({ error: 'internal_error', message: error.message });
 });
 
 await app.register(cors, { origin: WEB_ORIGIN, credentials: true });
 await registerAuthHook(app);
+
+app.addHook('onRequest', async (request) => {
+  if (request.userId) {
+    Sentry.setUser({ id: request.userId });
+  }
+});
 
 // All application routes live under /api so a single CloudFront behavior
 // (/api/*) can route here while everything else serves the static SPA.
@@ -49,6 +63,7 @@ await registerAuthHook(app);
 await app.register(
   async (api) => {
     api.get('/health', async () => ({ ok: true }));
+    await registerDebugRoutes(api);
     await registerCourseRoutes(api);
     await registerCategoryRoutes(api);
     await registerSessionRoutes(api);
@@ -70,6 +85,7 @@ process.on('SIGTERM', () => void shutdown('SIGTERM'));
 try {
   await app.listen({ port: PORT, host: '0.0.0.0' });
 } catch (err) {
+  captureApiException(err);
   app.log.error(err);
   process.exit(1);
 }

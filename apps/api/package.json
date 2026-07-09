@@ -14,13 +14,16 @@
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
     "test:auth": "node --import tsx --test src/auth/ensureUser.test.ts src/routes/account.test.ts src/routes/onboarding.test.ts ../../packages/shared/src/onboardingCatalog.test.ts ../../packages/shared/src/onboardingSeed.test.ts",
-    "probe:auth": "node scripts/auth-phase3-jwt-probe.mjs"
+    "probe:auth": "node scripts/auth-phase3-jwt-probe.mjs",
+    "test:sentry": "node --import tsx --test src/sentry.test.ts",
+    "probe:ops-sentry": "node scripts/ops-sentry-probe.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1077.0",
     "@echotype/shared": "workspace:*",
     "@fastify/cors": "^10.0.1",
     "@prisma/client": "^5.22.0",
+    "@sentry/node": "^10.64.0",
     "aws-jwt-verify": "^5.2.1",
     "fastify": "^5.1.0",
     "pino-pretty": "^11.3.0",

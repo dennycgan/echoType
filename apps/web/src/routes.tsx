@@ -12,6 +12,7 @@ import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
 import { RequireAuth } from './auth/RequireAuth';
 import { AccountPage } from './pages/AccountPage';
+import { SentryRouteError } from './components/SentryRouteError';
 
 export const router = [
   {
@@ -52,6 +53,7 @@ export const router = [
   },
   {
     element: <AppLayout />,
+    errorElement: <SentryRouteError />,
     children: [
       { path: '/', element: <HomePage /> },
       { path: '/courses', element: <Navigate to="/" replace /> },

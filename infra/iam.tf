@@ -99,6 +99,7 @@ data "aws_iam_policy_document" "github_deploy" {
       "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/COGNITO_USER_POOL_ID",
       "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/COGNITO_CLIENT_ID",
       "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/COGNITO_REGION",
+      "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/SENTRY_DSN_WEB",
     ]
   }
 

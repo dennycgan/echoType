@@ -8,6 +8,9 @@ import { ensureUser, ProfileIncompleteError } from './ensureUser.js';
 import { verifyAccessToken } from './verifyAccessToken.js';
 
 const PUBLIC_API_PATHS = new Set(['/api/health']);
+if (process.env.SENTRY_DEBUG === '1') {
+  PUBLIC_API_PATHS.add('/api/debug/sentry');
+}
 
 function requestPath(url: string): string {
   return url.split('?')[0] ?? url;
