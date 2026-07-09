@@ -1210,3 +1210,42 @@
   - Prod verified: web and API probe issues in Sentry; web release artifacts include
     source files.
 - Supersedes / superseded-by: none
+
+---
+
+## ADR-0024 — Ops Phase 2: Privacy policy, footer, and page-status polish
+- Status: Accepted (2026-07-09)
+- Commit/PR anchor: fec3519
+- Plain summary: Public `/privacy` policy, sticky `SiteFooter` on AppLayout and auth
+  layouts (not Typing), register consent line, shared loading/empty/error components,
+  and list/detail/account error polish. Google user-data disclosure deferred to Google
+  sign-in capability. Ops & safety capability complete; CloudWatch and API rate limiting
+  remain Known debt.
+- Context: Ops & safety Phase 2 (STATE); Sentry Phase 1 shipped (ADR-0023). Custom domain
+  at https://echotype.ink (ADR-0022). Privacy page is a prerequisite for future Google
+  OAuth brand verification; Google-specific policy copy ships with Google sign-in.
+- Decision:
+  1. **Legal routes** — `/privacy` only (no `/terms`); structured copy in
+     `apps/web/src/content/legal/privacy.ts`; contact `dennygan.nz@gmail.com`.
+  2. **Register consent** — static agree line + link to `/privacy`; no checkbox.
+  3. **Footer** — `SiteFooter` on AppLayout and `AuthLayout`; **no footer on Typing**
+     (`/courses/:id/type`); sticky bottom via flex layout + `mt-auto`.
+  4. **Page status** — shared `PageLoading`, `PageEmpty`, `PageError`, `NotFoundPage`;
+     `describeQueryError` in `lib/apiErrors.ts`; global `*` → `NotFoundPage`.
+  5. **Polish scope** — `CourseListPage` (isError before isEmpty), `CollectionDetailPage`
+     (404 vs network error), `TypingPage`, `AccountPage`, `SentryRouteError`.
+  6. **Probes** — `test:ops-phase2`, `ops-phase2-probe.mjs`; web-only deploy (`deploy-web`).
+  7. **Deferred** — Google Sign-In user-data disclosure in privacy policy; CloudWatch
+     and API rate limiting (Known debt; ADR-0023 §10).
+  8. **Capability close** — Ops & safety marked complete after Phase 2 prod acceptance;
+     active capability → Google sign-in.
+- Rejected alternatives:
+  - `/terms` route in Phase 2 — not required for MVP or Google basic-scope verification.
+  - Register checkbox — static line sufficient for email/password signup.
+  - Footer on Typing page — immersive UX; `/privacy` reachable via direct URL or other routes.
+  - Placeholder privacy copy — full policy in repo from day one.
+- Consequences:
+  - Prod verified: https://echotype.ink/privacy (`deploy-web` after `fec3519`).
+  - Google sign-in capability unblocked for IdP work; privacy Google-data section added
+    when that capability ships.
+- Supersedes / superseded-by: none
