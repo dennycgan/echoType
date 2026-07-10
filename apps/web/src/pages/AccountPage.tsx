@@ -7,6 +7,8 @@ import {
   ACCOUNT_DELETE_COGNITO_FAILED_MESSAGE,
   AccountDeleteCognitoError,
 } from '../auth/accountDelete';
+import { loadAuthSession } from '../auth/authSession.js';
+import { isOrphanGoogleSession } from '../auth/cognitoOAuthExchange.js';
 import { mapChangePasswordError, mapCognitoError } from '../auth/mapCognitoError';
 import { validateNickname } from '../auth/nicknamePolicy';
 import { validatePassword } from '../auth/passwordPolicy';
@@ -40,8 +42,16 @@ export function AccountPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
-  const deleteReady =
-    deletePassword.length > 0 && isDeleteConfirmationValid(deleteConfirm) && !deleteSubmitting;
+  const orphanGoogleSession = (() => {
+    const session = loadAuthSession();
+    return session ? isOrphanGoogleSession(session) : false;
+  })();
+
+  const deleteReady = orphanGoogleSession
+    ? isDeleteConfirmationValid(deleteConfirm) && !deleteSubmitting
+    : deletePassword.length > 0 &&
+      isDeleteConfirmationValid(deleteConfirm) &&
+      !deleteSubmitting;
 
   useEffect(() => {
     if (status !== 'authed') return;
@@ -231,6 +241,7 @@ export function AccountPage() {
 
       <section className="rounded-md border bg-white p-4">
         <h2 className="text-sm font-medium text-slate-900">Change password</h2>
+        {!orphanGoogleSession ? (
         <form className="mt-3 space-y-3" onSubmit={onPasswordSubmit}>
           <label className="block text-sm">
             <span className="text-slate-700">Current password</span>
@@ -275,6 +286,11 @@ export function AccountPage() {
             {passwordSubmitting ? 'Updating…' : 'Update password'}
           </button>
         </form>
+        ) : (
+          <p className="mt-2 text-sm text-slate-600">
+            Password sign-in is not set up for this Google-only session.
+          </p>
+        )}
       </section>
 
       <section className="rounded-md border border-red-200 bg-red-50 p-4">
@@ -284,6 +300,7 @@ export function AccountPage() {
           cannot be undone.
         </p>
         <form className="mt-4 space-y-3" onSubmit={onDeleteSubmit}>
+          {!orphanGoogleSession && (
           <label className="block text-sm">
             <span className="text-slate-700">Current password</span>
             <input
@@ -295,6 +312,7 @@ export function AccountPage() {
               className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
             />
           </label>
+          )}
           <label className="block text-sm">
             <span className="text-slate-700">Type DELETE to confirm</span>
             <input

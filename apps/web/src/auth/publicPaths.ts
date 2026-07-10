@@ -1,4 +1,4 @@
-const PUBLIC_AUTH_PATHS = new Set(['/login', '/register', '/verify-email']);
+const PUBLIC_AUTH_PATHS = new Set(['/login', '/register', '/verify-email', '/auth/callback']);
 
 export function isPublicAuthPath(pathname: string): boolean {
   return PUBLIC_AUTH_PATHS.has(pathname);

@@ -7,6 +7,7 @@ describe('publicPaths', () => {
     assert.equal(isPublicAuthPath('/login'), true);
     assert.equal(isPublicAuthPath('/register'), true);
     assert.equal(isPublicAuthPath('/verify-email'), true);
+    assert.equal(isPublicAuthPath('/auth/callback'), true);
     assert.equal(isPublicAuthPath('/courses/short'), false);
   });
 

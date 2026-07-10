@@ -12,6 +12,7 @@ import {
   loadAuthSession,
   persistCognitoSession,
 } from './authSession.js';
+import { isOrphanGoogleSession } from './cognitoOAuthExchange.js';
 import {
   changePassword as cognitoChangePassword,
   confirmSignUp,
@@ -199,13 +200,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!isDeleteConfirmationValid(confirmation)) {
         throw new Error('Type DELETE to confirm account deletion.');
       }
-      if (!password) {
-        throw new Error('Password is required.');
-      }
 
       const session = loadAuthSession();
       if (!session) {
         throw new Error('not_authed');
+      }
+
+      const orphanGoogle = isOrphanGoogleSession(session);
+
+      if (orphanGoogle) {
+        await api.deleteAccount({
+          adminCognitoDelete: true,
+          idToken: session.idToken,
+        });
+        logout();
+        return;
+      }
+
+      if (!password) {
+        throw new Error('Password is required.');
       }
 
       const loginEmail = getSessionEmail(session) ?? session.username;

@@ -17,7 +17,8 @@
     "test:sentry": "node --import tsx --test src/lib/sentry.test.ts",
     "probe:ops-sentry": "node scripts/ops-sentry-probe.mjs",
     "test:ops-phase2": "node --import tsx --test src/lib/apiErrors.test.ts src/content/legal/privacy.test.ts",
-    "probe:ops-phase2": "node scripts/ops-phase2-probe.mjs"
+    "probe:ops-phase2": "node scripts/ops-phase2-probe.mjs",
+    "probe:auth-google-phase2": "node scripts/auth-google-phase2-probe.mjs"
   },
   "dependencies": {
     "@echotype/shared": "workspace:*",

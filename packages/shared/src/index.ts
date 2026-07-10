@@ -10,3 +10,4 @@ export * from './serializeTxtExport.js';
 export * from './onboardingSeed.js';
 export * from './account.js';
 export * from './cognitoOAuth.js';
+export * from './federatedClaims.js';

@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthLayout } from '../../auth/AuthLayout';
 import { useAuth } from '../../auth/AuthProvider';
+import { startGoogleSignIn } from '../../auth/cognitoOAuthExchange';
 import { isUserNotFound } from '../../auth/mapCognitoError';
 import { GUEST_LOGIN_TOAST, resolvePostLoginPath } from '../../auth/resolvePostLoginPath';
 
@@ -18,6 +19,18 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [showSignUpLink, setShowSignUpLink] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+
+  async function onGoogleSignIn() {
+    setError(null);
+    setGoogleSubmitting(true);
+    try {
+      await startGoogleSignIn(next);
+    } catch {
+      setError('Google sign-in is not available right now.');
+      setGoogleSubmitting(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -56,7 +69,21 @@ export function LoginPage() {
       {reset && (
         <p className="mt-2 text-sm text-green-700">Password updated. You can sign in now.</p>
       )}
-      <form className="mt-4 space-y-4" onSubmit={onSubmit}>
+      <button
+        type="button"
+        data-testid="auth-google"
+        disabled={googleSubmitting || submitting}
+        onClick={() => void onGoogleSignIn()}
+        className="mt-4 w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-60"
+      >
+        {googleSubmitting ? 'Redirecting…' : 'Continue with Google'}
+      </button>
+      <div className="my-4 flex items-center gap-3 text-xs text-slate-500">
+        <span className="h-px flex-1 bg-slate-200" />
+        <span>or</span>
+        <span className="h-px flex-1 bg-slate-200" />
+      </div>
+      <form className="space-y-4" onSubmit={onSubmit}>
         <label className="block text-sm">
           <span className="text-slate-700">Email</span>
           <input

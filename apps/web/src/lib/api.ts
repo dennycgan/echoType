@@ -1,4 +1,4 @@
-import type { AccountDTO } from '@echotype/shared';
+import type { AccountDTO, FederatedLinkResult } from '@echotype/shared';
 import type {
   AnnotationIssue,
   ContentIssue,
@@ -198,6 +198,15 @@ export const api = {
   getAccount: () => request<AccountDTO>('/account'),
   updateAccount: (input: { name: string }) =>
     request<AccountDTO>('/account', { method: 'PUT', body: JSON.stringify(input) }),
-  deleteAccount: () => request<void>('/account', { method: 'DELETE' }),
+  deleteAccount: (opts?: { adminCognitoDelete?: boolean; idToken?: string }) =>
+    request<void>('/account', {
+      method: 'DELETE',
+      body: JSON.stringify(opts ?? {}),
+    }),
+  linkFederated: (idToken: string) =>
+    request<FederatedLinkResult>('/auth/federated/link', {
+      method: 'POST',
+      body: JSON.stringify({ idToken }),
+    }),
   seedOnboarding: () => request<void>('/onboarding/seed', { method: 'POST' }),
 };

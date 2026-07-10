@@ -59,6 +59,17 @@ resource "aws_ssm_parameter" "cognito_region" {
   }
 }
 
+resource "aws_ssm_parameter" "cognito_domain_prefix" {
+  name        = "/${var.project}/COGNITO_DOMAIN_PREFIX"
+  description = "Cognito Hosted UI domain prefix for OAuth (echotype-ink)."
+  type        = "String"
+  value       = var.cognito_domain_prefix
+
+  tags = {
+    Name = "${var.project}-cognito-domain-prefix"
+  }
+}
+
 resource "aws_ssm_parameter" "sentry_dsn_web" {
   name        = "/${var.project}/SENTRY_DSN_WEB"
   description = "Sentry DSN for echotype-web; baked into Vite build via deploy-web.yml."

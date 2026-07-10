@@ -45,13 +45,15 @@ jobs:
           POOL_ID=$(aws ssm get-parameter --name /echotype/COGNITO_USER_POOL_ID --query Parameter.Value --output text)
           CLIENT_ID=$(aws ssm get-parameter --name /echotype/COGNITO_CLIENT_ID --query Parameter.Value --output text)
           REGION=$(aws ssm get-parameter --name /echotype/COGNITO_REGION --query Parameter.Value --output text)
-          if [ -z "$POOL_ID" ] || [ -z "$CLIENT_ID" ]; then
+          DOMAIN_PREFIX=$(aws ssm get-parameter --name /echotype/COGNITO_DOMAIN_PREFIX --query Parameter.Value --output text)
+          if [ -z "$POOL_ID" ] || [ -z "$CLIENT_ID" ] || [ -z "$DOMAIN_PREFIX" ]; then
             echo "COGNITO SSM params empty — check github-deploy IAM ssm:GetParameter on /echotype/COGNITO_*"
             exit 1
           fi
           echo "pool_id=$POOL_ID" >> "$GITHUB_OUTPUT"
           echo "client_id=$CLIENT_ID" >> "$GITHUB_OUTPUT"
           echo "region=$REGION" >> "$GITHUB_OUTPUT"
+          echo "domain_prefix=$DOMAIN_PREFIX" >> "$GITHUB_OUTPUT"
 
       - name: Resolve Sentry DSN for Vite build
         id: sentry
@@ -69,6 +71,7 @@ jobs:
           VITE_COGNITO_USER_POOL_ID: ${{ steps.cognito.outputs.pool_id }}
           VITE_COGNITO_CLIENT_ID: ${{ steps.cognito.outputs.client_id }}
           VITE_COGNITO_REGION: ${{ steps.cognito.outputs.region }}
+          VITE_COGNITO_DOMAIN_PREFIX: ${{ steps.cognito.outputs.domain_prefix }}
           VITE_SENTRY_DSN: ${{ steps.sentry.outputs.dsn }}
           VITE_SENTRY_RELEASE: ${{ github.sha }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}

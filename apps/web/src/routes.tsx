@@ -10,6 +10,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
+import { AuthCallbackPage } from './pages/auth/AuthCallbackPage';
 import { RequireAuth } from './auth/RequireAuth';
 import { AccountPage } from './pages/AccountPage';
 import { NotFoundPage } from './components/page-status/NotFoundPage';
@@ -36,6 +37,10 @@ export const router = [
   {
     path: '/verify-email',
     element: <VerifyEmailPage />,
+  },
+  {
+    path: '/auth/callback',
+    element: <AuthCallbackPage />,
   },
   {
     path: '/forgot-password',

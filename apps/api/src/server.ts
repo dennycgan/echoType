@@ -10,6 +10,7 @@ import { registerCategoryRoutes } from './routes/categories.js';
 import { registerSessionRoutes } from './routes/sessions.js';
 import { registerAccountRoutes } from './routes/account.js';
 import { registerOnboardingRoutes } from './routes/onboarding.js';
+import { registerFederatedAuthRoutes } from './routes/federatedAuth.js';
 import { registerDebugRoutes } from './routes/debug.js';
 
 initSentry();
@@ -69,6 +70,7 @@ await app.register(
     await registerSessionRoutes(api);
     await registerAccountRoutes(api);
     await registerOnboardingRoutes(api);
+    await registerFederatedAuthRoutes(api);
   },
   { prefix: '/api' },
 );
