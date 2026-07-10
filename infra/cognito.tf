@@ -80,9 +80,9 @@ resource "aws_cognito_identity_provider" "google" {
   }
 
   attribute_mapping = {
-    email    = "email"
-    name     = "name"
-    username = "email"
+    email = "email"
+    name  = "name"
+    # Pool uses username_attributes = ["email"]; do not map username — Cognito derives it.
   }
 }
 
