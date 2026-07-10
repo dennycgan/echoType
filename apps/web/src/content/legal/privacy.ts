@@ -77,6 +77,15 @@ export const PRIVACY_POLICY: PrivacyPolicy = {
         },
       ],
     },
+    {
+      heading: 'Changes to this policy',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'We may update this policy from time to time. The date at the top of this page reflects the most recent update.',
+        },
+      ],
+    },
   ],
   contactEmail: 'dennygan.nz@gmail.com',
 };
