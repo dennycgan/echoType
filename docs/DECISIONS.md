@@ -1249,3 +1249,49 @@
   - Google sign-in capability unblocked for IdP work; privacy Google-data section added
     when that capability ships.
 - Supersedes / superseded-by: none
+
+---
+
+## ADR-0025 — Google sign-in Phase 1: GCP OAuth + Cognito Google IdP (infra only)
+- Status: Accepted (2026-07-10)
+- Commit/PR anchor: 4ac791d
+- Plain summary: Google federated sign-in is wired at the identity layer — GCP OAuth Web
+  client, Cognito Hosted UI domain `echotype-ink`, Google IdP on the existing user pool,
+  and SPA OAuth settings for authorization-code flow. No web login button or `/auth/callback`
+  handler yet; manual Hosted UI acceptance lands on SPA 404 with `?code=...` until Phase 2.
+- Context: Google sign-in capability Phase 1 (STATE); custom domain at https://echotype.ink
+  (ADR-0022); privacy footer shipped (ADR-0024). Owner approved infra-first: secret stays
+  in Terraform only; shared URL builders + probes before web UX.
+- Decision:
+  1. **Cognito domain** — prefix `echotype-ink` →
+     `https://echotype-ink.auth.ap-southeast-2.amazoncognito.com`.
+  2. **Google secret placement** — `google_oauth_client_id` + `google_oauth_client_secret`
+     in `infra/terraform.tfvars` only; wired into Cognito Google IdP. **Not** SSM, EC2,
+     or API env (documented in `deploy/README.md`).
+  3. **IdP attribute mapping** — `email` and `name` only. Do **not** map `username` to
+     `email` when the pool uses `username_attributes = ["email"]` (AWS rejects; fixed in
+     `4ac791d`).
+  4. **SPA client OAuth** — callback `https://echotype.ink/auth/callback` (+ dev origin);
+     `supported_identity_providers` includes Google when tfvars set; authorization code
+     flow with `openid email profile`.
+  5. **GCP redirect URI** — register `terraform output -raw google_oauth_redirect_uri`
+     (`…/oauth2/idpresponse` on the Cognito domain).
+  6. **Shared contracts** — `packages/shared/src/cognitoOAuth.ts` (Hosted UI base URL,
+     Google IdP redirect URI, authorize URL builder) + unit tests.
+  7. **Acceptance** — `auth-google-phase1-probe.mjs` Part A (unit tests), Part B
+     (`PROBE_AWS=1` read-only Cognito), Part C (`PROBE_MANUAL=1` browser Hosted UI →
+     `/auth/callback?code=...` 404 OK). Email/password regression: manual prod login or
+     `auth-phase4-probe` Part B.
+  8. **Out of scope (Phase 2+)** — web Google button, `/auth/callback` token exchange,
+     account linking, `privacy.ts` Google disclosure, Google brand verification.
+- Rejected alternatives:
+  - Store Google client secret in SSM/EC2 — unnecessary exposure; Cognito holds federation secret.
+  - Map `username = "email"` on Google IdP — invalid for email-as-username pools.
+  - Ship web callback in Phase 1 — infra acceptance first; keeps deploy surface small.
+  - Custom Cognito domain on `echotype.ink` — Hosted UI prefix sufficient for MVP.
+- Consequences:
+  - Terraform outputs: `cognito_domain_prefix`, `cognito_hosted_ui_base_url`,
+    `google_oauth_redirect_uri`.
+  - Prod verified: Google sign-in via Hosted UI; callback 404 until Phase 2.
+  - Active phase → Google sign-in Phase 2 (web + linking).
+- Supersedes / superseded-by: none
