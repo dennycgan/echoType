@@ -194,6 +194,95 @@ Run these **in order** the first time (and any time CloudFront/S3 are recreated)
 > Steps 4 and 5 are independent afterwards: a frontend-only change just needs
 > `deploy-web.yml`; a backend-only change just needs `deploy.yml`.
 
+## Google sign-in Phase 1 (GCP OAuth + Cognito Google IdP)
+
+Infra-only: wires Google as a Cognito identity provider. **No EC2/API deploy** and
+**no `deploy-web.yml`** required for Phase 1 acceptance. Phase 2 adds the web
+login button and `/auth/callback` token exchange.
+
+### Where secrets live (important)
+
+| Secret | Stored in | Used by |
+|--------|-----------|---------|
+| Google OAuth **client ID + secret** | `infra/terraform.tfvars` (gitignored) → **Cognito Google IdP** (Terraform) | Cognito ↔ Google OAuth handshake only |
+| Cognito pool/client IDs | SSM + Vite/API env | EC2 API + web build |
+| User JWT access tokens | Browser session | API `Authorization: Bearer` |
+
+**The Google OAuth client secret is NOT copied to SSM, EC2 `deploy/.env`, or GitHub
+Secrets.** Cognito stores it and performs the Google OAuth exchange server-side.
+The Fastify API never sees the Google secret — only Cognito-issued JWTs (same as
+email/password today). Do not add `GOOGLE_*` to API runtime env.
+
+### Apply order
+
+The Google Cloud redirect URI is **predictable** before apply (domain prefix defaults
+to `echotype-ink`):
+
+```text
+https://echotype-ink.auth.ap-southeast-2.amazoncognito.com/oauth2/idpresponse
+```
+
+1. **GCP Console** (manual) — create OAuth Web client with that redirect URI (see below).
+2. **`terraform apply`** (local) — creates Cognito domain + Google IdP + enables OAuth on the SPA client.
+3. **Probe + manual test** — see acceptance at the end of this section.
+
+If `terraform apply` fails because the domain prefix is taken, change
+`cognito_domain_prefix` in `terraform.tfvars`, re-run apply, and **update the GCP
+redirect URI** to match `terraform output -raw google_oauth_redirect_uri`.
+
+### GCP Console steps
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services.
+2. **OAuth consent screen** (External): App name `EchoType`; support email; **Privacy policy**
+   `https://echotype.ink/privacy`; Authorized domains include `echotype.ink`.
+3. **Credentials → Create OAuth client ID → Web application**:
+   - **Authorized redirect URIs** (only this one for Phase 1):
+     ```bash
+     # After terraform apply, confirm with:
+     cd infra && terraform output -raw google_oauth_redirect_uri
+     ```
+     Expected default: `https://echotype-ink.auth.ap-southeast-2.amazoncognito.com/oauth2/idpresponse`
+   - Do **not** add `https://echotype.ink/auth/callback` here — that is the Cognito
+     app-client callback (Phase 2), not Google's redirect target.
+4. Copy **Client ID** and **Client secret**.
+
+### Terraform variables (`infra/terraform.tfvars`)
+
+```hcl
+cognito_domain_prefix      = "echotype-ink"
+google_oauth_client_id     = "<from GCP>"
+google_oauth_client_secret = "<from GCP>"
+```
+
+```bash
+cd infra
+terraform plan    # expect: user pool domain, google IdP, client OAuth settings
+terraform apply
+terraform output cognito_hosted_ui_base_url
+terraform output -raw google_oauth_redirect_uri
+```
+
+Email/password (`ALLOW_USER_SRP_AUTH`) is unchanged. OAuth code flow is added for
+Google federation and Phase 2 callback.
+
+### Phase 1 acceptance
+
+```bash
+# Unit tests + redirect URI contract
+pnpm --filter @echotype/api test:auth-google-phase1
+
+# After terraform apply (needs AWS creds + apps/api/.env COGNITO_*)
+PROBE_AWS=1 pnpm --filter @echotype/api probe:auth-google-phase1
+
+# Manual Google sign-in (prints authorize URL)
+PROBE_MANUAL=1 WEB_ORIGIN=https://echotype.ink pnpm --filter @echotype/api probe:auth-google-phase1
+```
+
+Manual checklist:
+
+- [ ] Browser completes Google sign-in → lands on `/auth/callback?code=...` (SPA 404 is OK until Phase 2).
+- [ ] Email/password login still works: `PROBE_COGNITO_AUTH=1` + `auth-phase4-probe.mjs` Part B.
+
 ## Future upgrades (TODO, not in MVP)
 
 - **Migrate to GHCR push/pull images**: build the API image on the GitHub runner,

@@ -15,3 +15,9 @@ db_password = "change-me-to-a-strong-password"
 # Sentry (required on first apply after Ops Phase 1 — from Sentry project settings)
 # sentry_dsn_web = "https://<key>@<org>.ingest.sentry.io/<project-id>"
 # sentry_dsn_api = "https://<key>@<org>.ingest.sentry.io/<project-id>"
+
+# Google sign-in Phase 1 (Cognito Google IdP — secret stays in Terraform/Cognito only, NOT EC2/SSM)
+# cognito_domain_prefix = "echotype-ink"
+# After: terraform output -raw google_oauth_redirect_uri  → use in GCP OAuth client
+# google_oauth_client_id     = "<from GCP>"
+# google_oauth_client_secret = "<from GCP>"

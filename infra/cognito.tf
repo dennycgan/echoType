@@ -1,5 +1,5 @@
 # Auth Phase 1: Cognito User Pool + SPA app client.
-# Callback path /auth/callback is a placeholder until Auth Phase 4; adjust here + re-apply if routes change.
+# Google sign-in Phase 1: Hosted UI domain + Google IdP (OAuth code flow for Phase 2 callback).
 # Email: COGNITO_DEFAULT (50/day AWS cap) — sufficient for MVP; switch to SES if volume hits the limit.
 # prevent_user_existence_errors LEGACY (Phase 5.1): client returns UserNotFoundException
 # so the app can tell users when no account exists for an email (ENABLED masks it).
@@ -16,6 +16,15 @@ locals {
     "${local.web_origin}/",
     "${var.dev_web_origin}/",
   ]
+
+  cognito_hosted_ui_base = "https://${var.cognito_domain_prefix}.auth.${var.region}.amazoncognito.com"
+  google_idp_redirect_uri = "${local.cognito_hosted_ui_base}/oauth2/idpresponse"
+  google_sign_in_enabled  = var.google_oauth_client_id != "" && var.google_oauth_client_secret != ""
+}
+
+resource "aws_cognito_user_pool_domain" "main" {
+  domain       = var.cognito_domain_prefix
+  user_pool_id = aws_cognito_user_pool.main.id
 }
 
 resource "aws_cognito_user_pool" "main" {
@@ -57,6 +66,26 @@ resource "aws_cognito_user_pool" "main" {
   }
 }
 
+resource "aws_cognito_identity_provider" "google" {
+  count = local.google_sign_in_enabled ? 1 : 0
+
+  user_pool_id  = aws_cognito_user_pool.main.id
+  provider_name = "Google"
+  provider_type = "Google"
+
+  provider_details = {
+    client_id        = var.google_oauth_client_id
+    client_secret    = var.google_oauth_client_secret
+    authorize_scopes = "openid email profile"
+  }
+
+  attribute_mapping = {
+    email    = "email"
+    name     = "name"
+    username = "email"
+  }
+}
+
 resource "aws_cognito_user_pool_client" "web" {
   name         = "${var.project}-web"
   user_pool_id = aws_cognito_user_pool.main.id
@@ -81,7 +110,11 @@ resource "aws_cognito_user_pool_client" "web" {
   callback_urls = local.cognito_callback_urls
   logout_urls   = local.cognito_logout_urls
 
-  supported_identity_providers = ["COGNITO"]
+  supported_identity_providers = local.google_sign_in_enabled ? ["COGNITO", "Google"] : ["COGNITO"]
+
+  allowed_oauth_flows                  = local.google_sign_in_enabled ? ["code"] : []
+  allowed_oauth_scopes                 = local.google_sign_in_enabled ? ["openid", "email", "profile"] : []
+  allowed_oauth_flows_user_pool_client = local.google_sign_in_enabled
 
   prevent_user_existence_errors = "LEGACY"
 
@@ -95,4 +128,6 @@ resource "aws_cognito_user_pool_client" "web" {
     "email",
     "name",
   ]
+
+  depends_on = [aws_cognito_identity_provider.google]
 }

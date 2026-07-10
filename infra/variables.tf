@@ -105,3 +105,22 @@ variable "sentry_dsn_api" {
   sensitive   = true
   description = "Sentry DSN for echotype-api; read by EC2 at deploy time (SecureString in SSM)."
 }
+
+variable "cognito_domain_prefix" {
+  type        = string
+  default     = "echotype-ink"
+  description = "Cognito Hosted UI domain prefix (must be unique in the region). Used in Google OAuth redirect URI."
+}
+
+variable "google_oauth_client_id" {
+  type        = string
+  default     = ""
+  description = "Google OAuth Web client ID. Stored in Cognito Google IdP only — not injected into EC2/API runtime."
+}
+
+variable "google_oauth_client_secret" {
+  type        = string
+  sensitive   = true
+  default     = ""
+  description = "Google OAuth client secret for Cognito Google IdP. Provide via terraform.tfvars (gitignored). Not in SSM or EC2."
+}

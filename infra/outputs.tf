@@ -79,6 +79,21 @@ output "cognito_region" {
   description = "Region of the Cognito User Pool (also in SSM /echotype/COGNITO_REGION)."
 }
 
+output "cognito_domain_prefix" {
+  value       = var.cognito_domain_prefix
+  description = "Cognito Hosted UI domain prefix (echotype-ink → echotype-ink.auth.<region>.amazoncognito.com)."
+}
+
+output "cognito_hosted_ui_base_url" {
+  value       = local.cognito_hosted_ui_base
+  description = "Cognito Hosted UI base URL (oauth2/authorize, logout)."
+}
+
+output "google_oauth_redirect_uri" {
+  value       = local.google_idp_redirect_uri
+  description = "Register this exact URI as the Authorized redirect URI on the Google Cloud OAuth Web client."
+}
+
 output "acm_certificate_arn" {
   value       = aws_acm_certificate.web.arn
   description = "ACM certificate ARN (us-east-1) attached to CloudFront."
