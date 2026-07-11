@@ -43,7 +43,7 @@ describe('resolvePostLoginPath', () => {
       mode: 'SHORT',
     });
     const next = `/courses/${guest.id}/type`;
-    assert.equal(resolvePostLoginPath(next), '/courses/short');
+    assert.equal(resolvePostLoginPath(next), '/');
   });
 
   it('redirects unknown uuid typing next when not in guest store', () => {

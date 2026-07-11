@@ -9,9 +9,7 @@ import boto3
 
 client = boto3.client("cognito-idp")
 
-EMAIL_EXISTS_MESSAGE = (
-    "An account with this email already exists. Try signing in with Google instead."
-)
+EMAIL_EXISTS_MESSAGE = "An account with this email already exists."
 
 
 def handler(event, _context):

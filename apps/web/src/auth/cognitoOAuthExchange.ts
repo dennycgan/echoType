@@ -130,7 +130,7 @@ export async function startGoogleSignIn(nextPath: string, hintEmail?: string): P
   writePendingOAuth({ codeVerifier, stateNonce });
 
   const state = encodeOAuthState({
-    next: nextPath.startsWith('/') ? nextPath : '/courses/short',
+    next: nextPath.startsWith('/') ? nextPath : '/',
     nonce: stateNonce,
     hintEmail: hintEmail?.trim() || undefined,
   });

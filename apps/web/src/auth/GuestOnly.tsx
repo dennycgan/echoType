@@ -4,7 +4,7 @@ import { useAuth } from './AuthProvider.js';
 export function GuestOnly({ children }: { children: React.ReactNode }) {
   const { status } = useAuth();
   const [params] = useSearchParams();
-  const next = params.get('next') || '/courses/short';
+  const next = params.get('next') || '/';
 
   if (status === 'loading') {
     return (
@@ -13,7 +13,7 @@ export function GuestOnly({ children }: { children: React.ReactNode }) {
   }
 
   if (status === 'authed') {
-    return <Navigate to={next.startsWith('/') ? next : '/courses/short'} replace />;
+    return <Navigate to={next.startsWith('/') ? next : '/'} replace />;
   }
 
   return <>{children}</>;

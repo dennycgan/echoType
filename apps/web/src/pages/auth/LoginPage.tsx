@@ -10,7 +10,7 @@ export function LoginPage() {
   const { login, mapError, isUserNotConfirmed } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const next = params.get('next') || '/courses/short';
+  const next = params.get('next') || '/';
   const verified = params.get('verified') === '1';
   const reset = params.get('reset') === '1';
 

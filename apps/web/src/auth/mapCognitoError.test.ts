@@ -19,9 +19,11 @@ describe('mapCognitoError', () => {
     assert.match(mapCognitoError({ code: 'UserNotFoundException' }), /No account found/);
   });
 
-  it('maps UsernameExistsException with Google hint', () => {
-    assert.match(mapCognitoError({ code: 'UsernameExistsException' }), /already exists/);
-    assert.match(mapCognitoError({ code: 'UsernameExistsException' }), /Google/);
+  it('maps UsernameExistsException', () => {
+    assert.equal(
+      mapCognitoError({ code: 'UsernameExistsException' }),
+      'An account with this email already exists.',
+    );
   });
 
   it('maps CodeMismatchException', () => {

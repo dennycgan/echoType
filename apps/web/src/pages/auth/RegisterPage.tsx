@@ -90,8 +90,8 @@ export function RegisterPage() {
             At least 8 characters with uppercase, lowercase, and a number.
           </span>
         </label>
-        {error && (
-          <p className="text-sm text-red-600 whitespace-pre-line" role="alert">
+          {error && (
+          <p className="text-sm text-red-600" role="alert">
             {error}
           </p>
         )}
