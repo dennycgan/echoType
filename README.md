@@ -6,9 +6,11 @@
 
 **Live:** [echotype.ink](https://echotype.ink)
 
-I built EchoType because I wanted to revisit English texts I actually care about — poems, quotes, essays — through repetitive typing, until words and rhythm sink in. It is meant to be quiet, focused, and meaningful — not a WPM contest.
+EchoType is a typing tool where you load up any text (poems, speeches, quotes, essays) and just type through it on loop. Good for moments when your brain needs something to do without actual thinking.
 
-The name comes from echo — a voice returning. The texts I choose are usually ones that already feel like my own; typing them is how I make them so.
+You can add custom annotations to phrases beforehand; the notes stay visible as you type, so glosses stay in context instead of a separate glossary. Sign in to keep your texts and practice history; or browse and type the sample courses as a guest.
+
+The name comes from echo — a voice returning. I built it because I wanted to revisit texts I actually care about through repetitive typing, until the words and rhythm sink in.
 
 ![EchoType in action](docs/product-screenshot.png)
 
