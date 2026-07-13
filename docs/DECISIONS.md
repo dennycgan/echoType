@@ -1294,4 +1294,100 @@
     `google_oauth_redirect_uri`.
   - Prod verified: Google sign-in via Hosted UI; callback 404 until Phase 2.
   - Active phase → Google sign-in Phase 2 (web + linking).
-- Supersedes / superseded-by: none
+- Supersedes / superseded-by: IdP `name` mapping later removed in ADR-0026 (G4A).
+
+## ADR-0026 — Google sign-in Phase 2: web OAuth, email linking, nickname, G1–G5
+- Status: Accepted (2026-07-10)
+- Commit/PR anchor: 32c8107
+- Plain summary: Google sign-in is live in the SPA — Hosted UI button, `/auth/callback`
+  code exchange, email-first forced linking (AdminLink then delete orphan `Google_*`),
+  preserve native nickname / sync `email_verified`, and blocking NicknameSetupModal for
+  pure-Google users with empty name. Follow-up fixes (self-link, OAuth errors, register
+  email guard) sit under ADR-0027 / later shas on the same capability.
+- Context: Phase 1 (ADR-0025) left Hosted UI landing on SPA 404. Cognito creates a
+  separate federated user (`Google_<sub>`) on first Google entry; email/password natives
+  use email-as-username. Same email can exist as two Cognito users until app linking runs.
+  Owner accepted G1A–G5A product fixes during Phase 2 acceptance.
+- Decision:
+  1. **Web OAuth** — Login/Register Google button → Cognito Hosted UI
+     (`identity_provider=Google`, `prompt: login select_account`, `max_age: 0`);
+     `/auth/callback` exchanges code and continues session. Google button does **not**
+     autofill from the login Email field (hintEmail removed after autofill broke signup).
+  2. **Email-first linking (Way X)** — After federated tokens: look up Postgres
+     `users.email`. If a row exists and `users.id !==` current Cognito `sub`, and a
+     native Cognito user exists for that id: **AdminLinkProviderForUser first**, then
+     **delete** the orphan `Google_*` user (`linkThenDeleteOrphan`). Never delete-then-link.
+     Repeat Google-only sign-in (`users.id === claims.sub`) → `already_linked` (no self-link).
+  3. **G1A nickname** — After link / federated sync, preserve Postgres nickname; do not
+     let Google `name` overwrite L2. Nickname writes go through API
+     `AdminUpdateUserAttributes` (SPA `updateAttributes` lacks
+     `aws.cognito.signin.user.admin` after OAuth).
+  4. **G2A email_verified** — After link / `already_linked`, sync Cognito
+     `email_verified=true` for the destination user.
+  5. **G3A pure Google nickname** — New Google-only users get empty `name` and a blocking
+     `NicknameSetupModal` (not redirect to `/account?setup=nickname`).
+  6. **G4A IdP mapping** — Remove Google IdP `name` mapping in Terraform (email only).
+     Updates ADR-0025 decision 3. Ignore Cognito `username=sub` plan drift (known harmless).
+  7. **G5A link order + isGoogleLinked** — Link before orphan delete; fix linked-session
+     detection; IAM includes `AdminUpdateUserAttributes`.
+  8. **Post-login default** — When no `next`, land on `/` (not `/courses/short`).
+  9. **Out of scope** — Privacy Google disclosure + brand verification (Phase 3);
+     sticky Google account picker is UX friction only (select_account already set; no fix).
+- Rejected alternatives:
+  - Delete orphan before AdminLink — loses DestinationUser if link fails; code uses
+    link-then-delete.
+  - Client-side Cognito `updateAttributes` for nickname after Google OAuth — fails without
+    admin scope; use API Admin path.
+  - Prefill Google authorize with login-form email — caused Hosted UI / signup autofill bugs.
+- Consequences:
+  - Existing email/password users keep one EchoType account when they later use Google.
+  - Pure Google users get a Cognito `Google_*` username until/unless linked; Postgres
+    `users.id` remains Cognito `sub`.
+  - Follow-ups on same capability: `4c51639` (self-link), `ff2b004` (no hintEmail),
+    `5ee7d54` / `99dcd68` (register email guard + copy) — identity SSoT in ADR-0027.
+- Supersedes / superseded-by: Partially updates ADR-0025 IdP attribute mapping (`name` removed).
+
+## ADR-0027 — Account identity: Postgres email as the single source of truth across all sign-in paths
+- Status: Accepted (2026-07-11)
+- Commit/PR anchor: 5ee7d54
+- Plain summary: Account ownership is decided by Postgres `users.email` (globally unique),
+  not by Cognito. Any sign-in path that creates or links an account must look up that email
+  first. Register duplicate prevention is app precheck plus PreSignUp Lambda. Future IdPs
+  must follow the same rule and enumerate Cognito coexistence shapes before shipping.
+- Context: Cognito allows the same email on multiple users (federated `Google_<sub>` and
+  native email-as-username are independent). Cognito does not reject SignUp solely because
+  another user already has that email attribute. Relying on `UsernameExistsException` or
+  `AdminGetUser` alone cannot answer “does EchoType already own this email?”
+- Decision:
+  1. **`users.email` is authoritative** for account uniqueness; **`users.id` = Cognito `sub`**.
+  2. **Any login path** creates or links only after Postgres email lookup:
+     - Row exists → attach to existing `users.id` (Google Way X: AdminLink then delete orphan;
+       see ADR-0026).
+     - No row → new user.
+  3. **Register must block same-email duplicates**: application precheck
+     (`POST /api/auth/email-status` via Cognito `ListUsers`) for UX + **PreSignUp Lambda**
+     (`PreSignUp_SignUp` and `PreSignUp_AdminCreateUser`) as hard stop. Copy:
+     `An account with this email already exists.`
+  4. **`PreSignUp_ExternalProvider` is allowed** even when email already exists so first-time
+     Google entry can create the federated Cognito user; app-side linking (ADR-0026) then
+     reconciles to Postgres.
+  5. **New identity providers** must obey this constraint and **pre-enumerate** all Cognito
+     coexistence shapes with existing native/federated accounts before implementation.
+- Rejected alternatives:
+  - Treat Cognito as source of truth for email uniqueness — false for federated + native.
+  - PreSignUp-only without app precheck — poor UX (opaque Cognito errors).
+  - App precheck only — race / direct SignUp bypass without Lambda.
+- Consequences:
+  - Apple/GitHub (or other) linking can reuse the same email-first gate.
+  - Cognito may show `username=sub` Terraform drift (known harmless; ignore or `-target`).
+  - Orphan federated cleanup after failed/partial flows remains semi-manual today; automate
+    if public self-serve volume warrants it.
+- Known fragility:
+  - PreSignUp does **not** run for paths that never hit the PreSignUp trigger (e.g. some
+    console/Admin mutations, `AdminLinkProviderForUser`). Current product has no public
+    AdminCreateUser signup surface; residual risk accepted.
+  - PreSignUp **does** reject `PreSignUp_AdminCreateUser` when email already exists (same
+    ListUsers check as SignUp) — do not document the opposite.
+  - ExternalProvider intentionally not rejected on email clash (required for Google L2).
+  - Orphan `Google_*` cleanup is semi-automatic (link-then-delete on success paths only).
+- Supersedes / superseded-by: none (complements ADR-0026 / ADR-0015)

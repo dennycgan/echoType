@@ -26,18 +26,18 @@
 ## Phase Roadmap (active capability only)
 Active capability: Google sign-in
 - [x] Phase 1 — GCP OAuth config + Cognito Google IdP
-- [ ] Phase 2 — Web sign-in button + account linking    <-- YOU ARE HERE
-- [ ] Phase 3 — privacy.ts Google data disclosure + Google verification submission
+- [x] Phase 2 — Web sign-in button + account linking
+- [ ] Phase 3 — privacy.ts Google data disclosure + Google verification submission    <-- YOU ARE HERE
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Google sign-in capability — Phase 2 web callback + account linking
-- Sub-steps done: Phase 1 infra prod-verified (`4ac791d`); Hosted UI Google sign-in → `/auth/callback?code=...` (404 expected until Phase 2)
-- Next step: Google sign-in Phase 2 design — `/auth/callback`, sign-in button, account linking
-- Related decisions: ADR-0015, ADR-0022, ADR-0024, ADR-0025
+- Goal (one line): Google sign-in capability — Phase 3 privacy disclosure + Google brand verification
+- Sub-steps done: Phase 1 infra (`4ac791d`); Phase 2 web + linking + nickname + email-dup guard (ADR-0026, ADR-0027; work anchors `32c8107`, `5ee7d54`)
+- Next step: privacy.ts Google data disclosure + Google verification submission (production)
+- Related decisions: ADR-0015, ADR-0022, ADR-0024, ADR-0025, ADR-0026, ADR-0027
 
 ## Contract pointers (don't memorize, go read the source)
 - Stats metrics (definitions/formulas only): docs/STATS.md
@@ -64,6 +64,7 @@ Active capability: Google sign-in
 - API JWT auth: apps/api/src/auth/, probe `apps/api/scripts/auth-phase3-jwt-probe.mjs`
 - Web auth (Cognito SPA): apps/web/src/auth/, apps/web/.env.example, probe `apps/web/scripts/auth-phase4-probe.mjs`, `auth-phase5-probe.mjs`, `auth-phase6-probe.mjs`
 - Google sign-in Phase 1 (infra): `infra/cognito.tf`, `packages/shared/src/cognitoOAuth.ts`, probe `apps/api/scripts/auth-google-phase1-probe.mjs`; GCP OAuth redirect = `terraform output -raw google_oauth_redirect_uri`
+- Google sign-in Phase 2 (web + linking): `apps/web/src/auth/cognitoOAuthExchange.ts`, `NicknameSetupModal.tsx`; API `apps/api/src/auth/federatedLink.ts`, `federatedSync.ts`, `routes/federatedAuth.ts`, `routes/emailStatus.ts`; PreSignUp `infra/lambda/cognito_presignup/`, `infra/cognito_presignup.tf`
 - Account API + page: packages/shared/src/account.ts, apps/api/src/routes/account.ts, apps/web/src/pages/AccountPage.tsx
 - Guest course catalog (local): apps/web/src/guest/guestCoursesStore.ts, apps/web/src/guest/useCourseCatalog.ts
 - Account vs guest writes: useCourseCatalog (data); collection !isGuest UI (CourseListPage, CollectionDetailPage); useRequireAuthAction (e.g. New collection); TypingPage disabled Save
