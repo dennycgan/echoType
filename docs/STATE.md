@@ -16,6 +16,7 @@
 - [x] Custom domain (echotype.ink — ACM + CloudFront alias + Cognito URLs; unblocks Google sign-in → Auth follow-up; ADR-0022)
 - [x] Ops & safety (Sentry + disclaimer/error states; ADR-0023/0024; CloudWatch/rate limiting deferred)
 - [x] Google sign-in (Cognito Google IdP + account linking; ADR-0025–0028)
+- [~] (maintenance) Polish & UX improvements — ongoing    <-- YOU ARE HERE
 
 
 > Each line is a capability, not a sub-step. Completed capabilities stay one line
@@ -24,17 +25,18 @@
 > Top-to-bottom = current execution order. Reorder if priorities change; never leave it unordered.
 
 ## Phase Roadmap (active capability only)
-(none — all listed capabilities complete; expand here when the owner picks the next capability)
+Active capability: Maintenance & polish
+- [~] Ongoing UX improvements and bug fixes (no active phase)
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): none — awaiting next capability choice
-- Sub-steps done: Google sign-in complete (Phases 1–3; ADR-0025–0028; privacy disclosure `34e82b9`)
-- Next step: owner picks next capability (Known debt / polish / new work)
-- Related decisions: ADR-0025, ADR-0026, ADR-0027, ADR-0028
+- Goal (one line): Post-launch maintenance — polish and bug fixes as discovered
+- Sub-steps done: Google sign-in capability closed (ADR-0025–0028)
+- Next step: ongoing
+- Related decisions: see Known debt table
 
 ## Contract pointers (don't memorize, go read the source)
 - Stats metrics (definitions/formulas only): docs/STATS.md
