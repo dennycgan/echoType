@@ -15,7 +15,7 @@
 - [x] Auth (Cognito; replaces demo-user shim; required before sharing externally)
 - [x] Custom domain (echotype.ink — ACM + CloudFront alias + Cognito URLs; unblocks Google sign-in → Auth follow-up; ADR-0022)
 - [x] Ops & safety (Sentry + disclaimer/error states; ADR-0023/0024; CloudWatch/rate limiting deferred)
-- [ ] Google sign-in (Cognito Google IdP + account linking)    <-- YOU ARE HERE
+- [x] Google sign-in (Cognito Google IdP + account linking; ADR-0025–0028)
 
 
 > Each line is a capability, not a sub-step. Completed capabilities stay one line
@@ -24,20 +24,17 @@
 > Top-to-bottom = current execution order. Reorder if priorities change; never leave it unordered.
 
 ## Phase Roadmap (active capability only)
-Active capability: Google sign-in
-- [x] Phase 1 — GCP OAuth config + Cognito Google IdP
-- [x] Phase 2 — Web sign-in button + account linking
-- [ ] Phase 3 — privacy.ts Google data disclosure + Google verification submission    <-- YOU ARE HERE
+(none — all listed capabilities complete; expand here when the owner picks the next capability)
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Google sign-in capability — Phase 3 privacy disclosure + Google brand verification
-- Sub-steps done: Phase 1 infra (`4ac791d`); Phase 2 web + linking + nickname + email-dup guard (ADR-0026, ADR-0027; work anchors `32c8107`, `5ee7d54`)
-- Next step: privacy.ts Google data disclosure + Google verification submission (production)
-- Related decisions: ADR-0015, ADR-0022, ADR-0024, ADR-0025, ADR-0026, ADR-0027
+- Goal (one line): none — awaiting next capability choice
+- Sub-steps done: Google sign-in complete (Phases 1–3; ADR-0025–0028; privacy disclosure `34e82b9`)
+- Next step: owner picks next capability (Known debt / polish / new work)
+- Related decisions: ADR-0025, ADR-0026, ADR-0027, ADR-0028
 
 ## Contract pointers (don't memorize, go read the source)
 - Stats metrics (definitions/formulas only): docs/STATS.md
@@ -91,7 +88,7 @@ Active capability: Google sign-in
 | Annotation | Overlay measurement = mirror offsetTop (lines) + per-glyph getBoundingClientRect (charEdges); NOT Range.getClientRects() | Phase 2 deliberate | do not revert without ADR | ADR-0002 |
 | Auth | Guest typing progress not restored after login | In-memory session only; sign in before starting a session you intend to save | intentional (ADR-0015 §16) | ADR-0015 |
 | Auth | Email change | Deferred if implementation requires extra SES/Lambda cost beyond existing Cognito verify path | Auth Phase 5 cost check, or post-MVP | ADR-0015 |
-| Auth | Google OAuth consent screen shows Cognito domain instead of app name "EchoType" | Two separate issues: (1) Google brand verification required to show app name on consent screen; (2) Cognito custom domain (auth.echotype.ink) would replace long Cognito URL but still not show app name without verification | Future polish | ADR-0022 |
+| Auth | Google OAuth consent screen shows Cognito domain instead of app name "EchoType" | Two separate issues: (1) Google brand verification required to show app name on consent screen; (2) Cognito custom domain (auth.echotype.ink) would replace long Cognito URL but still not show app name without verification | Future polish | ADR-0028 |
 | Ops & safety | CloudWatch structured logging/alarms (planned Ops Phase 2; never shipped) | Current user volume does not warrant | Revisit when user volume warrants | ADR-0023, ADR-0024 |
 | Ops & safety | API rate limiting (planned Ops Phase 3; never shipped) | Same | Same | ADR-0023, ADR-0024 |
 | Custom domain | Wildcard `*.echotype.ink` CNAME still points to Porkbun parking | MVP canonical host is apex only (ADR-0022); ACM cert covers wildcard for future subdomains | future if www or subdomain needed | ADR-0022 |

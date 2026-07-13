@@ -1391,3 +1391,36 @@
   - ExternalProvider intentionally not rejected on email clash (required for Google L2).
   - Orphan `Google_*` cleanup is semi-automatic (link-then-delete on success paths only).
 - Supersedes / superseded-by: none (complements ADR-0026 / ADR-0015)
+
+## ADR-0028 — Google sign-in Phase 3: privacy Google disclosure; brand verification deferred
+- Status: Accepted (2026-07-13)
+- Commit/PR anchor: 34e82b9
+- Plain summary: Privacy policy discloses Google sign-in data use (email + display name via
+  OAuth; create/link account; no Google password). Google brand verification is **not**
+  submitted. Capability Google sign-in is complete.
+- Context: ADR-0024 deferred Google user-data copy to this capability. Phase 3 STATE line
+  originally bundled “verification submission”; owner accepted privacy-only after confirming
+  Cognito/SPA scopes are only `openid email profile` (non-sensitive Sign-In). Official Google
+  OAuth app-state rules: with basic identity scopes only, Testing apps need not use the test
+  user allowlist, are not under the sensitive-scope 100-user cap, and are exempt from the
+  7-day Testing refresh-token penalty; a Testing warning UI may still appear (not the
+  unverified Danger UI). Brand verification would only improve consent branding (app name),
+  already tracked as Known debt.
+- Decision:
+  1. **Privacy** — Add labeled block `Google sign-in:` under “What we collect” (after Account
+     data) in `apps/web/src/content/legal/privacy.ts`. Keep `lastUpdated: July 2026`. Extend
+     `privacy.test.ts` and `ops-phase2-probe.mjs` contract checks. Homepage unchanged (footer
+     Privacy link only).
+  2. **Brand verification** — Do **not** submit GCP OAuth brand verification or require
+     Publishing=Production for Phase 3 acceptance. Residual consent branding (Cognito domain
+     vs “EchoType”) remains Known debt.
+  3. **Capability close** — Mark Google sign-in complete after prod privacy acceptance
+     (`deploy-web`); no next capability queued in STATE until the owner picks one.
+- Rejected alternatives:
+  - Bundle brand verification / Production publish into Phase 3 — no product gain for basic
+    scopes; polish only.
+  - Add in-page Privacy link on HomePage — footer sufficient for this phase.
+- Consequences:
+  - Prod: https://echotype.ink/privacy shows Google disclosure.
+  - Active capability queue empty until next owner choice.
+- Supersedes / superseded-by: Completes the Google disclosure deferred in ADR-0024.
