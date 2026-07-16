@@ -51,6 +51,11 @@ export type FederatedLinkInput = {
   idPayload: Record<string, unknown>;
 };
 
+export type FederatedLinkOutcome = FederatedLinkResult & {
+  /** Internal routing detail; stripped before the API response is sent. */
+  nativeUsername?: string;
+};
+
 function orphanUsernameFromGoogleSub(googleSub: string): string {
   return `Google_${googleSub}`;
 }
@@ -144,14 +149,19 @@ export async function linkGoogleFederatedUser(
   input: FederatedLinkInput,
   admin: CognitoAdminPort = defaultCognitoAdmin,
   userLookup: UserLookupPort = defaultUserLookup,
-): Promise<FederatedLinkResult> {
+): Promise<FederatedLinkOutcome> {
   const claims = parseFederatedTokenClaims(input.accessPayload, input.idPayload);
   if (!claims) {
     throw new Error('invalid_token_claims');
   }
 
   if (claims.isGoogleLinked) {
-    return { linked: false, requiresReauth: false, reason: 'already_linked' };
+    return {
+      linked: false,
+      requiresReauth: false,
+      reason: 'already_linked',
+      nativeUsername: claims.cognitoUsername,
+    };
   }
 
   if (!claims.isOrphanGoogleSession) {
@@ -175,7 +185,12 @@ export async function linkGoogleFederatedUser(
     // Pure Google signup already created Postgres row with id === Cognito sub. Do not
     // AdminLink Google onto itself (InvalidParameterException on repeat sign-in).
     if (nativeUser.id === claims.sub) {
-      return { linked: false, requiresReauth: false, reason: 'already_linked' };
+      return {
+        linked: false,
+        requiresReauth: false,
+        reason: 'already_linked',
+        nativeUsername: claims.cognitoUsername,
+      };
     }
 
     if (!(await nativeCognitoUserExists(nativeUser.id, admin))) {
@@ -188,7 +203,7 @@ export async function linkGoogleFederatedUser(
 
   try {
     await linkThenDeleteOrphan(nativeUsername, claims.googleSub, orphanUsername, admin);
-    return { linked: true, requiresReauth: true, reason: 'linked' };
+    return { linked: true, requiresReauth: true, reason: 'linked', nativeUsername };
   } catch (err) {
     if (isMergingNotSupportedError(err)) {
       // Hosted UI creates the orphan Google_* user before the API ever sees tokens,
@@ -200,7 +215,7 @@ export async function linkGoogleFederatedUser(
       // sign-in recreates the orphan and the native user is untouched.
       await deleteOrphanIfPresent(orphanUsername, admin);
       await attemptLink(nativeUsername, claims.googleSub, admin);
-      return { linked: true, requiresReauth: true, reason: 'linked' };
+      return { linked: true, requiresReauth: true, reason: 'linked', nativeUsername };
     }
 
     if (isAliasExistsError(err)) {
@@ -209,12 +224,12 @@ export async function linkGoogleFederatedUser(
       }
 
       await linkThenDeleteOrphan(nativeUsername, claims.googleSub, orphanUsername, admin);
-      return { linked: true, requiresReauth: true, reason: 'linked' };
+      return { linked: true, requiresReauth: true, reason: 'linked', nativeUsername };
     }
 
     if (isMisleadingLinkedInvalidParameterError(err)) {
       await deleteOrphanIfPresent(orphanUsername, admin);
-      return { linked: true, requiresReauth: true, reason: 'linked' };
+      return { linked: true, requiresReauth: true, reason: 'linked', nativeUsername };
     }
 
     if (isUserNotFoundError(err)) {

@@ -45,6 +45,7 @@ describe('linkGoogleFederatedUser', () => {
       linked: false,
       requiresReauth: false,
       reason: 'already_linked',
+      nativeUsername: 'e9be9418-40a1-70ee-de57-e2f27405b3bb',
     });
   });
 
@@ -91,6 +92,7 @@ describe('linkGoogleFederatedUser', () => {
       linked: false,
       requiresReauth: false,
       reason: 'already_linked',
+      nativeUsername: 'Google_107121059094644779940',
     });
   });
 
@@ -188,6 +190,7 @@ describe('linkGoogleFederatedUser', () => {
       linked: true,
       requiresReauth: true,
       reason: 'linked',
+      nativeUsername,
     });
     assert.equal(listedEmail, 'pending-native@example.com');
     assert.equal(linkedNative, nativeUsername);
@@ -285,6 +288,7 @@ describe('linkGoogleFederatedUser', () => {
       linked: true,
       requiresReauth: true,
       reason: 'linked',
+      nativeUsername,
     });
     assert.equal(linkCalls, 2);
     assert.deepEqual(order, ['link', 'delete:Google_107121059094644779940', 'link']);
@@ -408,6 +412,7 @@ describe('linkGoogleFederatedUser', () => {
       linked: true,
       requiresReauth: true,
       reason: 'linked',
+      nativeUsername: nativeUserId,
     });
     assert.equal(linkedNative, nativeUserId);
     assert.equal(linkedGoogleSub, '107121059094644779940');
@@ -459,6 +464,7 @@ describe('linkGoogleFederatedUser', () => {
       linked: true,
       requiresReauth: true,
       reason: 'linked',
+      nativeUsername: nativeUserId,
     });
     assert.equal(linkCalls, 2);
     assert.equal(deleteCount, 1);
@@ -502,6 +508,7 @@ describe('linkGoogleFederatedUser', () => {
       linked: true,
       requiresReauth: true,
       reason: 'linked',
+      nativeUsername: nativeUserId,
     });
     assert.equal(deleteCount, 1);
   });

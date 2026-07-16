@@ -30,6 +30,45 @@ export async function adminGetUserPoolUsername(params: {
   return res.Username ?? params.usernameOrAlias;
 }
 
+export type CognitoNativeUserProfile = {
+  username: string;
+  sub: string;
+  email: string;
+  name: string;
+};
+
+export async function adminGetNativeUserProfile(params: {
+  userPoolId: string;
+  username: string;
+}): Promise<CognitoNativeUserProfile> {
+  const res = await getClient().send(
+    new AdminGetUserCommand({
+      UserPoolId: params.userPoolId,
+      Username: params.username,
+    }),
+  );
+  const attributes = Object.fromEntries(
+    (res.UserAttributes ?? [])
+      .filter((attribute): attribute is { Name: string; Value: string } =>
+        Boolean(attribute.Name && attribute.Value),
+      )
+      .map((attribute) => [attribute.Name, attribute.Value]),
+  );
+  const sub = attributes.sub?.trim();
+  const email = attributes.email?.trim();
+  const name = attributes.name?.trim();
+  if (!sub || !email || !name) {
+    throw new Error('native_profile_incomplete');
+  }
+
+  return {
+    username: res.Username ?? params.username,
+    sub,
+    email,
+    name,
+  };
+}
+
 export async function adminLinkGoogleToNativeUser(params: {
   userPoolId: string;
   nativeUsername: string;

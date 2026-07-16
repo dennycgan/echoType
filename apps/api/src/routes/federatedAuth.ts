@@ -1,8 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { claimsFromFederatedTokens } from '../auth/cognitoUserProfile.js';
+import {
+  adminGetNativeUserProfile,
+  type CognitoNativeUserProfile,
+} from '../auth/cognitoAdmin.js';
+import { loadCognitoConfig } from '../auth/cognitoConfig.js';
 import { ensureUser, resolveUserProfile } from '../auth/ensureUser.js';
-import { linkGoogleFederatedUser } from '../auth/federatedLink.js';
+import {
+  linkGoogleFederatedUser,
+  type FederatedLinkOutcome,
+} from '../auth/federatedLink.js';
 import { syncNativeLinkedAttributes } from '../auth/federatedSync.js';
 import { prisma } from '../prisma.js';
 import { verifyAccessToken } from '../auth/verifyAccessToken.js';
@@ -19,13 +27,83 @@ function bearerToken(authorization: string | undefined): string | null {
   return token || null;
 }
 
-async function syncLinkedNativeByEmail(email: string): Promise<void> {
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, name: true },
+type LinkedNativeUser = { id: string; name: string };
+
+export type LinkedNativeAccountDeps = {
+  findUserByEmail: (email: string) => Promise<LinkedNativeUser | null>;
+  getNativeProfile: (nativeUsername: string) => Promise<CognitoNativeUserProfile>;
+  upsertUserByEmail: (profile: {
+    id: string;
+    email: string;
+    name: string;
+  }) => Promise<LinkedNativeUser>;
+  syncNativeAttributes: (nativeUsername: string, name: string) => Promise<void>;
+};
+
+const defaultLinkedNativeAccountDeps: LinkedNativeAccountDeps = {
+  findUserByEmail: (email) =>
+    prisma.user.findUnique({
+      where: { email },
+      select: { id: true, name: true },
+    }),
+  getNativeProfile: (nativeUsername) => {
+    const { userPoolId } = loadCognitoConfig();
+    return adminGetNativeUserProfile({ userPoolId, username: nativeUsername });
+  },
+  upsertUserByEmail: ({ id, email, name }) =>
+    prisma.user.upsert({
+      where: { email },
+      create: { id, email, name },
+      update: {},
+      select: { id: true, name: true },
+    }),
+  syncNativeAttributes: syncNativeLinkedAttributes,
+};
+
+export async function ensureLinkedNativeAccount(
+  email: string,
+  nativeUsername: string,
+  deps: LinkedNativeAccountDeps = defaultLinkedNativeAccountDeps,
+): Promise<void> {
+  const existing = await deps.findUserByEmail(email);
+  if (existing) {
+    await deps.syncNativeAttributes(existing.id, existing.name);
+    return;
+  }
+
+  const profile = await deps.getNativeProfile(nativeUsername);
+  if (profile.email.toLowerCase() !== email.trim().toLowerCase()) {
+    throw new Error('native_email_mismatch');
+  }
+
+  const user = await deps.upsertUserByEmail({
+    id: profile.sub,
+    email: profile.email,
+    name: profile.name,
   });
-  if (!user) return;
-  await syncNativeLinkedAttributes(user.id, user.name);
+  if (user.id !== profile.sub) {
+    throw new Error('native_identity_conflict');
+  }
+  await deps.syncNativeAttributes(profile.username, user.name);
+}
+
+export async function reconcileLinkedNativeAccount(
+  result: FederatedLinkOutcome,
+  accessPayload: Record<string, unknown>,
+  idPayload: Record<string, unknown>,
+  deps: LinkedNativeAccountDeps = defaultLinkedNativeAccountDeps,
+): Promise<void> {
+  if (result.reason !== 'linked' && result.reason !== 'already_linked') return;
+
+  const claims = parseFederatedTokenClaims(accessPayload, idPayload);
+  if (!claims) {
+    throw new Error('invalid_token_claims');
+  }
+  await ensureLinkedNativeAccount(
+    claims.email,
+    result.nativeUsername ?? claims.cognitoUsername,
+    deps,
+  );
 }
 
 export async function registerFederatedAuthRoutes(api: FastifyInstance) {
@@ -56,19 +134,7 @@ export async function registerFederatedAuthRoutes(api: FastifyInstance) {
     try {
       const result = await linkGoogleFederatedUser({ accessPayload, idPayload });
 
-      if (result.reason === 'already_linked') {
-        const claims = parseFederatedTokenClaims(accessPayload, idPayload);
-        if (claims?.email) {
-          await syncLinkedNativeByEmail(claims.email);
-        }
-      }
-
-      if (result.reason === 'linked') {
-        const claims = parseFederatedTokenClaims(accessPayload, idPayload);
-        if (claims?.email) {
-          await syncLinkedNativeByEmail(claims.email);
-        }
-      }
+      await reconcileLinkedNativeAccount(result, accessPayload, idPayload);
 
       if (result.reason === 'new_user') {
         const claims = claimsFromFederatedTokens(accessPayload, idPayload);
@@ -83,7 +149,11 @@ export async function registerFederatedAuthRoutes(api: FastifyInstance) {
         return { ...result, needsNicknameSetup: true };
       }
 
-      return result;
+      return {
+        linked: result.linked,
+        requiresReauth: result.requiresReauth,
+        reason: result.reason,
+      };
     } catch (err) {
       const code =
         err instanceof Error && err.message === 'google_sub_missing'
