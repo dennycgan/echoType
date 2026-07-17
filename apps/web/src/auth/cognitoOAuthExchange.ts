@@ -250,13 +250,7 @@ export async function exchangeAuthorizationCode(code: string): Promise<CognitoTo
   });
 
   if (!res.ok) {
-    const errorBody = await res.text().catch(() => '(unreadable)');
-    console.log('[callback] token exchange failed', {
-      status: res.status,
-      body: errorBody,
-      code: code.slice(0, 8),
-      timestamp: Date.now(),
-    });
+    const errorBody = await res.text().catch(() => '');
     let errorCode: string | undefined;
     try {
       const parsed = JSON.parse(errorBody) as { error?: unknown };

@@ -29,12 +29,6 @@ export function AuthCallbackPage() {
       window.history.replaceState({}, document.title, '/auth/callback');
     }
 
-    console.log('[callback] completeOAuthCallbackOnce called', {
-      code: code?.slice(0, 8),
-      state: state?.slice(0, 8),
-      timestamp: Date.now(),
-    });
-
     void completeOAuthCallbackOnce({
       oauthError,
       code,
