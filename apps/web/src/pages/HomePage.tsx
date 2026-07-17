@@ -1,11 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ACCOUNT_DELETED_FLASH } from '../auth/accountDelete';
-import { AUTH_FLASH_ERROR_KEY } from '../auth/cognitoOAuthExchange';
+import {
+  AUTH_FLASH_ERROR_KEY,
+  consumeStaleSessionRetry,
+  startGoogleSignIn,
+} from '../auth/cognitoOAuthExchange';
+import { PageLoading } from '../components/page-status/PageLoading';
 
 export function HomePage() {
   const [flash, setFlash] = useState<string | null>(null);
   const [flashError, setFlashError] = useState<string | null>(null);
+  const [staleSessionRetry] = useState(() => consumeStaleSessionRetry());
+
+  useLayoutEffect(() => {
+    if (!staleSessionRetry) return;
+    void startGoogleSignIn(staleSessionRetry.nextPath, staleSessionRetry.hintEmail).catch(() => {
+      sessionStorage.setItem(
+        AUTH_FLASH_ERROR_KEY,
+        'Google sign-in is not available right now. Try again.',
+      );
+      window.location.replace('/');
+    });
+  }, [staleSessionRetry]);
 
   useEffect(() => {
     const error = sessionStorage.getItem(AUTH_FLASH_ERROR_KEY);
@@ -19,6 +36,10 @@ export function HomePage() {
       setFlash(message);
     }
   }, []);
+
+  if (staleSessionRetry) {
+    return <PageLoading label="Refreshing your Google sign-in…" />;
+  }
 
   return (
     <div className="space-y-6">

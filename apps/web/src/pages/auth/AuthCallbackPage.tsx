@@ -4,6 +4,7 @@ import { AuthLayout } from '../../auth/AuthLayout';
 import {
   completeOAuthCallbackOnce,
   redirectToHostedUiLogout,
+  saveStaleSessionRetry,
   shouldClearHostedUiAfterCallbackError,
   startGoogleSignIn,
 } from '../../auth/cognitoOAuthExchange';
@@ -40,6 +41,18 @@ export function AuthCallbackPage() {
       state,
     }).then((outcome) => {
       if (cancelled) return;
+
+      if (outcome.kind === 'stale_session_retry') {
+        saveStaleSessionRetry({
+          nextPath: outcome.nextPath,
+          hintEmail: outcome.hintEmail,
+          createdAt: Date.now(),
+        });
+        // This existing path calls clearPendingOAuth(), so REAUTH_COUNT is zero
+        // before HomePage starts the automatic retry after Cognito logout.
+        redirectToHostedUiLogout('/');
+        return;
+      }
 
       if (outcome.kind === 'error') {
         if (shouldClearHostedUiAfterCallbackError(outcome.message)) {

@@ -20,7 +20,9 @@ import { assertCognitoOAuthConfig, oauthRedirectUri } from './cognitoOAuthConfig
 const PKCE_STORAGE_KEY = 'echotype.oauth.pkce';
 const STATE_NONCE_STORAGE_KEY = 'echotype.oauth.stateNonce';
 const REAUTH_COUNT_KEY = 'echotype.oauth.reauthCount';
+const STALE_SESSION_RETRY_KEY = 'echotype.oauth.staleSessionRetry';
 const MAX_OAUTH_REAUTH = 1;
+const STALE_SESSION_RETRY_MAX_AGE_MS = 2 * 60 * 1000;
 
 /** Prevents Strict Mode from starting two PKCE flows (second overwrites verifier → invalid_grant). */
 let googleSignInRedirectStarted = false;
@@ -37,7 +39,69 @@ const completedOAuthCallbacks = new Map<string, OAuthCallbackOutcome>();
 export type OAuthCallbackOutcome =
   | { kind: 'error'; message: string }
   | { kind: 'redirect'; destination: string; flashGuest: boolean }
-  | { kind: 'reauth'; nextPath: string; hintEmail?: string };
+  | { kind: 'reauth'; nextPath: string; hintEmail?: string }
+  | { kind: 'stale_session_retry'; nextPath: string; hintEmail?: string };
+
+export type StaleSessionRetry = {
+  nextPath: string;
+  hintEmail?: string;
+  createdAt: number;
+};
+
+type SessionStorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+class TokenExchangeError extends Error {
+  constructor(readonly errorCode?: string) {
+    super('token_exchange_failed');
+    this.name = 'TokenExchangeError';
+  }
+}
+
+export function shouldRetryStaleCognitoSession(
+  errorCode: string | undefined,
+  reauthCount: number,
+): boolean {
+  return errorCode === 'invalid_grant' && reauthCount === MAX_OAUTH_REAUTH;
+}
+
+export function saveStaleSessionRetry(
+  retry: StaleSessionRetry,
+  storage: SessionStorageLike = sessionStorage,
+): void {
+  storage.setItem(STALE_SESSION_RETRY_KEY, JSON.stringify(retry));
+}
+
+export function consumeStaleSessionRetry(
+  storage: SessionStorageLike = sessionStorage,
+  now = Date.now(),
+): StaleSessionRetry | null {
+  const raw = storage.getItem(STALE_SESSION_RETRY_KEY);
+  storage.removeItem(STALE_SESSION_RETRY_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<StaleSessionRetry>;
+    const nextPath = parsed.nextPath;
+    const createdAt = parsed.createdAt;
+    if (
+      typeof nextPath !== 'string' ||
+      !nextPath.startsWith('/') ||
+      nextPath.startsWith('//') ||
+      typeof createdAt !== 'number' ||
+      now - createdAt < 0 ||
+      now - createdAt > STALE_SESSION_RETRY_MAX_AGE_MS
+    ) {
+      return null;
+    }
+    return {
+      nextPath,
+      createdAt,
+      hintEmail: typeof parsed.hintEmail === 'string' ? parsed.hintEmail : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
 
 function linkFailedMessage(body: unknown): string {
   if (body && typeof body === 'object') {
@@ -178,7 +242,14 @@ export async function exchangeAuthorizationCode(code: string): Promise<CognitoTo
       code: code.slice(0, 8),
       timestamp: Date.now(),
     });
-    throw new Error('token_exchange_failed');
+    let errorCode: string | undefined;
+    try {
+      const parsed = JSON.parse(errorBody) as { error?: unknown };
+      if (typeof parsed.error === 'string') errorCode = parsed.error;
+    } catch {
+      // Keep the generic token exchange error when Cognito returns a non-JSON body.
+    }
+    throw new TokenExchangeError(errorCode);
   }
 
   clearPendingPkce();
@@ -389,6 +460,14 @@ export function completeOAuthCallbackOnce(input: {
       };
     } catch (err) {
       clearAuthSession();
+      const reauthCount = Number(sessionStorage.getItem(REAUTH_COUNT_KEY) ?? 0);
+      if (
+        err instanceof TokenExchangeError &&
+        shouldRetryStaleCognitoSession(err.errorCode, reauthCount)
+      ) {
+        clearPendingPkce();
+        return { kind: 'stale_session_retry', nextPath, hintEmail };
+      }
       clearPendingOAuth();
       return { kind: 'error', message: callbackErrorMessage(err) };
     } finally {
