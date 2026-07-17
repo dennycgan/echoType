@@ -1352,6 +1352,12 @@
   with `InvalidParameterException` ("Merging is not currently supported…"). Recovery is
   still link-first: catch that specific message → delete orphan → retry link once. Other
   paths keep link-then-delete; the product did **not** switch to global delete-first.
+- Amendment (2026-07-17, `b268219`): Decision 1's `prompt: login select_account` +
+  `max_age: 0` still applies to **user-initiated** Continue with Google. Automatic legs
+  (post-link reauth and stale-session retry) pass `{ autoReuse: true }` and omit
+  `prompt`/`max_age` so EchoType does not force a second picker. Google may still show
+  its own chooser (see ADR-0027 addendum). Decision 9's "sticky picker / no fix" refers
+  to the user-initiated path only.
 - Supersedes / superseded-by: Partially updates ADR-0025 IdP attribute mapping (`name` removed).
   Decision 2 partially superseded by amendment above (`c49b890`).
 
@@ -1416,6 +1422,21 @@
      best-effort; `a2ad035`, `b268219`).
   4. **Google-only account without password** — intentional Known debt: no
      AdminSetUserPassword path yet (STATE).
+- Amendment (2026-07-17, `43a0035`): Decision 2's "No row → new user" is refined. After a
+  Postgres email miss, look up Cognito for a **CONFIRMED** native user with that email
+  (`ListUsers`). If found → AdminLink to that native username (not `new_user`). Only when
+  no confirmed native exists → `new_user`. Materialize Postgres after link via
+  `AdminGetUser` nickname (`4bf4d51`); onboarding remains `/api/onboarding/seed`.
+- Addendum — Cognito Hosted UI architectural constraint (2026-07-17):
+  Cognito Hosted UI cannot forward `login_hint` to Google IdP (AWS documented limitation).
+  During L2 linking with stale-session recovery, automatic legs (reauth and HomePage
+  retry) may still reach Google's account chooser on multi-account browsers.
+  Workaround: `{ autoReuse: true }` omits EchoType-side `prompt=select_account` /
+  `max_age` on those automatic legs; Google may still show a chooser at its discretion.
+  Complete fix: redesign Google→Cognito initiation to bypass Hosted UI so a `login_hint`
+  can reach Google (User Pool federation today still depends on Cognito
+  authorize/`idpresponse`; this is an OAuth-initiation rewrite, not a one-line URL change).
+  Deferred. Single-account users are typically unaffected by the second chooser.
 - Supersedes / superseded-by: none (complements ADR-0026 / ADR-0015)
 
 ## ADR-0028 — Google sign-in Phase 3: privacy Google disclosure; brand verification deferred
