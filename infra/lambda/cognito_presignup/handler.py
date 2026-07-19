@@ -1,6 +1,8 @@
 """Cognito PreSignUp: block native SignUp when email already exists (incl. Google_*).
 
 ExternalProvider (Google) is always allowed so app-side L2 linking still works.
+AdminCreateUser is allowed when only Google_* users hold the email (the API's
+Google-only -> native password conversion; no public AdminCreateUser entry point).
 """
 
 from __future__ import annotations
@@ -34,9 +36,20 @@ def handler(event, _context):
             resp = client.list_users(
                 UserPoolId=pool_id,
                 Filter=f'email = "{safe}"',
-                Limit=1,
+                Limit=5,
             )
-            if resp.get("Users"):
+            existing = resp.get("Users") or []
+            if trigger == "PreSignUp_AdminCreateUser":
+                # Google-only -> native password conversion (create-first): the API
+                # creates a native twin while the Google_* orphan still holds the
+                # email. AdminCreateUser has no public entry point, so allowing it
+                # when every existing holder is a Google_* federated profile does
+                # not weaken the public SignUp guard.
+                existing = [
+                    u for u in existing
+                    if not (u.get("Username") or "").startswith("Google_")
+                ]
+            if existing:
                 raise Exception(EMAIL_EXISTS_MESSAGE)
 
     return event

@@ -189,17 +189,19 @@ resource "aws_iam_role_policy" "ec2_params" {
   policy = data.aws_iam_policy_document.ec2_params.json
 }
 
-# Google sign-in Phase 2: EC2 API links federated Google users to existing native
-# profiles (AdminLinkProviderForUser) and may admin-delete Cognito users when the
-# account API cannot use password re-auth (AdminDeleteUser). Scoped to this pool only.
+# EC2 API links federated Google users, manages linked profile attributes/deletion,
+# and converts Google-only users to native users with a password (delete orphan ->
+# AdminCreateUser -> AdminSetUserPassword -> AdminLink). Scoped to this pool only.
 data "aws_iam_policy_document" "ec2_cognito_admin" {
   statement {
-    sid    = "CognitoLinkAndDeleteUsers"
+    sid    = "CognitoAdminUsers"
     effect = "Allow"
     actions = [
       "cognito-idp:AdminGetUser",
+      "cognito-idp:AdminCreateUser",
       "cognito-idp:AdminLinkProviderForUser",
       "cognito-idp:AdminDeleteUser",
+      "cognito-idp:AdminSetUserPassword",
       "cognito-idp:AdminUpdateUserAttributes",
       "cognito-idp:ListUsers",
     ]

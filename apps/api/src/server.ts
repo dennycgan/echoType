@@ -33,6 +33,8 @@ const app = Fastify({
 declare module 'fastify' {
   interface FastifyRequest {
     userId: string;
+    /** Cognito pool username from the access token (Google_<sub> for federated); native username == sub. */
+    cognitoUsername: string;
   }
 }
 

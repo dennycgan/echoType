@@ -4,6 +4,7 @@ import { EMAIL_ALREADY_EXISTS_MESSAGE } from '@echotype/shared';
 import { AuthLayout } from '../../auth/AuthLayout.js';
 import { useAuth } from '../../auth/AuthProvider.js';
 import { validatePassword } from '../../auth/passwordPolicy.js';
+import { PasswordInput } from '../../components/auth/PasswordInput.js';
 import { api } from '../../lib/api.js';
 
 export function RegisterPage() {
@@ -12,6 +13,7 @@ export function RegisterPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -27,6 +29,10 @@ export function RegisterPage() {
     const passwordError = validatePassword(password);
     if (passwordError) {
       setError(passwordError);
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
 
@@ -78,17 +84,18 @@ export function RegisterPage() {
         </label>
         <label className="block text-sm">
           <span className="text-slate-700">Password</span>
-          <input
-            type="password"
-            required
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-          />
+          <PasswordInput value={password} onChange={setPassword} autoComplete="new-password" />
           <span className="mt-1 block text-xs text-slate-500">
             At least 8 characters with uppercase, lowercase, and a number.
           </span>
+        </label>
+        <label className="block text-sm">
+          <span className="text-slate-700">Confirm password</span>
+          <PasswordInput
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            autoComplete="new-password"
+          />
         </label>
           {error && (
           <p className="text-sm text-red-600" role="alert">

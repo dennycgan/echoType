@@ -244,6 +244,11 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify(opts ?? {}),
     }),
+  setPassword: (newPassword: string) =>
+    request<void>('/account/set-password', {
+      method: 'POST',
+      body: JSON.stringify({ newPassword }),
+    }),
   linkFederated: (idToken: string) =>
     request<FederatedLinkResult>('/auth/federated/link', {
       method: 'POST',

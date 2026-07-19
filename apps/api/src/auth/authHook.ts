@@ -51,6 +51,7 @@ export async function registerAuthHook(app: FastifyInstance) {
         preserveNickname: federated?.isGoogleLinked === true,
       });
       req.userId = user.id;
+      req.cognitoUsername = claims.username ?? claims.sub;
     } catch (err) {
       if (err instanceof ProfileIncompleteError) {
         return reply.status(403).send({ error: 'profile_incomplete' });

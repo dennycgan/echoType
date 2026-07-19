@@ -12,7 +12,12 @@ import {
   loadAuthSession,
   persistCognitoSession,
 } from './authSession.js';
-import { isOrphanGoogleSession, logoutWithHostedUiClear } from './cognitoOAuthExchange.js';
+import {
+  clearPendingOAuth,
+  isOrphanGoogleSession,
+  logoutWithHostedUiClear,
+  resetGoogleSignInRedirectGuard,
+} from './cognitoOAuthExchange.js';
 import {
   changePassword as cognitoChangePassword,
   confirmSignUp,
@@ -36,7 +41,12 @@ export type AuthContextValue = {
   displayName: string | null;
   email: string | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => boolean;
+  /**
+   * Ends the app session. Default also clears the Cognito Hosted UI SSO cookie
+   * (redirects to `/`). Pass `{ clearHostedUi: false }` when the caller needs to
+   * navigate to a specific page afterward (e.g. set-password → /login?pwset=1).
+   */
+  logout: (opts?: { clearHostedUi?: boolean }) => boolean;
   register: (email: string, password: string, nickname: string) => Promise<void>;
   confirmEmail: (email: string, code: string) => Promise<void>;
   resendCode: (email: string) => Promise<void>;
@@ -110,14 +120,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [syncFromSession],
   );
 
-  const logout = useCallback((): boolean => {
-    queryClient.clear();
-    const redirecting = logoutWithHostedUiClear();
-    if (!redirecting) {
-      syncFromSession();
-    }
-    return redirecting;
-  }, [queryClient, syncFromSession]);
+  const logout = useCallback(
+    (opts?: { clearHostedUi?: boolean }): boolean => {
+      queryClient.clear();
+      if (opts?.clearHostedUi === false) {
+        // Local sign-out only — caller owns the next navigation.
+        resetGoogleSignInRedirectGuard();
+        clearAuthSession();
+        clearPendingOAuth();
+        syncFromSession();
+        return false;
+      }
+      const redirecting = logoutWithHostedUiClear();
+      if (!redirecting) {
+        syncFromSession();
+      }
+      return redirecting;
+    },
+    [queryClient, syncFromSession],
+  );
 
   const register = useCallback(async (regEmail: string, password: string, nickname: string) => {
     await signUp(regEmail, password, nickname);

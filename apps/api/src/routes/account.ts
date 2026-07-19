@@ -1,8 +1,15 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { User } from '@prisma/client';
-import { UpdateAccountInput, type AccountDTO, needsNicknameSetup } from '@echotype/shared';
+import {
+  SetPasswordInput,
+  UpdateAccountInput,
+  type AccountDTO,
+  isPureGoogleCognitoUser,
+  needsNicknameSetup,
+} from '@echotype/shared';
 import { parseFederatedTokenClaims } from '@echotype/shared';
-import { adminDeleteCognitoUser } from '../auth/cognitoAdmin.js';
+import { adminDeleteCognitoUser, adminGetUserPasswordFacts } from '../auth/cognitoAdmin.js';
+import { setPasswordForGoogleOnlyUser } from '../auth/googlePasswordSetup.js';
 import { loadCognitoConfig } from '../auth/cognitoConfig.js';
 import { syncAccountNicknameToCognito } from '../auth/syncAccountNicknameToCognito.js';
 import { verifyAccessToken } from '../auth/verifyAccessToken.js';
@@ -15,14 +22,31 @@ const DeleteAccountBody = z.object({
   adminCognitoDelete: z.boolean().optional(),
 });
 
-function toAccountDTO(user: User): AccountDTO {
+function toAccountDTO(user: User, canSetPassword: boolean): AccountDTO {
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     needsNicknameSetup: needsNicknameSetup(user.name),
     onboardingSeededAt: user.onboardingSeededAt?.toISOString() ?? null,
+    canSetPassword,
   };
+}
+
+/** Queried live per request (ADR: no caching) so the flag flips right after set-password. */
+async function resolveCanSetPassword(req: FastifyRequest): Promise<boolean> {
+  try {
+    const { userPoolId } = loadCognitoConfig();
+    const facts = await adminGetUserPasswordFacts({
+      userPoolId,
+      username: req.cognitoUsername,
+    });
+    return isPureGoogleCognitoUser(facts.userStatus, facts.identitiesRaw);
+  } catch (err) {
+    // Degrade to false: account page still loads, set-password section just hides.
+    req.log.error({ err }, 'canSetPassword lookup failed');
+    return false;
+  }
 }
 
 function bearerToken(authorization: string | undefined): string | null {
@@ -33,8 +57,41 @@ function bearerToken(authorization: string | undefined): string | null {
 
 export async function registerAccountRoutes(api: FastifyInstance) {
   api.get('/account', async (req) => {
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: req.userId } });
-    return toAccountDTO(user);
+    const [user, canSetPassword] = await Promise.all([
+      prisma.user.findUniqueOrThrow({ where: { id: req.userId } }),
+      resolveCanSetPassword(req),
+    ]);
+    return toAccountDTO(user, canSetPassword);
+  });
+
+  api.post('/account/set-password', async (req, reply) => {
+    const parsed = SetPasswordInput.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'validation_error', issues: parsed.error.issues });
+    }
+
+    // Converts the Google-only federated user to a linked native user; eligibility
+    // is re-checked live inside (only pure Google users without a password).
+    try {
+      const result = await setPasswordForGoogleOnlyUser(
+        {
+          userId: req.userId,
+          cognitoUsername: req.cognitoUsername,
+          newPassword: parsed.data.newPassword,
+        },
+        undefined,
+        req.log,
+      );
+      if (result.kind === 'not_eligible') {
+        return reply.status(400).send({ error: 'password_already_set' });
+      }
+    } catch (err) {
+      req.log.error({ err }, 'google-only set-password conversion failed');
+      return reply.status(502).send({ error: 'cognito_set_password_failed' });
+    }
+
+    // Session tokens now belong to the deleted federated user; client logs out.
+    return reply.status(204).send();
   });
 
   api.put('/account', async (req, reply) => {
@@ -60,7 +117,7 @@ export async function registerAccountRoutes(api: FastifyInstance) {
       return reply.status(502).send({ error: 'cognito_sync_failed' });
     }
 
-    return toAccountDTO(user);
+    return toAccountDTO(user, await resolveCanSetPassword(req));
   });
 
   api.delete('/account', async (req, reply) => {

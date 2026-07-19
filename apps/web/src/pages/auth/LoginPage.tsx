@@ -4,6 +4,8 @@ import { AuthLayout } from '../../auth/AuthLayout';
 import { useAuth } from '../../auth/AuthProvider';
 import { AUTH_FLASH_ERROR_KEY, startGoogleSignIn } from '../../auth/cognitoOAuthExchange';
 import { isUserNotFound } from '../../auth/mapCognitoError';
+import { PASSWORD_CHANGED_LOGIN_MESSAGE } from '../../auth/passwordMessages';
+import { PasswordInput } from '../../components/auth/PasswordInput';
 import { GUEST_LOGIN_TOAST, resolvePostLoginPath } from '../../auth/resolvePostLoginPath';
 
 export function LoginPage() {
@@ -13,6 +15,7 @@ export function LoginPage() {
   const next = params.get('next') || '/';
   const verified = params.get('verified') === '1';
   const reset = params.get('reset') === '1';
+  const pwset = params.get('pwset') === '1';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,8 +78,8 @@ export function LoginPage() {
       {verified && (
         <p className="mt-2 text-sm text-green-700">Email verified. You can sign in now.</p>
       )}
-      {reset && (
-        <p className="mt-2 text-sm text-green-700">Password updated. You can sign in now.</p>
+      {(reset || pwset) && (
+        <p className="mt-2 text-sm text-green-700">{PASSWORD_CHANGED_LOGIN_MESSAGE}</p>
       )}
       <button
         type="button"
@@ -106,13 +109,10 @@ export function LoginPage() {
         </label>
         <label className="block text-sm">
           <span className="text-slate-700">Password</span>
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
+          <PasswordInput
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+            onChange={setPassword}
+            autoComplete="current-password"
           />
         </label>
         {error && <p className="text-sm text-red-600">{error}</p>}

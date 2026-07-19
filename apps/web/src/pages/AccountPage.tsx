@@ -13,7 +13,12 @@ import { isOrphanGoogleSession } from '../auth/cognitoOAuthExchange.js';
 import { mapChangePasswordError, mapCognitoError } from '../auth/mapCognitoError';
 import { validateNickname } from '../auth/nicknamePolicy';
 import { validatePassword } from '../auth/passwordPolicy';
+import {
+  PASSWORD_CHANGE_SIGNOUT_NOTICE,
+  PASSWORD_REAUTH_LOGIN_PATH,
+} from '../auth/passwordMessages';
 import { api } from '../lib/api';
+import { PasswordInput } from '../components/auth/PasswordInput';
 import { PageError } from '../components/page-status/PageError';
 import { PageLoading } from '../components/page-status/PageLoading';
 
@@ -35,6 +40,12 @@ export function AccountPage() {
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+
+  const [canSetPassword, setCanSetPassword] = useState(false);
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupPasswordConfirm, setSetupPasswordConfirm] = useState('');
+  const [setupPasswordError, setSetupPasswordError] = useState<string | null>(null);
+  const [setupPasswordSubmitting, setSetupPasswordSubmitting] = useState(false);
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [accountLoading, setAccountLoading] = useState(true);
@@ -66,6 +77,7 @@ export function AccountPage() {
         if (cancelled) return;
         setEmail(account.email);
         setNickname(account.name);
+        setCanSetPassword(account.canSetPassword);
         applyDisplayName(account.name);
       } catch {
         if (!cancelled) {
@@ -92,6 +104,7 @@ export function AccountPage() {
         const account = await api.getAccount();
         setEmail(account.email);
         setNickname(account.name);
+        setCanSetPassword(account.canSetPassword);
         applyDisplayName(account.name);
       } catch {
         setLoadError('Could not load account details. Try again later.');
@@ -147,12 +160,41 @@ export function AccountPage() {
     setPasswordSubmitting(true);
     try {
       await changePassword(currentPassword, newPassword);
-      logout();
-      navigate('/login?reset=1', { replace: true });
+      // Same re-auth path as set-password: Hosted UI logout would bounce to `/`.
+      logout({ clearHostedUi: false });
+      navigate(PASSWORD_REAUTH_LOGIN_PATH, { replace: true });
     } catch (err) {
       setPasswordError(mapChangePasswordError(err));
     } finally {
       setPasswordSubmitting(false);
+    }
+  }
+
+  async function onSetPasswordSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSetupPasswordError(null);
+
+    const validationError = validatePassword(setupPassword);
+    if (validationError) {
+      setSetupPasswordError(validationError);
+      return;
+    }
+    if (setupPassword !== setupPasswordConfirm) {
+      setSetupPasswordError('Passwords do not match.');
+      return;
+    }
+
+    setSetupPasswordSubmitting(true);
+    try {
+      await api.setPassword(setupPassword);
+      // Tokens belong to the deleted federated user. Clear the local session
+      // without Hosted UI logout (that would bounce to `/` and drop ?pwset=1).
+      logout({ clearHostedUi: false });
+      navigate(PASSWORD_REAUTH_LOGIN_PATH, { replace: true });
+    } catch {
+      setSetupPasswordError('Could not set password. Try again later.');
+    } finally {
+      setSetupPasswordSubmitting(false);
     }
   }
 
@@ -173,6 +215,12 @@ export function AccountPage() {
     } catch (err) {
       if (err instanceof AccountDeleteCognitoError) {
         setDeleteError(ACCOUNT_DELETE_COGNITO_FAILED_MESSAGE);
+        return;
+      }
+      // Map before the raw-message fallback: Cognito's own text says
+      // "Incorrect username or password." but this form only asks for a password.
+      if ((err as { name?: string } | null)?.name === 'NotAuthorizedException') {
+        setDeleteError(mapChangePasswordError(err));
         return;
       }
       if (err instanceof Error && err.message !== 'not_authed') {
@@ -241,41 +289,69 @@ export function AccountPage() {
         </form>
       </section>
 
+      {canSetPassword ? (
+        <section className="rounded-md border bg-white p-4">
+          <h2 className="text-sm font-medium text-slate-900">Set a password</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Add a password so you can also sign in with your email.
+          </p>
+          <form className="mt-3 space-y-3" onSubmit={onSetPasswordSubmit}>
+            <label className="block text-sm">
+              <span className="text-slate-700">Password</span>
+              <PasswordInput
+                value={setupPassword}
+                onChange={setSetupPassword}
+                autoComplete="new-password"
+              />
+              <span className="mt-1 block text-xs text-slate-500">
+                At least 8 characters with uppercase, lowercase, and a number.
+              </span>
+            </label>
+            <label className="block text-sm">
+              <span className="text-slate-700">Confirm password</span>
+              <PasswordInput
+                value={setupPasswordConfirm}
+                onChange={setSetupPasswordConfirm}
+                autoComplete="new-password"
+              />
+            </label>
+            {setupPasswordError && <p className="text-sm text-red-600">{setupPasswordError}</p>}
+            <button
+              type="submit"
+              disabled={setupPasswordSubmitting}
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+            >
+              {setupPasswordSubmitting ? 'Saving…' : 'Save password'}
+            </button>
+            <p className="text-xs text-red-600">{PASSWORD_CHANGE_SIGNOUT_NOTICE}</p>
+          </form>
+        </section>
+      ) : (
       <section className="rounded-md border bg-white p-4">
         <h2 className="text-sm font-medium text-slate-900">Change password</h2>
-        {!orphanGoogleSession ? (
         <form className="mt-3 space-y-3" onSubmit={onPasswordSubmit}>
           <label className="block text-sm">
             <span className="text-slate-700">Current password</span>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
+            <PasswordInput
               value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              onChange={setCurrentPassword}
+              autoComplete="current-password"
             />
           </label>
           <label className="block text-sm">
             <span className="text-slate-700">New password</span>
-            <input
-              type="password"
-              required
-              autoComplete="new-password"
+            <PasswordInput
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              onChange={setNewPassword}
+              autoComplete="new-password"
             />
           </label>
           <label className="block text-sm">
             <span className="text-slate-700">Confirm new password</span>
-            <input
-              type="password"
-              required
-              autoComplete="new-password"
+            <PasswordInput
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              onChange={setConfirmPassword}
+              autoComplete="new-password"
             />
           </label>
           {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
@@ -287,13 +363,10 @@ export function AccountPage() {
           >
             {passwordSubmitting ? 'Updating…' : 'Update password'}
           </button>
+          <p className="text-xs text-red-600">{PASSWORD_CHANGE_SIGNOUT_NOTICE}</p>
         </form>
-        ) : (
-          <p className="mt-2 text-sm text-slate-600">
-            Password sign-in is not set up for this Google-only session.
-          </p>
-        )}
       </section>
+      )}
 
       <section className="rounded-md border border-red-200 bg-red-50 p-4">
         <h2 className="text-sm font-medium text-red-900">Danger zone</h2>
@@ -305,13 +378,10 @@ export function AccountPage() {
           {!orphanGoogleSession && (
           <label className="block text-sm">
             <span className="text-slate-700">Current password</span>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
+            <PasswordInput
               value={deletePassword}
-              onChange={(e) => setDeletePassword(e.target.value)}
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              onChange={setDeletePassword}
+              autoComplete="current-password"
             />
           </label>
           )}
