@@ -44,7 +44,7 @@ The stack is conventional React/Node/Postgres. The interesting choices are aroun
 | Overlay layout | **Mirror measurement + global indices** | A hidden mirror measures per-character `offsetTop` for visual-line breaks and per-glyph `getBoundingClientRect` for horizontal edges (charEdges); annotations are stored as global indices. Post-layout width rules widen note labels and separate touching highlight bands without re-measuring on each keystroke. |
 | Frontend | **React 18 + Vite + Tailwind** | Component model fits a measurement-heavy overlay; utilities keep the typing surface simple without a heavy design system. |
 | State | **Zustand + TanStack Query** | Local typing UI state vs server-backed course list and mutations. |
-| Auth | **AWS Cognito (email/password SRP + Google IdP) + JWT in Fastify** | Email/password or Continue with Google (Hosted UI, `openid email profile`). Cognito `sub` is the user primary key; Postgres `users.email` is the account identity source of truth so Google and password sign-in link to one profile. Guests browse and type sample courses from `localStorage`; signed-in users persist data in PostgreSQL. New accounts with zero courses receive a one-time onboarding seed (`POST /api/onboarding/seed`). Public [privacy policy](https://echotype.ink/privacy) (includes Google OAuth disclosure). |
+| Auth | **AWS Cognito (email/password SRP + Google IdP) + JWT in Fastify** | Email/password or Continue with Google (Hosted UI, `openid email profile`). Cognito `sub` is the user primary key; Postgres `users.email` is the account identity source of truth so Google and password sign-in link to one profile. A Google-only account can add a password later: since the pool authenticates by email and a federated username (`Google_<sub>`) is unreachable by email-based auth, the API rebuilds it as a native user (create → set password → migrate the Postgres `id` via `ON UPDATE CASCADE` → delete orphan → relink), create-first with compensating cleanup so any step can fail safely. Guests browse and type sample courses from `localStorage`; signed-in users persist data in PostgreSQL. New accounts with zero courses receive a one-time onboarding seed (`POST /api/onboarding/seed`). Public [privacy policy](https://echotype.ink/privacy) (includes Google OAuth disclosure). |
 | Regression guard | **Playwright probes (local) + unit tests** | Stop-loss scripts after overlay/layout/auth changes; alignment and stats helpers unit-tested (`node:test`). |
 | Observability | **Sentry (web + API)** | `@sentry/react` + Vite plugin (source maps uploaded in CI, not published to S3); `@sentry/node` on Fastify. DSNs in SSM; release = deploy git sha. |
 | Cloud | **EC2 + RDS + S3 + CloudFront + SSM + GitHub Actions OIDC** | One CloudFront distribution serves the SPA (S3/OAC) and `/api/*` (EC2) on **https://echotype.ink** — same-origin HTTPS, no mixed content. ACM certificate (us-east-1) and DNS are Terraform-managed; CI deploys API via OIDC + SSM and frontend via `deploy-web.yml` (S3 sync + invalidation). |
@@ -133,7 +133,7 @@ I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I ru
 | ✅ | **Auth** — Cognito email/password (SRP), JWT-verified API, guest sample catalog, account page (nickname, password change, delete), onboarding seed for new users |
 | ✅ | **Custom domain** — echotype.ink via ACM + CloudFront alias; HTTPS enforced |
 | ✅ | **Ops & safety** — Sentry (web + API), public privacy policy, unified loading/error/empty states |
-| ✅ | **Google sign-in** — Cognito Google IdP, Hosted UI OAuth, email-based account linking, privacy Google disclosure |
+| ✅ | **Google sign-in** — Cognito Google IdP, Hosted UI OAuth, email-based account linking, add-password for Google-only accounts via identity reconstruction, privacy Google disclosure |
 | 🔧 | **Maintenance** — Ongoing polish and UX fixes |
 
 ---
@@ -141,7 +141,7 @@ I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I ru
 ## Further reading
 
 - **`docs/STATE.md`** — Current engineering snapshot and roadmap.
-- **`docs/DECISIONS.md`** — Decision log (28 ADRs: anchoring, measurement, stats, auth, Google federation + email identity, layout, import/export, forgiving mode, immersive refocus, custom domain, Sentry, privacy).
+- **`docs/DECISIONS.md`** — Decision log (29 ADRs: anchoring, measurement, stats, auth, Google federation + email identity + password reconstruction, layout, import/export, forgiving mode, immersive refocus, custom domain, Sentry, privacy).
 - **`docs/STATS.md`** — Stats field definitions and formulas (the contract).
 - **`deploy/README.md`** — Terraform, SSM access, cloud deploy.
 
