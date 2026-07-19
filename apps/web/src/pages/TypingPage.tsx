@@ -891,7 +891,10 @@ function TypingSession({
           </div>
         </div>
 
-        <div ref={inputPanelRef} className="shrink-0 space-y-2">
+        {/* relative: containing block for the immersive 1px textarea — without it the
+            absolute textarea anchors at the document top-left and every keystroke
+            scrolls the caret (page/visual viewport) back there. */}
+        <div ref={inputPanelRef} className="relative shrink-0 space-y-2">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <TypingModeSwitch
             checked={immersiveMode}
