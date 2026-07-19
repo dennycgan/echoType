@@ -1522,3 +1522,41 @@
   reports both the migration failure and the compensation failure ("manual cleanup required").
 - Supersedes / superseded-by: Extends ADR-0027 (email-first account identity) and reuses the
   ADR-0026 delete-then-link linking primitive.
+
+## ADR-0030 — Course whitespace: keep ≤2 blank lines; confirm-time normalize; blank rows visible
+- Status: Accepted (2026-07-19)
+- Commit/PR anchor: 22ff742
+- Plain summary (owner reads this): Interior blank lines in a course stay (up to two);
+  only longer runs get compressed. Whitespace is cleaned when content is confirmed, not
+  on every keystroke. The typing page shows blank lines again; Enter on newlines stays
+  optional (ADR-0007 unchanged).
+- Context: Users who paste or edit multi-passage text with blank separators saw those
+  blanks disappear on the typing page. Investigation showed the stored `content` kept
+  `\n\n`; `AnnotatedText` rendered a blank visual line as an empty span, so the row
+  height collapsed to 0 and margins collapsed — a display bug, not a storage bug. There
+  was also no shared rule for how many blanks to keep, trailing junk, or spaces-only
+  lines. Changing ADR-0007 so blank-line `\n` require Enter was considered and rejected
+  for this fix: auto-skip remains the typist-friendly path.
+- Decision:
+  1. **`normalizeCourseWhitespace`** (shared `course.ts`): LF normalize → whitespace-only
+     lines become empty → `/\n{4,}/g` → `\n\n\n` (keep at most two visual blank lines;
+     three blanks / four `\n` start compression) → edge `trim()`.
+  2. **When:** apply at content confirmation only — editor Step 1 Next, `.txt` import
+     (before marker scan), and API `prepareCourseContent` (silent normalize; annotations
+     validated against the normalized string). Never in per-keystroke `setContent`
+     (`normalizeLineEndings` only there).
+  3. **Display:** `AnnotatedText` / editor line rows use `minHeight: charHeight` so a
+     blank line occupies one line of height.
+  4. **Typing engine:** no change to ADR-0007. After a paragraph, the cursor may sit on
+     the next non-newline character while blank rows remain visible above — intentional
+     for typists; content authors may find it surprising (Known debt).
+- Rejected alternatives:
+  - Compress at `{3,}` `\n` — would eat a single blank line (`\n\n`).
+  - Force Enter on blank-line `\n` — conflicts with optional-Enter UX already valued.
+  - Normalize only on the client — API would accept divergent whitespace from raw callers.
+- Consequences:
+  - Length / mode checks use post-normalize content (Step 1 and server agree).
+  - Edit of legacy courses with extra blanks may change content on Step 1 Next and open
+    the existing annotation review path if anchors move relative to the new string.
+  - No DB backfill; next edit/save normalizes.
+- Supersedes / superseded-by: Complements ADR-0007 (does not change newline skip sync).
