@@ -33,7 +33,7 @@ Since I am a Chinese native speaker, I can also pin native-language annotations 
 
 ## Tech Stack
 
-The stack is conventional React/Node/Postgres. The interesting choices are around correctness — most visibly annotation alignment (type contracts, measurement-driven layout, atomic replacement). The typing engine follows the same discipline: keystrokes are graded by aligned comparison rather than naive string equality (newline auto-skip, IME-aware composition, strict vs forgiving grading), and every stored stat — session rows, course cumulative, collection rollups — is defined by formula in `docs/STATS.md`.
+The stack is conventional React/Node/Postgres. The interesting choices are around correctness — most visibly annotation alignment (type contracts, measurement-driven layout, atomic replacement). The typing engine follows the same discipline: keystrokes are graded by aligned comparison rather than naive string equality (newline auto-skip, IME-aware composition, strict vs forgiving grading), and every stored stat — session rows, course cumulative, collection rollups — is defined by formula in `docs/STATS.md`. Course text is whitespace-normalized once when content is confirmed — never per keystroke — by a shared, unit-tested pure function that preserves intentional blank lines between passages (up to two) while trimming edges and collapsing longer runs.
 
 | Layer | Choice | Why |
 |-------|--------|-----|
@@ -141,7 +141,7 @@ I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I ru
 ## Further reading
 
 - **`docs/STATE.md`** — Current engineering snapshot and roadmap.
-- **`docs/DECISIONS.md`** — Decision log (29 ADRs: anchoring, measurement, stats, auth, Google federation + email identity + password reconstruction, layout, import/export, forgiving mode, immersive refocus, custom domain, Sentry, privacy).
+- **`docs/DECISIONS.md`** — Decision log (30 ADRs: anchoring, measurement, stats, auth, Google federation + email identity + password reconstruction, layout, import/export, content whitespace normalization, forgiving mode, immersive refocus, custom domain, Sentry, privacy).
 - **`docs/STATS.md`** — Stats field definitions and formulas (the contract).
 - **`deploy/README.md`** — Terraform, SSM access, cloud deploy.
 
