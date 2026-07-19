@@ -66,6 +66,7 @@ Active capability: Maintenance & polish
 - Google sign-in Phase 2 (web + linking): `apps/web/src/auth/cognitoOAuthExchange.ts`, `NicknameSetupModal.tsx`; API `apps/api/src/auth/federatedLink.ts`, `federatedSync.ts`, `routes/federatedAuth.ts`, `routes/emailStatus.ts`; PreSignUp `infra/lambda/cognito_presignup/`, `infra/cognito_presignup.tf`
 - Google L2 maintenance (unmaterialized native + stale Hosted UI): API `ensureLinkedNativeAccount` in `routes/federatedAuth.ts`; web stale-session retry + `autoReuse` in `cognitoOAuthExchange.ts` / `HomePage.tsx`
 - Account API + page: packages/shared/src/account.ts, apps/api/src/routes/account.ts, apps/web/src/pages/AccountPage.tsx
+- Google-only password setup (identity reconstruction): apps/api/src/auth/googlePasswordSetup.ts, `POST /account/set-password`; PreSignUp `AdminCreateUser` relaxation in `infra/lambda/cognito_presignup/handler.py`; shared re-auth copy `apps/web/src/auth/passwordMessages.ts`
 - Guest course catalog (local): apps/web/src/guest/guestCoursesStore.ts, apps/web/src/guest/useCourseCatalog.ts
 - Account vs guest writes: useCourseCatalog (data); collection !isGuest UI (CourseListPage, CollectionDetailPage); useRequireAuthAction (e.g. New collection); TypingPage disabled Save
 - Onboarding catalog (shared): packages/shared/src/onboardingCatalog.ts (re-exported in apps/api/prisma/fixtures/courseCatalog.ts)
@@ -92,7 +93,7 @@ Active capability: Maintenance & polish
 | Auth | Guest typing progress not restored after login | In-memory session only; sign in before starting a session you intend to save | intentional (ADR-0015 §16) | ADR-0015 |
 | Auth | Email change | Deferred if implementation requires extra SES/Lambda cost beyond existing Cognito verify path | Auth Phase 5 cost check, or post-MVP | ADR-0015 |
 | Auth | Google OAuth consent screen shows Cognito domain instead of app name "EchoType" | Two separate issues: (1) Google brand verification required to show app name on consent screen; (2) Cognito custom domain (auth.echotype.ink) would replace long Cognito URL but still not show app name without verification | Future polish | ADR-0028 |
-| Auth | Google-only users cannot set a password for email/password login | Cognito AdminSetUserPassword needed; L2 linking + materialize paths now stable; product feature still deferred | Auth follow-up | ADR-0027 |
+| Auth | Google-only user password setup requires identity reconstruction (delete `Google_*` + AdminCreateUser + migrate Postgres id) because a Cognito federated username does not accept email-based SRP auth | Cognito architectural constraint; Firebase/Auth0 would not require this | No fix planned; monitor Sentry for Step 5 compensation failures | ADR-0029 |
 | Auth | Google account chooser may appear twice on L2 linking path (multi-account Chrome users) | Cognito Hosted UI cannot forward login_hint to Google; architectural constraint | Fix: redesign Google→Cognito initiation to bypass Hosted UI so login_hint can reach Google | ADR-0027 |
 | Ops & safety | CloudWatch structured logging/alarms (planned Ops Phase 2; never shipped) | Current user volume does not warrant | Revisit when user volume warrants | ADR-0023, ADR-0024 |
 | Ops & safety | API rate limiting (planned Ops Phase 3; never shipped) | Same | Same | ADR-0023, ADR-0024 |

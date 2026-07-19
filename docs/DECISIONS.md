@@ -1471,3 +1471,54 @@
   - Prod: https://echotype.ink/privacy shows Google disclosure.
   - Active capability queue empty until next owner choice.
 - Supersedes / superseded-by: Completes the Google disclosure deferred in ADR-0024.
+
+## ADR-0029 — Google-only user password setup via identity reconstruction
+- Status: Accepted (2026-07-19)
+- Commit/PR anchor: 1fd2615
+- Plain summary: A Google-only user (Cognito `EXTERNAL_PROVIDER`) who wants an email +
+  password sign-in gets a rebuilt native Cognito user; you cannot just set a password on
+  the federated profile.
+- Context: In this `username_attributes = ["email"]` pool a federated user's username is
+  `Google_<sub>`, not the email. `AdminSetUserPassword` on that profile does flip it to
+  `CONFIRMED`, but email-based SRP sign-in still fails — the email entry point only resolves
+  to native-origin users, so a federated-origin profile returns `UserNotFoundException` even
+  when CONFIRMED with `email_verified = true` (validated against the live pool). Per AWS
+  guidance the user must own a native profile.
+- Decision: Create-first identity reconstruction in `apps/api/src/auth/googlePasswordSetup.ts`,
+  ordered so every failure leaves the account usable (no rollback, retry-safe):
+  1. Live eligibility re-check (`AdminGetUser`: `EXTERNAL_PROVIDER` + Google identity).
+  2. Idempotent resume — `adminListUsersByEmail`; if a native twin already exists it is a
+     leftover from an interrupted attempt (PreSignUp + L2 guarantee no other coexistence),
+     so reuse it instead of creating a duplicate.
+  3. `AdminCreateUser` native user (`email_verified = true`, nickname preserved, `SUPPRESS`).
+  4. `AdminSetUserPassword(permanent)` → `CONFIRMED`.
+  5. Postgres `users.id` migrate old federated sub → new native sub (**commit point**;
+     the three `userId` FKs are `ON UPDATE CASCADE`, so courses/history follow). On failure:
+     compensate by `AdminDeleteUser(native twin)` so email sign-in cannot race `ensureUser`
+     into the unique-email conflict; the old federated account stays fully intact.
+  6. Best-effort: delete the orphan `Google_*` user.
+  7. Best-effort: `AdminLink` the Google identity to the native user.
+  The new `users.id` is the native sub, so the ADR-0027 invariant (`users.id` = Cognito sub)
+  holds. The caller's tokens belong to the deleted federated user, so the client logs out
+  locally and routes to `/login?pwset=1`; change-password reuses the same re-auth path.
+- Rejected alternatives:
+  - `AdminSetUserPassword` directly on the federated user — password set succeeds but email
+    sign-in returns `UserNotFoundException` (email entry point does not route to
+    federated-origin usernames).
+  - Move to Firebase/Auth0 — native password on a federated user is supported without a
+    rebuild, but leaves the AWS stack.
+- Consequences:
+  - Steps 6–7 failing never fails the request: email + password already works, and the next
+    Google sign-in self-heals through the standard L2 link flow (delete-then-link, consistent
+    with the ADR-0026 exception).
+  - PreSignUp Lambda relaxed for `PreSignUp_AdminCreateUser` only: allowed when every existing
+    email holder is a `Google_*` federated profile (AdminCreateUser has no public entry point);
+    public `PreSignUp_SignUp` guard unchanged.
+  - IAM: EC2 role gains `cognito-idp:AdminCreateUser` (this change) and `AdminSetUserPassword`
+    (prior commit).
+- Known fragility: if the Step 5 compensation delete also fails, a passworded native twin and
+  the old `Google_*` coexist while Postgres still points at the old sub; email sign-in hits the
+  unique-email conflict. Needs manual cleanup of the native twin in the Cognito console. Sentry
+  reports both the migration failure and the compensation failure ("manual cleanup required").
+- Supersedes / superseded-by: Extends ADR-0027 (email-first account identity) and reuses the
+  ADR-0026 delete-then-link linking primitive.
