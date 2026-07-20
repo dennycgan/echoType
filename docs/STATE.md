@@ -48,6 +48,7 @@ Active capability: Maintenance & polish
 - Types/validation: packages/shared/course.ts, packages/shared/category.ts
 - Course + collection routes: apps/api/src/routes/courses.ts, apps/api/src/routes/categories.ts
 - Typing UI: apps/web/src/pages/TypingPage.tsx
+- Typing scroll + immersive caret pin: apps/web/src/lib/typingScroll.ts (ADR-0031)
 - Session timer + pause: apps/web/src/components/typing/SessionTimerStrip.tsx, TimerEndDialog.tsx, apps/web/src/lib/sessionTimer.ts; probe `apps/web/scripts/phase7-pause-probe.mjs`
 - Typing Back paths: apps/web/src/lib/collectionPaths.ts
 - Mode list + collections UI: apps/web/src/pages/CourseListPage.tsx, CollectionDetailPage.tsx

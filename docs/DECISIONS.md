@@ -1560,3 +1560,48 @@
     the existing annotation review path if anchors move relative to the new string.
   - No DB backfill; next edit/save normalizes.
 - Supersedes / superseded-by: Complements ADR-0007 (does not change newline skip sync).
+
+---
+
+## ADR-0031 — Immersive caret follows passage cursor under pinch-zoom
+- Status: Accepted (2026-07-20)
+- Commit/PR anchor: 83d4cf1 (`be8bccb` input-panel `relative` containing block)
+- Plain summary: In immersive mode the hidden 1px textarea is repositioned over the
+  passage typing cursor each update so Mac pinch-zoom does not pan the visual
+  viewport to the input panel. Passage auto-scroll runs only when the cursor leaves
+  the visible area. Non-immersive mode may still pan to show the visible input —
+  accepted as normal browser behavior.
+- Context: With trackpad pinch-zoom, if the focused caret lies outside the visual
+  viewport, the browser scrolls/pans to reveal it on each keystroke. Immersive’s
+  absolute textarea previously sat at the input-panel origin (after `be8bccb` fixed
+  document-top-left anchoring), so zoomed users staring at mid-passage text jumped
+  toward the panel. Forcing passage `scrollTop` to the upper third every keystroke
+  made long passages feel like a reset. A short-lived window/`visualViewport`
+  restore lock was tried for non-immersive zoom and reverted: it failed to stop the
+  pan reliably and risked fighting intentional user pans.
+- Decision:
+  1. **Immersive caret pin** — `positionImmersiveTextareaAtCursor` places the
+     hidden textarea over `[data-typing-cursor]` (panel-relative `left`/`top`)
+     after passage scroll updates (`typingScroll.ts` / `TypingPage` layout effect).
+  2. **Passage follow** — `scrollPassageToTypingCursor` is only-if-needed (padding
+     band); no per-keystroke force to a fixed anchor ratio.
+  3. **Non-immersive zoom** — Visible textarea remains below the passage; browser
+     caret scroll-into-view may bring the input to the bottom of the visual
+     viewport. Product accepts this; use immersive when practicing zoomed on the
+     passage.
+  4. **No viewport lock** — Do not snapshot/restore `window`/`visualViewport` on
+     every keystroke for this problem.
+- Rejected alternatives:
+  - Per-keystroke visualViewport restore lock — ineffective for non-immersive on
+    Mac; side effects on pan/IME timing; reverted before ship of `83d4cf1` final
+    shape.
+  - Keep every-keystroke upper-third passage scroll — feels like position reset
+    when a scrollbar is present.
+- Consequences:
+  - Immersive class omits fixed `left-0 top-0`; position is JS-driven. Clearing
+    styles when immersive turns off is required.
+  - Input panel must stay `position: relative` (containing block).
+  - Passage border removal (`f3722da`, `framed={false}`) is unrelated visual polish
+    and does not change this ADR.
+- Supersedes / superseded-by: Extends immersive UX in ADR-0021 / ADR-0008; does not
+  flip ADR-0021 refocus/amber decisions.
