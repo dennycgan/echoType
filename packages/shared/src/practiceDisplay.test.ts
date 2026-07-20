@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import {
   formatLocalYmd,
   formatPracticeDuration,
-  formatPracticeSummaryLine,
+  formatPracticeSummaryLines,
 } from './practiceDisplay.js';
 
 describe('formatPracticeDuration', () => {
@@ -39,50 +39,62 @@ describe('formatLocalYmd', () => {
   });
 });
 
-describe('formatPracticeSummaryLine', () => {
+describe('formatPracticeSummaryLines', () => {
   const savedAt = new Date(2026, 6, 20, 12, 0, 0).toISOString();
 
-  it('includes loops when totalCompletedPasses > 0', () => {
-    assert.equal(
-      formatPracticeSummaryLine({
+  it('uses plural times when totalCompletedPasses > 1', () => {
+    assert.deepEqual(
+      formatPracticeSummaryLines({
         totalDurationSec: 5880,
         totalCompletedPasses: 47,
         lastSavedAt: new Date(2026, 4, 27, 12, 0, 0).toISOString(),
       }),
-      '1 hr 38 min across 47 loops · Last saved 2026-05-27',
+      {
+        line1: "You've returned to these texts 47 times, for 1 hr 38 min.",
+        line2: 'Last practiced: 2026-05-27',
+      },
     );
   });
 
-  it('uses singular loop for 1 pass', () => {
-    assert.equal(
-      formatPracticeSummaryLine({
+  it('uses singular time when totalCompletedPasses is 1', () => {
+    assert.deepEqual(
+      formatPracticeSummaryLines({
         totalDurationSec: 60,
         totalCompletedPasses: 1,
         lastSavedAt: savedAt,
       }),
-      '1 min across 1 loop · Last saved 2026-07-20',
+      {
+        line1: "You've returned to these texts 1 time, for 1 min.",
+        line2: 'Last practiced: 2026-07-20',
+      },
     );
   });
 
-  it('omits loops when totalCompletedPasses is 0', () => {
-    assert.equal(
-      formatPracticeSummaryLine({
+  it('uses spent wording when totalCompletedPasses is 0', () => {
+    assert.deepEqual(
+      formatPracticeSummaryLines({
         totalDurationSec: 2280,
         totalCompletedPasses: 0,
         lastSavedAt: savedAt,
       }),
-      '38 min · Last saved 2026-07-20',
+      {
+        line1: "You've spent 38 min with these texts.",
+        line2: 'Last practiced: 2026-07-20',
+      },
     );
   });
 
   it('shows minimum duration when totalCompletedPasses is 0 and duration is 0', () => {
-    assert.equal(
-      formatPracticeSummaryLine({
+    assert.deepEqual(
+      formatPracticeSummaryLines({
         totalDurationSec: 0,
         totalCompletedPasses: 0,
         lastSavedAt: savedAt,
       }),
-      '1 min · Last saved 2026-07-20',
+      {
+        line1: "You've spent 1 min with these texts.",
+        line2: 'Last practiced: 2026-07-20',
+      },
     );
   });
 });

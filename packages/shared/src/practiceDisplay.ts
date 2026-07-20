@@ -60,15 +60,24 @@ export function formatLocalYmd(iso: string): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-export function formatPracticeSummaryLine(opts: {
+export function formatPracticeSummaryLines(opts: {
   totalDurationSec: number;
   totalCompletedPasses: number;
   lastSavedAt: string;
-}): string {
+}): { line1: string; line2: string } {
   const duration = formatPracticeDuration(opts.totalDurationSec);
   const date = formatLocalYmd(opts.lastSavedAt);
-  if (opts.totalCompletedPasses > 0) {
-    return `${duration} across ${formatLoopCount(opts.totalCompletedPasses)} · Last saved ${date}`;
+  const line2 = `Last practiced: ${date}`;
+  const passes = Math.max(0, Math.floor(opts.totalCompletedPasses));
+  if (passes > 0) {
+    const timeWord = passes === 1 ? 'time' : 'times';
+    return {
+      line1: `You've returned to these texts ${passes} ${timeWord}, for ${duration}.`,
+      line2,
+    };
   }
-  return `${duration} · Last saved ${date}`;
+  return {
+    line1: `You've spent ${duration} with these texts.`,
+    line2,
+  };
 }

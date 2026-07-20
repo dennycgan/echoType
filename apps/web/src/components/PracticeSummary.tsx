@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { formatPracticeSummaryLine } from '@echotype/shared';
+import { formatPracticeSummaryLines } from '@echotype/shared';
 import { useAuth } from '../auth/AuthProvider';
+import { InfoTooltip } from './InfoTooltip';
 import { api } from '../lib/api';
 
-const SUMMARY_TEXT_CLASS = 'text-center text-sm text-slate-600';
+const SUMMARY_TEXT_CLASS = 'text-center text-lg font-semibold text-slate-900';
 
 export function PracticeSummary() {
   const { status } = useAuth();
@@ -38,13 +39,27 @@ export function PracticeSummary() {
     );
   }
 
+  const { line1, line2 } = formatPracticeSummaryLines({
+    totalDurationSec: data.totalDurationSec,
+    totalCompletedPasses: data.totalCompletedPasses,
+    lastSavedAt: data.lastSavedAt!,
+  });
+
   return (
-    <p className={SUMMARY_TEXT_CLASS} data-testid="practice-summary-line">
-      {formatPracticeSummaryLine({
-        totalDurationSec: data.totalDurationSec,
-        totalCompletedPasses: data.totalCompletedPasses,
-        lastSavedAt: data.lastSavedAt!,
-      })}
-    </p>
+    <div className={SUMMARY_TEXT_CLASS} data-testid="practice-summary-lines">
+      <p>{line1}</p>
+      <p className="mt-1 flex items-center justify-center gap-1">
+        <span>{line2}</span>
+        <InfoTooltip
+          ariaLabel="About practice summary"
+          placement="bottom"
+        >
+          <span className="block text-left">
+            <span className="block">Based on saved sessions only.</span>
+            <span className="mt-1.5 block">Unsaved practice is not recorded.</span>
+          </span>
+        </InfoTooltip>
+      </p>
+    </div>
   );
 }
