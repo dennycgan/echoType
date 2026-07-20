@@ -5,9 +5,13 @@ export const TYPING_SURFACE_CLASS =
 /** Two lines of leading-relaxed text-base plus vertical padding (p-4). */
 export const TYPING_TEXTAREA_CLASS = `${TYPING_SURFACE_CLASS} h-[calc(2*1.625rem+2rem)] w-full resize-none overflow-y-auto whitespace-pre-wrap break-words text-slate-900 focus:border-slate-500 focus:outline-none`;
 
-/** Visually hidden but focusable — anchored in typing panel, not viewport-fixed. */
+/**
+ * Visually hidden but focusable. Positioned via JS over the passage typing cursor
+ * (see positionImmersiveTextareaAtCursor) so pinch-zoom caret scroll-into-view
+ * does not pan to the input panel. Containing block: input panel `relative`.
+ */
 export const TYPING_TEXTAREA_IMMERSIVE_CLASS =
-  'pointer-events-none absolute left-0 top-0 h-px w-px resize-none overflow-hidden opacity-0 border-0 p-0';
+  'pointer-events-none absolute h-px w-px resize-none overflow-hidden opacity-0 border-0 p-0';
 
 export const IMMERSIVE_MODE_STORAGE_KEY = 'echotype-immersive-mode';
 

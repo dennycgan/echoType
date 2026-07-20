@@ -47,7 +47,12 @@ import {
   TYPING_TEXTAREA_IMMERSIVE_CLASS,
   formatTypingDuration,
 } from '../lib/typingSurface';
-import { scrollPassageToTypingCursor, scrollTextareaToCaret } from '../lib/typingScroll';
+import {
+  clearImmersiveTextareaPosition,
+  positionImmersiveTextareaAtCursor,
+  scrollPassageToTypingCursor,
+  scrollTextareaToCaret,
+} from '../lib/typingScroll';
 import { usePassageMaxHeight } from '../lib/usePassageMaxHeight';
 
 const IDLE_MS = 5000;
@@ -556,9 +561,20 @@ function TypingSession({
 
   useLayoutEffect(() => {
     const passage = passageScrollRef.current;
+    const panel = inputPanelRef.current;
+    const textarea = textareaRef.current;
     if (!passage) return;
+
     scrollPassageToTypingCursor(passage);
-  }, [typed, typingStatuses]);
+
+    if (textarea && panel) {
+      if (immersiveMode) {
+        positionImmersiveTextareaAtCursor(textarea, passage, panel);
+      } else {
+        clearImmersiveTextareaPosition(textarea);
+      }
+    }
+  }, [typed, typingStatuses, immersiveMode]);
 
   useLayoutEffect(() => {
     const el = textareaRef.current;
