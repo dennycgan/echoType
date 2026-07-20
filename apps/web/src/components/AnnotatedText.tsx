@@ -23,7 +23,7 @@ import {
 import { createCanvasTextMeasurer, extendNoteWidths } from './annotated-text/noteExtension';
 import { useTextMeasurement } from './annotated-text/useTextMeasurement';
 import type { TargetCharStatus } from '../lib/typingAlign';
-import { TYPING_SURFACE_CLASS } from '../lib/typingSurface';
+import { TYPING_SURFACE_BASE, TYPING_SURFACE_CLASS } from '../lib/typingSurface';
 
 // Read-only annotated text renderer (Phase 2.0).
 //
@@ -63,6 +63,12 @@ interface AnnotatedTextProps {
   clickableNotes?: boolean;
   /** Typing page: widen note bubbles rightward into free space (noteExtension.ts rules). */
   extendNotes?: boolean;
+  /**
+   * When false, omit the surface border (typing-page passage). Default true so
+   * editor previews keep a framed card. Do not use className="border-0" — Tailwind
+   * may not win over TYPING_SURFACE_CLASS's `border`.
+   */
+  framed?: boolean;
   className?: string;
 }
 
@@ -365,6 +371,7 @@ export function AnnotatedText({
   typingStatuses,
   clickableNotes = false,
   extendNotes = false,
+  framed = true,
   className,
 }: AnnotatedTextProps) {
   const { refs, layout, chars, containerWidth } = useTextMeasurement(content);
@@ -477,7 +484,7 @@ export function AnnotatedText({
 
   return (
     <div
-      className={`${TYPING_SURFACE_CLASS} ${className ?? ''}`}
+      className={`${framed ? TYPING_SURFACE_CLASS : TYPING_SURFACE_BASE} ${className ?? ''}`}
       data-testid="annotated-text"
     >
       <div ref={refs.boxRef as Ref<HTMLDivElement>} style={{ position: 'relative' }}>

@@ -896,6 +896,7 @@ function TypingSession({
               typingStatuses={typingStatuses}
               clickableNotes={!showLeaveDialog && !timerEndOpen}
               extendNotes
+              framed={false}
             />
             {immersiveMode && !typingInputFocused && (
               <div
