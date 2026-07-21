@@ -1,5 +1,5 @@
 ---
-description: EchoType commit message format — Conventional Commits header (type, optional scope, subject)
+description: echoType commit message format — Conventional Commits header (type, optional scope, subject)
 alwaysApply: true
 ---
 
@@ -44,7 +44,7 @@ chore(web): add scroll navigation probe script
 
 **Don't** invent rare types (`style`, `perf`, …) unless the owner asks — pick the closest row above.
 
-## Scopes (EchoType)
+## Scopes (echoType)
 
 | Scope | Typical paths |
 |-------|----------------|
@@ -64,7 +64,7 @@ Omit scope when a single commit fairly touches web + api + shared (rare); say so
 **Do**
 
 - Imperative mood: `add`, `fix`, `remove`, `align` — not `added` / `fixes`
-- Lowercase first letter after the colon (proper nouns OK: `EchoType`, `WPM`, `ADR-0014`)
+- Lowercase first letter after the colon (proper nouns OK: `echoType`, `WPM`, `ADR-0014`)
 - ~72 characters or fewer when practical
 - Focus on **what** changed; put **why** in the body
 

@@ -1,4 +1,4 @@
-# EchoType
+# echoType
 
 **Repeat, type, and remember meaningful English texts**
 
@@ -6,13 +6,13 @@
 
 **Live:** [echotype.ink](https://echotype.ink)
 
-EchoType is a typing tool where you load up any text (poems, speeches, quotes, essays) and just type through it on loop. Good for moments when your brain needs something to do without actual thinking.
+echoType is a typing tool where you load up any text (poems, speeches, quotes, essays) and just type through it on loop. Good for moments when your brain needs something to do without actual thinking.
 
 You can add custom annotations to phrases beforehand; the notes stay visible as you type, so glosses stay in context instead of a separate glossary. Sign in to keep your texts and practice history; or browse and type the sample courses as a guest.
 
 The name comes from echo — a voice returning. I built it because I wanted to revisit texts I actually care about through repetitive typing, until the words and rhythm sink in.
 
-![EchoType in action](docs/product-screenshot.png)
+![echoType in action](docs/product-screenshot.png)
 
 Since I am a Chinese native speaker, I can also pin native-language annotations above unfamiliar English words to keep them visible while typing. But the heart is the loop: choose a text I want to remember, type it, return to it.
 
@@ -27,7 +27,7 @@ Since I am a Chinese native speaker, I can also pin native-language annotations 
 - **Notes survive edits** — If you change the source text later, your notes are not silently wiped. The app shows you which notes still align and which need your attention before saving.
 - **Your courses are portable plain text** — Import a `.txt` with inline `{phrase}{annotation}` markers to create a fully annotated course in one step (parse errors point at the offending line); export any course back to the same format for local backup. The parser and serializer are shared, round-trip-tested pure functions that run entirely in the browser — no upload, no extra cloud cost.
 - **Honest practice stats** — Manual saves write per-session rows (WPM, accuracy, loops, active time); courses keep materialized cumulative stats and collections roll them up. Signed-in users also see a home summary of total practice time and completed passes across all courses — a JWT-backed read aggregate over those existing course columns, not a second set of user-level counters. One written contract (`docs/STATS.md`) defines every stored formula.
-- **Try before sign-up** — Guests browse and type sample courses from a local catalog; sign in (email/password or Google) to persist courses, collections, and saved practice sessions in PostgreSQL. The same email maps to one EchoType account whether you register with password or continue with Google.
+- **Try before sign-up** — Guests browse and type sample courses from a local catalog; sign in (email/password or Google) to persist courses, collections, and saved practice sessions in PostgreSQL. The same email maps to one echoType account whether you register with password or continue with Google.
 
 ---
 

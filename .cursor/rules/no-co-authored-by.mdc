@@ -1,5 +1,5 @@
 ---
-description: EchoType commit hygiene — never add Co-authored-by; use git commit-tree; verify every commit
+description: echoType commit hygiene — never add Co-authored-by; use git commit-tree; verify every commit
 alwaysApply: true
 ---
 

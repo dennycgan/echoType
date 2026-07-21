@@ -1,5 +1,5 @@
 ---
-description: EchoType workflow gates — design-first, scope control, and two-step user approval before git actions
+description: echoType workflow gates — design-first, scope control, and two-step user approval before git actions
 alwaysApply: true
 ---
 
@@ -19,7 +19,7 @@ These gates apply to every task in this repo. When a gate blocks progress, stop 
 
 **When** the task is non-trivial (new feature, multi-file change, UX flow, API contract, or architectural choice), design-first is mandatory. When in doubt about whether a task is non-trivial, ask the user first instead of guessing. "Trivial" is judged from the user's risk perspective, not from code line count.
 
-**Why:** EchoType phases are gated (Phase 2 → 3 → 4). Asking discrete questions (2–5 decisions) before code is proven; shipping the wrong shape costs more than one review round.
+**Why:** echoType phases are gated (Phase 2 → 3 → 4). Asking discrete questions (2–5 decisions) before code is proven; shipping the wrong shape costs more than one review round.
 
 ## Scope control
 

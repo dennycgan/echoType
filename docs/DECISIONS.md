@@ -1,4 +1,4 @@
-# EchoType — Decision Log (ADR)
+# echoType — Decision Log (ADR)
 
 > Major technical/engineering decisions. Each entry is immutable: never edit or
 > delete its reasoning. To overturn a decision, write a NEW entry and only flip
@@ -1708,3 +1708,22 @@
   - Nickname modal under Night stays a light island by design until a follow-up.
 - Supersedes / superseded-by: none (maintenance polish; does not flip typing
   ADRs).
+
+---
+
+## ADR-0034 — Display brand casing: echoType
+- Status: Accepted (2026-07-21)
+- Commit/PR anchor: 983a035
+- Plain summary (owner reads this): Display name is `echoType` (`echo` modifier, `Type` subject). Existing DB/onboarding description rows may keep the old spelling; no migration. Historical ADR body text keeps the old spelling; do not rewrite.
+- Context: Product display name aligned with the GitHub repo `echoType` for recognition and to distinguish from similarly named sites.
+- Decision:
+  1. **Casing** — User-facing and current docs/rules product name is `echoType` (string only; no dual-style typography).
+  2. **Seeds** — Onboarding catalog copy updated and guest `ONBOARDING_CATALOG` version bumped; already-materialized Postgres descriptions are left as-is.
+  3. **History** — Do not rewrite prior ADR reasoning that says EchoType.
+- Rejected alternatives:
+  - Migrate existing course/collection descriptions in production — out of maintenance scope; accepted temporary mix.
+  - Dual-weight `echo`/`Type` UI split — separate visual work, not this change.
+- Consequences:
+  - New guests and new onboarding seeds see `echoType`; older accounts may still show old casing in stored descriptions.
+  - Sentry project slugs and technical identifiers (`echotype.ink`, `@echotype/*`, SSM) unchanged.
+- Supersedes / superseded-by: none.

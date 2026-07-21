@@ -1,11 +1,11 @@
 ---
-description: EchoType language policy — English for code/UI/commits; Chinese for local kickoff and seed noteText
+description: echoType language policy — English for code/UI/commits; Chinese for local kickoff and seed noteText
 alwaysApply: true
 ---
 
 # Language Policy
 
-EchoType uses a deliberate split: product-facing engineering artifacts in English; Chinese where the spec or demo data calls for it.
+echoType uses a deliberate split: product-facing engineering artifacts in English; Chinese where the spec or demo data calls for it.
 
 ## Code and comments
 

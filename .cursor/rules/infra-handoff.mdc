@@ -1,5 +1,5 @@
 ---
-description: EchoType infra handoff — Terraform and AWS commands are proposed to the user, not executed by the agent
+description: echoType infra handoff — Terraform and AWS commands are proposed to the user, not executed by the agent
 alwaysApply: true
 ---
 

@@ -1,5 +1,5 @@
 ---
-description: EchoType git commit and push discipline — two-step approval, scope check, never chain git writes
+description: echoType git commit and push discipline — two-step approval, scope check, never chain git writes
 alwaysApply: true
 ---
 

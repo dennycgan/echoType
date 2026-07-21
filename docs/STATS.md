@@ -1,4 +1,4 @@
-# EchoType — Stats Metrics Reference
+# echoType — Stats Metrics Reference
 
 > Static definitions and formulas for statistical fields only.  
 > UX flows, persistence policy, phases, and tags → `docs/STATE.md` / `docs/DECISIONS.md`.  

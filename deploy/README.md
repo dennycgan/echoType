@@ -1,4 +1,4 @@
-# EchoType — Cloud walking skeleton (manual deploy)
+# echoType — Cloud walking skeleton (manual deploy)
 
 Terraform provisions EC2 + RDS; the backend runs with docker compose against RDS.
 Automated deploys go through GitHub Actions (OIDC + SSM, no SSH — see the CI/CD
@@ -233,7 +233,7 @@ redirect URI** to match `terraform output -raw google_oauth_redirect_uri`.
 ### GCP Console steps
 
 1. [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services.
-2. **OAuth consent screen** (External): App name `EchoType`; support email; **Privacy policy**
+2. **OAuth consent screen** (External): App name `echoType`; support email; **Privacy policy**
    `https://echotype.ink/privacy`; Authorized domains include `echotype.ink`.
 3. **Credentials → Create OAuth client ID → Web application**:
    - **Authorized redirect URIs** (only this one for Phase 1):
