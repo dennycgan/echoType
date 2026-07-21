@@ -6,10 +6,10 @@ export default {
     extend: {
       colors: {
         // Monkeytype Serika Dark (themes.ts `serika_dark`).
-        // EchoType Night: outer shell uses subAlt; passage/textarea uses bg (swapped vs MT default nesting).
+        // echoType Night: outer shell uses subAlt; passage/textarea uses bg (swapped vs MT default nesting).
         // Untyped body uses `sub` #646669 (MT upcoming text). `text` #d1d0c5 is kept for
         // chrome emphasis (outline CTA labels) — it reads as “already typed” if used on passage.
-        // Annotation yellow = `main`. Typing correct/wrong stay EchoType emerald/red.
+        // Annotation yellow = `main`. Typing correct/wrong stay echoType emerald/red.
         serika: {
           /** Page / header outside the passage box */
           bg: '#2c2e31',

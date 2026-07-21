@@ -19,7 +19,7 @@ export const PRIVACY_POLICY: PrivacyPolicy = {
   title: 'Privacy Policy',
   lastUpdated: 'July 2026',
   intro: [
-    'EchoType ("we", "us") is a personal portfolio project. This policy explains what data we collect and how we use it.',
+    'echoType ("we", "us") is a personal portfolio project. This policy explains what data we collect and how we use it.',
   ],
   sections: [
     {
@@ -33,7 +33,7 @@ export const PRIVACY_POLICY: PrivacyPolicy = {
         {
           type: 'labeled',
           label: 'Google sign-in:',
-          text: 'If you choose to sign in with Google, we receive your Google account email address and display name from Google OAuth. We use this information to create or link your EchoType account. We do not receive your Google password or any other Google account data.',
+          text: 'If you choose to sign in with Google, we receive your Google account email address and display name from Google OAuth. We use this information to create or link your echoType account. We do not receive your Google password or any other Google account data.',
         },
         {
           type: 'labeled',
@@ -59,7 +59,7 @@ export const PRIVACY_POLICY: PrivacyPolicy = {
     {
       heading: 'How we use your data',
       blocks: [
-        { type: 'paragraph', text: 'To provide the EchoType typing practice service' },
+        { type: 'paragraph', text: 'To provide the echoType typing practice service' },
         { type: 'paragraph', text: 'To save your courses and practice history across sessions' },
         { type: 'paragraph', text: 'To identify and fix application errors' },
       ],

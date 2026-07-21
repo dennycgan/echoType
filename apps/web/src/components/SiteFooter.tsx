@@ -22,7 +22,7 @@ export function SiteFooter() {
           GitHub
         </a>
         <span aria-hidden="true">·</span>
-        <span>© {year} EchoType</span>
+        <span>© {year} echoType</span>
       </div>
     </footer>
   );

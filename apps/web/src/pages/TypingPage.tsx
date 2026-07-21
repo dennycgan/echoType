@@ -1164,7 +1164,7 @@ const WPM_TOOLTIP = (
       English typing tests.
     </p>
     <p className="mt-1">
-      EchoType uses that same rule for every course language. For passages that are not written as
+      echoType uses that same rule for every course language. For passages that are not written as
       spaced words (Chinese, Japanese, symbol-heavy text, logographic writing, and similar), the score may
       not match a words-per-minute you would estimate by reading the passage.
     </p>

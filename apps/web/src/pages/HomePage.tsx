@@ -53,7 +53,7 @@ export function HomePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Welcome to EchoType</h1>
+        <h1 className="text-2xl font-semibold">Welcome to echoType</h1>
         <p className="mt-2 text-slate-600">
           Repeat, type, and remember meaningful texts with your own annotated notes.
         </p>

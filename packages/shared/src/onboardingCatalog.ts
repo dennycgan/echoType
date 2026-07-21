@@ -44,14 +44,15 @@ export const ONBOARDING_GUEST_STABLE_COURSE_ID_EXAMPLE = '00000000-0000-4000-800
 
 /** Phase 6.2 onboarding catalog — owner content (2026). */
 export const ONBOARDING_CATALOG: OnboardingCatalog = {
-  version: 3,
+  // v4: refresh guest seed after display-brand casing update in descriptions.
+  version: 4,
   collections: [
     {
       stableId: GUEST_SHORT_COLLECTION_ID,
       mode: 'SHORT',
       name: 'Beyond English',
       description:
-        'EchoType works with any script. This collection features a Tang dynasty poem in Classical Chinese — type the characters, follow the English translations, and experience how the app extends beyond the Latin alphabet.',
+        'echoType works with any script. This collection features a Tang dynasty poem in Classical Chinese — type the characters, follow the English translations, and experience how the app extends beyond the Latin alphabet.',
     },
     {
       stableId: GUEST_ARTICLE_COLLECTION_ID,
@@ -68,7 +69,7 @@ export const ONBOARDING_CATALOG: OnboardingCatalog = {
       collectionStableId: GUEST_SHORT_COLLECTION_ID,
       title: 'Deer Enclosure 鹿柴 (Wang Wei)',
       description:
-        'This course exists to show that EchoType is not limited to any one language or script. Deer Enclosure (Lu Zhai) is a celebrated Tang dynasty poem by Wang Wei, and one of the most beloved works in the Chinese literary canon. The poem moves through stillness, echo, and returning light: "Yet I hear the echo of voices" evokes echo, while "Shining once more upon luscious green moss" suggests return, repetition, and quiet settling. This course lets you type Wang Wei\'s lines, and the poem mirrors EchoType itself: quiet, repeated, echoing, and reflective, in sync with what the product is named for.',
+        'This course exists to show that echoType is not limited to any one language or script. Deer Enclosure (Lu Zhai) is a celebrated Tang dynasty poem by Wang Wei, and one of the most beloved works in the Chinese literary canon. The poem moves through stillness, echo, and returning light: "Yet I hear the echo of voices" evokes echo, while "Shining once more upon luscious green moss" suggests return, repetition, and quiet settling. This course lets you type Wang Wei\'s lines, and the poem mirrors echoType itself: quiet, repeated, echoing, and reflective, in sync with what the product is named for.',
       content: `空山不见人，但闻人语响。
 返景入深林，复照青苔上。`,
       annotations: [
@@ -86,7 +87,7 @@ export const ONBOARDING_CATALOG: OnboardingCatalog = {
       collectionStableId: null,
       title: 'Stray Birds — 49 (Tagore)',
       description:
-        'English prose with Chinese annotations — the primary use case EchoType was built for. Chinese-speaking learners of English type authentic literary text and read notes in their native language. Tagore\'s Stray Birds offers short, complete thoughts ideal for this practice.',
+        'English prose with Chinese annotations — the primary use case echoType was built for. Chinese-speaking learners of English type authentic literary text and read notes in their native language. Tagore\'s Stray Birds offers short, complete thoughts ideal for this practice.',
       content: `I thank thee that I am none of the wheels of power but I am one with the living creatures that are crushed by it.`,
       annotations: [
         { phrase: 'thank thee', note: '感谢上帝（thee 为古英语"你"）' },
@@ -150,7 +151,7 @@ But, in a larger sense, we can not dedicate — we can not consecrate — we can
       collectionStableId: null,
       title: 'What I Have Lived For (Russell)',
       description:
-        'The preface to Bertrand Russell\'s autobiography, written in English and annotated here in Chinese — demonstrating EchoType\'s core use case for Chinese-speaking learners of English. Russell\'s prose is precise and emotionally direct; typing it slowly reveals how carefully each sentence is built.',
+        'The preface to Bertrand Russell\'s autobiography, written in English and annotated here in Chinese — demonstrating echoType\'s core use case for Chinese-speaking learners of English. Russell\'s prose is precise and emotionally direct; typing it slowly reveals how carefully each sentence is built.',
       content: `Three passions, simple but overwhelmingly strong, have governed my life: the longing for love, the search for knowledge, and unbearable pity for the suffering of mankind. These passions, like great winds, have blown me hither and thither, in a wayward course, over a deep ocean of anguish, reaching to the very verge of despair.
 
 I have sought love, first, because it brings ecstasy -- ecstasy so great that I would often have sacrificed all the rest of life for a few hours of this joy. I have sought it, next, because it relieves loneliness -- that terrible loneliness in which one shivering consciousness looks over the rim of the world into the cold unfathomable lifeless abyss. I have sought it, finally, because in the union of love I have seen, in a mystic miniature, the prefiguring vision of the heaven that saints and poets have imagined. This is what I sought, and though it might seem too good for human life, this is what -- at last -- I have found.

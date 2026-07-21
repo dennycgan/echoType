@@ -56,7 +56,7 @@ function resolveInitialEditorState(
   if (editorMode === 'edit' && rawContent !== content) {
     const crCount = (rawContent.match(/\r/g) ?? []).length;
     console.log(
-      `[EchoType] Normalized ${crCount} legacy CRLF endings; annotation indices remapped.`,
+      `[echoType] Normalized ${crCount} legacy CRLF endings; annotation indices remapped.`,
     );
   }
 

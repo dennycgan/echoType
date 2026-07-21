@@ -35,7 +35,7 @@ export function maybeCaptureSentryTest(): void {
   if (!import.meta.env.PROD || !import.meta.env.VITE_SENTRY_DSN) return;
   const params = new URLSearchParams(window.location.search);
   if (params.get('sentry_test') !== '1') return;
-  Sentry.captureException(new Error('EchoType Sentry web probe'));
+  Sentry.captureException(new Error('echoType Sentry web probe'));
 }
 
 export { Sentry };

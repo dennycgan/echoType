@@ -5,13 +5,13 @@ type SiteHeaderProps = {
   className?: string;
 };
 
-/** EchoType / Short / Article — shared across AppLayout and auth pages. */
+/** echoType / Short / Article — shared across AppLayout and auth pages. */
 export function SiteHeader({ trailing, className }: SiteHeaderProps) {
   return (
     <header className={`border-b bg-white dark:border-serika-raised dark:bg-serika-bg${className ? ` ${className}` : ''}`}>
       <nav className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-3">
         <Link to="/" className="text-lg font-semibold text-slate-900 dark:text-serika-text">
-          EchoType
+          echoType
         </Link>
         <Link to="/courses/short" className="text-sm text-slate-600 hover:text-slate-900 dark:text-serika-text dark:hover:text-serika-text">
           Short
