@@ -1,8 +1,6 @@
 # echoType
 
-**Repeat, type, and remember meaningful English texts**
-
-*Practice English typing with your own annotated texts.*
+**Repeat, type, and remember meaningful texts with your own annotated notes.**
 
 **Live:** [echotype.ink](https://echotype.ink)
 
@@ -14,7 +12,7 @@ The name comes from echo — a voice returning. I built it because I wanted to r
 
 ![echoType in action](docs/product-screenshot.png)
 
-Since I am a Chinese native speaker, I can also pin native-language annotations above unfamiliar English words to keep them visible while typing. But the heart is the loop: choose a text I want to remember, type it, return to it.
+You can pin native-language glosses above unfamiliar words — so the meaning stays in sight while you type. But the heart is the loop: choose a text you want to remember, type it, return to it.
 
 ---
 
