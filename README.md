@@ -37,6 +37,7 @@ The stack is conventional React/Node/Postgres. The interesting choices are aroun
 
 | Layer | Choice | Why |
 |-------|--------|-----|
+| Workspace | **pnpm monorepo** | `apps/web`, `apps/api`, and `packages/shared` — one install, shared contracts and onboarding catalog, filtered scripts (`pnpm --filter @echotype/…`). |
 | Language | **TypeScript end-to-end** | Shared contracts across web, API, and a common types package. Inclusive range-index off-by-one bugs are caught at compile time, not in misaligned overlays. |
 | Contracts | **Zod in a shared package** | Same course and annotation payload parsing on client and server; mode-length rules live next to the types the editor imports. |
 | API + DB | **Fastify 5 + Prisma + PostgreSQL** | Small REST surface; courses own annotations replaced atomically inside one database transaction on update. |
@@ -141,7 +142,7 @@ I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I ru
 ## Further reading
 
 - **`docs/STATE.md`** — Current engineering snapshot and roadmap.
-- **`docs/DECISIONS.md`** — Decision log (33 ADRs: anchoring, measurement, stats, auth, Google federation + email identity + password reconstruction, layout, import/export, content whitespace normalization, forgiving mode, immersive refocus + caret under pinch-zoom, home practice summary, typing-session Night mode, custom domain, Sentry, privacy).
+- **`docs/DECISIONS.md`** — Decision log (34 ADRs: anchoring, measurement, stats, auth, Google federation + email identity + password reconstruction, layout, import/export, content whitespace normalization, forgiving mode, immersive refocus + caret under pinch-zoom, home practice summary, typing-session Night mode, custom domain, Sentry, privacy).
 - **`docs/STATS.md`** — Stats field definitions and formulas (the contract).
 - **`deploy/README.md`** — Terraform, SSM access, cloud deploy.
 
