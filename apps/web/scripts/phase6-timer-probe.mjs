@@ -1,4 +1,5 @@
 // Phase 6 session timer smoke (local only; NOT wired into CI).
+// BROKEN since Auth (JWT required): live /api/* calls need Bearer — or migrate to guest course ids. Do not treat SUMMARY PASS as green until fixed.
 //
 // Prereqs: API on :3001 (seeded) and web dev server on :5173.
 // Run: node apps/web/scripts/phase6-timer-probe.mjs

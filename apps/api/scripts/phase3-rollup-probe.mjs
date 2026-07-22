@@ -1,4 +1,5 @@
 // Phase 3 collection rollup smoke probe (local only; NOT wired into CI).
+// BROKEN since Auth (JWT required): live /api/* calls need Bearer — or migrate to guest course ids. Do not treat SUMMARY PASS as green until fixed.
 //
 // Exercises GET/POST /categories rollup via live API:
 //   1. Empty collection → rollup zeros

@@ -111,12 +111,13 @@ pnpm run typecheck
 pnpm --filter @echotype/web test:typing    # alignment / forgiving-mode unit tests
 pnpm --filter @echotype/web test:layout    # annotation overlay layout (extend + band gaps)
 pnpm --filter @echotype/shared test        # shared contract unit tests
-node apps/web/scripts/phase2-probe.mjs     # needs dev servers; expect SUMMARY PASS
+pnpm --filter @echotype/web probe:site-dark    # needs web :5173
+pnpm --filter @echotype/web probe:night-mode   # needs web :5173
 ```
 
 Reset DB: `pnpm --filter @echotype/api prisma:reset` then `SEED_ENV=dev pnpm --filter @echotype/api seed`.
 
-I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I run the Playwright probe locally. Project rules in `.cursor/rules/` keep AI-assisted sessions inside phase scope.
+I ship in phases with manual gates (`docs/STATE.md`); overlay/layout changes use unit tests, and dark/night use the local probes above. Some older auth-era probes need Bearer or guest course ids before they are green again (see `BROKEN` headers in those scripts). Project rules in `.cursor/rules/` keep AI-assisted sessions inside phase scope.
 
 ---
 

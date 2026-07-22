@@ -54,10 +54,12 @@ function resolveInitialEditorState(
   const rawAnnotations = initial?.annotations ?? [];
 
   if (editorMode === 'edit' && rawContent !== content) {
-    const crCount = (rawContent.match(/\r/g) ?? []).length;
-    console.log(
-      `[echoType] Normalized ${crCount} legacy CRLF endings; annotation indices remapped.`,
-    );
+    if (import.meta.env.DEV) {
+      const crCount = (rawContent.match(/\r/g) ?? []).length;
+      console.log(
+        `[echoType] Normalized ${crCount} legacy CRLF endings; annotation indices remapped.`,
+      );
+    }
   }
 
   const contentChanged = rawContent !== content;

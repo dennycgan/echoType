@@ -1,4 +1,5 @@
 // Phase 5 stats-based list sort smoke (local only; NOT wired into CI).
+// BROKEN since Auth (JWT required): live /api/* calls need Bearer — or migrate to guest course ids. Do not treat SUMMARY PASS as green until fixed.
 //
 // Prereq: API on :3001 with Phase 2 cumulative columns + indexes.
 // Run: node apps/api/scripts/phase5-sort-probe.mjs

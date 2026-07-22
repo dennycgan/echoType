@@ -1,4 +1,5 @@
 // Phase 4 lastPracticeHere tag smoke (local only; NOT wired into CI).
+// BROKEN since Auth (JWT required): live /api/* calls need Bearer — or migrate to guest course ids. Do not treat SUMMARY PASS as green until fixed.
 //
 // Prereq: API on :3001 with Phase 2+3 migrations applied.
 // Run: node apps/api/scripts/phase4-last-practice-tag-probe.mjs

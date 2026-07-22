@@ -1,4 +1,5 @@
 // Phase 2 stop-loss probe harness (local only; NOT wired into CI).
+// BROKEN since Auth (JWT required): live /api/* calls need Bearer — or migrate to guest course ids. Do not treat SUMMARY PASS as green until fixed.
 //
 // Collects objective evidence for the AnnotatedText read-only demo:
 //   b-1  measure-effect log: pure typing must add 0 entries; a resize adds
