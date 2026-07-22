@@ -34,7 +34,7 @@ Active capability: Maintenance & polish
 
 ## Now working on (describe ONLY the in-progress item)
 - Goal (one line): Post-launch maintenance — polish and bug fixes as discovered
-- Sub-steps done: Google sign-in capability closed (ADR-0025–0028); typing-session Night mode (ADR-0033)
+- Sub-steps done: Google sign-in capability closed (ADR-0025–0028); typing-session Night mode (ADR-0033); site-wide DocumentDark + tab-memory Night override (ADR-0036)
 - Next step: ongoing
 - Related decisions: see Known debt table
 
@@ -49,7 +49,8 @@ Active capability: Maintenance & polish
 - Types/validation: packages/shared/course.ts, packages/shared/category.ts
 - Course + collection routes: apps/api/src/routes/courses.ts, apps/api/src/routes/categories.ts
 - Typing UI: apps/web/src/pages/TypingPage.tsx
-- Typing Night mode (shell only): apps/web/src/lib/nightMode.ts, NightModeProvider.tsx; Tailwind `serika` tokens in `apps/web/tailwind.config.js`; probe `apps/web/scripts/night-mode-probe.mjs` (ADR-0033)
+- Typing Night mode (shell only): apps/web/src/lib/nightMode.ts, NightModeProvider.tsx; Tailwind `serika` tokens in `apps/web/tailwind.config.js`; probe `apps/web/scripts/night-mode-probe.mjs` (ADR-0033 palette; ADR-0036 tab-memory override)
+- Site DocumentDark (sole `html.dark` writer): apps/web/src/RootLayout.tsx, apps/web/src/lib/DocumentDarkProvider.tsx; probe `apps/web/scripts/site-dark-probe.mjs` (ADR-0036)
 - Typing scroll + immersive caret pin: apps/web/src/lib/typingScroll.ts (ADR-0031)
 - Session timer + pause: apps/web/src/components/typing/SessionTimerStrip.tsx, TimerEndDialog.tsx, apps/web/src/lib/sessionTimer.ts; probe `apps/web/scripts/phase7-pause-probe.mjs`
 - Typing Back paths: apps/web/src/lib/collectionPaths.ts
@@ -102,3 +103,5 @@ Active capability: Maintenance & polish
 | Ops & safety | CloudWatch structured logging/alarms (planned Ops Phase 2; never shipped) | Current user volume does not warrant | Revisit when user volume warrants | ADR-0023, ADR-0024 |
 | Ops & safety | API rate limiting (planned Ops Phase 3; never shipped) | Same | Same | ADR-0023, ADR-0024 |
 | Custom domain | Wildcard `*.echotype.ink` CNAME still points to Porkbun parking | MVP canonical host is apex only (ADR-0022); ACM cert covers wildcard for future subdomains | future if www or subdomain needed | ADR-0022 |
+| Frontend | No semantic color tokens; ~44 files use hardcoded Tailwind scales (bg-white, slate-*) plus per-component dark: serika overrides | Intentional: dark: path without CSS variables (ADR-0036); revisit if a third theme or large palette churn | Future if multi-theme needed | ADR-0036 |
+| Typing | Site DocumentDark (auto) and typing Night override (tab memory) coexist; typing can diverge from system within a tab until reload or Follow browser setting | Intentional C1-memory + retained Night switch (ADR-0036) | Revisit if users find divergence confusing | ADR-0036 |

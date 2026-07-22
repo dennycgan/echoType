@@ -19,7 +19,7 @@ You can pin native-language glosses above unfamiliar words — so the meaning st
 ## Differentiators
 
 - **Choose your own meaningful text** — Courses are passages and short articles you pick and keep (e.g. *Stray Birds*, favorite quotes). No random word lists; the text itself is the point.
-- **Quiet repetition over WPM** — The session is for low-pressure review and muscle memory, not speed leaderboards. Auto-loop restarts the passage on completion; a session timer with pause supports timeboxed practice. Optional *Night mode* softens the typing shell (header included) for long sessions — scoped to that page only, not a site-wide theme; it follows the browser light/dark preference by default, with a local override you can clear.
+- **Quiet repetition over WPM** — The session is for low-pressure review and muscle memory, not speed leaderboards. Auto-loop restarts the passage on completion; a session timer with pause supports timeboxed practice. The app follows the browser light/dark preference automatically (no site theme toggle). On the typing page, optional *Night mode* can force the shell light or dark for the current tab only (clears on refresh); “Follow browser setting” returns to automatic.
 - **Low-pressure modes** — *Immersive mode* hides the input box so you type against the passage itself. *Forgiving mode* relaxes accuracy grading: spaces, punctuation, and Latin letter case are ignored, while letters and numbers still must match.
 - **Native-language annotation overlay** — Optional notes in your own language float above anchored English characters while you type, so glosses stay in context instead of a separate glossary. On the typing page, long notes can widen into unused line space on the same row (without covering the next note).
 - **Notes survive edits** — If you change the source text later, your notes are not silently wiped. The app shows you which notes still align and which need your attention before saving.
@@ -41,7 +41,7 @@ The stack is conventional React/Node/Postgres. The interesting choices are aroun
 | API + DB | **Fastify 5 + Prisma + PostgreSQL** | Small REST surface; courses own annotations replaced atomically inside one database transaction on update. |
 | Anchor snapshots | **Server-derived only** | Clients send character indices and note text; the API derives the anchored substring at save time so stored snapshots cannot be spoofed. |
 | Overlay layout | **Mirror measurement + global indices** | A hidden mirror measures per-character `offsetTop` for visual-line breaks and per-glyph `getBoundingClientRect` for horizontal edges (charEdges); annotations are stored as global indices. Post-layout width rules widen note labels and separate touching highlight bands without re-measuring on each keystroke. |
-| Frontend | **React 18 + Vite + Tailwind** | Component model fits a measurement-heavy overlay; utilities keep the typing surface simple without a heavy design system. |
+| Frontend | **React 18 + Vite + Tailwind** | Component model fits a measurement-heavy overlay; utilities keep the typing surface simple without a heavy design system. Class-based `dark:` variants follow `prefers-color-scheme` site-wide (no CSS-variable theme layer). |
 | State | **Zustand + TanStack Query** | Local typing UI state vs server-backed course list and mutations. |
 | Auth | **AWS Cognito (email/password SRP + Google IdP) + JWT in Fastify** | Email/password or Continue with Google (Hosted UI, `openid email profile`). Cognito `sub` is the user primary key; Postgres `users.email` is the account identity source of truth so Google and password sign-in link to one profile. A Google-only account can add a password later: since the pool authenticates by email and a federated username (`Google_<sub>`) is unreachable by email-based auth, the API rebuilds it as a native user (create → set password → migrate the Postgres `id` via `ON UPDATE CASCADE` → delete orphan → relink), create-first with compensating cleanup so any step can fail safely. Guests browse and type sample courses from `localStorage`; signed-in users persist data in PostgreSQL. New accounts with zero courses receive a one-time onboarding seed (`POST /api/onboarding/seed`). Public [privacy policy](https://echotype.ink/privacy) (includes Google OAuth disclosure). |
 | Regression guard | **Playwright probes (local) + unit tests** | Stop-loss scripts after overlay/layout/auth changes; alignment and stats helpers unit-tested (`node:test`). |
@@ -126,21 +126,21 @@ I ship in phases with manual gates (`docs/STATE.md`); after overlay changes I ru
 |--------|------------|
 | ✅ | **Annotation feature** — Shared Zod contracts, overlay rendering (charEdges + post-layout width rules), four-step editor, edit-time review (re-anchor / delete) |
 | ✅ | **Cloud deploy** — Terraform-provisioned EC2/RDS/S3/CloudFront; OIDC + SSM deploys; live at https://echotype.ink |
-| ✅ | **Typing experience** — Auto-loop, newline auto-skip, IME composition, session timer with pause, immersive & forgiving modes, typing-shell Night mode, .txt import/export |
+| ✅ | **Typing experience** — Auto-loop, newline auto-skip, IME composition, session timer with pause, immersive & forgiving modes, typing-shell Night mode (tab-memory override), .txt import/export |
 | ✅ | **Course management** — Short/Article mode routes, search/sort, descriptions, collections with batch add and stats rollup |
 | ✅ | **Course stats** — Per-session rows + materialized course cumulative; home cross-course summary via aggregate API; formulas contracted in `docs/STATS.md` |
 | ✅ | **Auth** — Cognito email/password (SRP), JWT-verified API, guest sample catalog, account page (nickname, password change, delete), onboarding seed for new users |
 | ✅ | **Custom domain** — echotype.ink via ACM + CloudFront alias; HTTPS enforced |
 | ✅ | **Ops & safety** — Sentry (web + API), public privacy policy, unified loading/error/empty states |
 | ✅ | **Google sign-in** — Cognito Google IdP, Hosted UI OAuth, email-based account linking, add-password for Google-only accounts via identity reconstruction, privacy Google disclosure |
-| 🔧 | **Maintenance** — Ongoing polish and UX fixes |
+| 🔧 | **Maintenance** — Ongoing polish and UX fixes (incl. site-wide dark appearance following the browser) |
 
 ---
 
 ## Further reading
 
 - **`docs/STATE.md`** — Current engineering snapshot and roadmap.
-- **`docs/DECISIONS.md`** — Decision log (35 ADRs: anchoring, measurement, stats, auth, Google federation + email identity + password reconstruction, layout, import/export + export-notes footer, content whitespace normalization, forgiving mode, immersive refocus + caret under pinch-zoom, home practice summary, typing-session Night mode, custom domain, Sentry, privacy).
+- **`docs/DECISIONS.md`** — Decision log (36 ADRs: anchoring, measurement, stats, auth, Google federation + email identity + password reconstruction, layout, import/export + export-notes footer, content whitespace normalization, forgiving mode, immersive refocus + caret under pinch-zoom, home practice summary, typing-session Night mode, site-wide DocumentDark + tab-memory Night override, custom domain, Sentry, privacy).
 - **`docs/STATS.md`** — Stats field definitions and formulas (the contract).
 - **`deploy/README.md`** — Terraform, SSM access, cloud deploy.
 

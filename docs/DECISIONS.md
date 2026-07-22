@@ -1656,7 +1656,10 @@
 ---
 
 ## ADR-0033 — Typing-session Night mode (Serika shell; browser color-scheme default)
-- Status: Accepted (2026-07-21)
+- Status: Superseded in part by ADR-0036 (2026-07-22) — preference storage
+  (localStorage permanent pin) and document `html.dark` scope (typing-only /
+  no site-wide theme). Serika typing palette and Night switch UI still apply;
+  see ADR-0036 for current document-dark + tab-memory override rules.
 - Commit/PR anchor: 7a73d8e
 - Plain summary (owner reads this): On the typing page only, users can turn on a
   soft dark “Night mode” (including the top bar). By default it follows the
@@ -1706,8 +1709,8 @@
   - Auth pages sharing `SiteHeader` remain light unless a typing Night session
     left `html.dark` on (must keep teardown on route leave).
   - Nickname modal under Night stays a light island by design until a follow-up.
-- Supersedes / superseded-by: none (maintenance polish; does not flip typing
-  ADRs).
+- Supersedes / superseded-by: Superseded in part by ADR-0036 (preference
+  storage + document dark scope). Palette and Night switch chrome remain.
 
 ---
 
@@ -1775,3 +1778,57 @@
   - Future auto-strip or escape syntax needs a new ADR.
 - Supersedes / superseded-by: clarifies ADR-0019 (header wording); does not
   replace ADR-0018/0019 marker syntax.
+
+---
+
+## ADR-0036 — Site-wide DocumentDark + tab-memory typing Night override
+- Status: Accepted (2026-07-22)
+- Commit/PR anchor: aba8558
+- Plain summary (owner reads this): The whole app (including auth pages)
+  follows the browser light/dark setting automatically — no site theme
+  toggle. A single root writer sets `html.dark`. On the typing page only,
+  Night mode can still be forced on/off for the current browser tab; that
+  choice lives in memory (survives switching courses in the same tab, clears
+  on refresh or closing the tab). Old permanent localStorage pins are deleted
+  on load and not re-applied.
+- Context: Non-typing pages stayed bright at night after ADR-0033 scoped
+  `html.dark` to `/type`. Users also found a permanent Night override easy to
+  forget once the rest of the site auto-followed the browser. We wanted
+  GitHub-style system following without a multi-theme / CSS-variable redesign.
+- Decision:
+  1. **Document dark** — `RootLayout` + `DocumentDarkProvider` is the sole
+     writer of `html.dark` (`darkMode: 'class'`). Off typing routes (and on
+     typing with no override): `prefers-color-scheme`. Auth and App share the
+     same root provider (no per-layout listeners).
+  2. **effectiveDark** — If path is `/…/type` and in-memory preference is
+     `'1'`/`'0'`, use that; otherwise follow the browser. Leaving typing does
+     not clear the in-memory override; full reload / new tab does.
+  3. **Typing Night UI** — Switch + “Follow browser setting” remain
+     (ADR-0033 layout). Preference is module memory via `nightMode.ts`
+     (subscribe for same-tab sync); no localStorage/sessionStorage writes.
+     On boot, `removeItem('echotype-night-mode')` if present — do not load
+     legacy values into memory.
+  4. **Visual** — Non-typing dark shells use `dark:bg-serika-bg` (`#2c2e31`);
+     chrome uses existing `serika-*` `dark:` utilities. Light classes
+     (`bg-white`, `bg-slate-50`, …) unchanged. No CSS variable / semantic
+     token layer (intentional; see Known debt).
+  5. **Probes** — `night-mode-probe.mjs` (SPA keep / reload clear / legacy
+     clear) and `site-dark-probe.mjs` (home + login); local only, not CI.
+- Rejected alternatives:
+  - Site-wide CSS-variable / semantic token theme system — higher cost than
+    maintenance scope; portfolio product does not need a third theme yet.
+  - Permanent localStorage Night pin (ADR-0033) — diverges from site auto
+    dark and is easy to leave stuck; replaced by tab memory (C1-memory).
+  - sessionStorage “refresh clears” — incorrect; sessionStorage survives
+    refresh. True refresh-clear requires memory-only (or explicit wipe).
+  - Dual writers (NightModeProvider + site listener both mutating `html`) —
+    races on route leave; single writer only.
+- Consequences:
+  - Typing can still disagree with the system within one tab until reload or
+    Follow browser setting (Known debt).
+  - Components carry light + `dark:` hard-coded utilities (Known debt).
+  - ADR-0033 Serika typing palette and switch UX remain; only preference
+    persistence and document-dark scope change here.
+- Supersedes / superseded-by: Supersedes ADR-0033 preference storage and
+  typing-only `html.dark` / “no site-wide theme” scope. Does not replace
+  Serika palette decisions in ADR-0033.
