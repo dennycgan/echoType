@@ -259,7 +259,7 @@ export async function registerCourseRoutes(app: FastifyInstance) {
 
     const existing = await prisma.course.findFirst({
       where: { id: req.params.id, userId: req.userId },
-      select: { id: true },
+      select: { id: true, categoryId: true },
     });
     if (!existing) {
       return reply.status(404).send({ error: 'not_found' });
@@ -276,7 +276,9 @@ export async function registerCourseRoutes(app: FastifyInstance) {
             title: body.title,
             content,
             mode: body.mode as CourseMode,
-            categoryId: body.categoryId ?? null,
+            // PUT does not own collection membership (that is PATCH /courses/category):
+            // absent categoryId = preserve current value; explicit null = clear.
+            categoryId: body.categoryId !== undefined ? (body.categoryId ?? null) : existing.categoryId,
             description: toOptionalDescription(body.description),
             annotations: { create: toAnnotationRows(content, body.annotations) },
           },

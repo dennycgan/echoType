@@ -237,14 +237,15 @@ export function updateGuestCourse(id: string, input: UpdateCourseInput): CourseD
     title: input.title,
     content: input.content,
     mode: input.mode,
-    categoryId: null,
+    // Same contract as PUT /courses/:id: absent categoryId = preserve; null = clear.
+    categoryId: input.categoryId !== undefined ? (input.categoryId ?? null) : existing.categoryId,
     description: input.description ?? null,
     annotations: buildAnnotationDtos(input.content, input.annotations),
     updatedAt: nowIso(),
   };
   storage.courses[idx] = updated;
   writeStorage(storage);
-  return guestCourseToDTO(updated, null);
+  return guestCourseToDTO(updated, categoryNameFor(storage, updated.categoryId));
 }
 
 export function deleteGuestCourse(id: string): void {
