@@ -1834,3 +1834,30 @@
 - Supersedes / superseded-by: Supersedes ADR-0033 preference storage and
   typing-only `html.dark` / “no site-wide theme” scope. Does not replace
   Serika palette decisions in ADR-0033.
+
+---
+
+## ADR-0037 — PUT /courses/:id does not own collection membership
+- Status: Accepted (2026-08-01)
+- Commit/PR anchor: f8b45da
+- Plain summary (owner reads this): Editing and saving a course no longer
+  removes it from its collection. Collection membership only changes when
+  you explicitly move courses (or clear membership via that move API).
+- Context: Course editor Save sends PUT without `categoryId`. The API treated
+  a missing field as `null`, so every edit ejected the course into the mode
+  list’s uncategorized courses. Guest local update had the same hard-clear.
+- Decision:
+  1. **PUT semantics** — Absent `categoryId` preserves the stored value;
+     explicit `null` clears; a cuid sets membership. Same rule in
+     `updateGuestCourse`.
+  2. **Ownership** — Collection moves stay on `PATCH /courses/category`
+     (and the matching guest move path). PUT is for course content fields.
+- Rejected alternatives:
+  - Frontend-only fix (edit payload always re-sends `course.categoryId`) —
+    still leaves the API trap for any client that omits the field.
+- Consequences:
+  - Callers that relied on “omit = clear” on PUT must send explicit `null`.
+  - Editor UI still does not expose collection changes; no web payload change
+    required for this fix.
+- Supersedes / superseded-by: none
+

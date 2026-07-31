@@ -34,7 +34,7 @@ Active capability: Maintenance & polish
 
 ## Now working on (describe ONLY the in-progress item)
 - Goal (one line): Post-launch maintenance — polish and bug fixes as discovered
-- Sub-steps done: Google sign-in capability closed (ADR-0025–0028); typing-session Night mode (ADR-0033); site-wide DocumentDark + tab-memory Night override (ADR-0036)
+- Sub-steps done: Google sign-in capability closed (ADR-0025–0028); typing-session Night mode (ADR-0033); site-wide DocumentDark + tab-memory Night override (ADR-0036); preserve categoryId on course PUT (ADR-0037)
 - Next step: ongoing
 - Related decisions: see Known debt table
 
@@ -47,7 +47,7 @@ Active capability: Maintenance & polish
 - Collection rollup: packages/shared/categoryRollup.ts, apps/api/src/routes/categories.ts
 - Session types/API: packages/shared/session.ts, apps/api/src/routes/sessions.ts
 - Types/validation: packages/shared/course.ts, packages/shared/category.ts
-- Course + collection routes: apps/api/src/routes/courses.ts, apps/api/src/routes/categories.ts
+- Course + collection routes: apps/api/src/routes/courses.ts, apps/api/src/routes/categories.ts (PUT preserves categoryId when omitted — ADR-0037; moves via PATCH /courses/category)
 - Typing UI: apps/web/src/pages/TypingPage.tsx
 - Typing Night mode (shell only): apps/web/src/lib/nightMode.ts, NightModeProvider.tsx; Tailwind `serika` tokens in `apps/web/tailwind.config.js`; probe `apps/web/scripts/night-mode-probe.mjs` (ADR-0033 palette; ADR-0036 tab-memory override)
 - Site DocumentDark (sole `html.dark` writer): apps/web/src/RootLayout.tsx, apps/web/src/lib/DocumentDarkProvider.tsx; probe `apps/web/scripts/site-dark-probe.mjs` (ADR-0036)
