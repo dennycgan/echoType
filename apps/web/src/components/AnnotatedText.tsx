@@ -21,6 +21,10 @@ import {
   type Note,
 } from './annotated-text/layoutUtils';
 import { createCanvasTextMeasurer, extendNoteWidths } from './annotated-text/noteExtension';
+import {
+  computeNotePopoverPlacement,
+  type NotePopoverPlacement,
+} from './annotated-text/notePopoverPlacement';
 import { useTextMeasurement } from './annotated-text/useTextMeasurement';
 import type { TargetCharStatus } from '../lib/typingAlign';
 import { TYPING_SURFACE_BASE, TYPING_SURFACE_CLASS } from '../lib/typingSurface';
@@ -331,17 +335,33 @@ function NotePopover({
   popoverRef: RefObject<HTMLDivElement>;
   onClose: () => void;
 }) {
-  const [pos, setPos] = useState({ top: 0, left: 0, minWidth: 0, maxWidth: 240 });
+  // null until layout measures — stay visibility:hidden to avoid a placement flash.
+  const [pos, setPos] = useState<NotePopoverPlacement | null>(null);
 
   useLayoutEffect(() => {
+    const el = popoverRef.current;
+    if (!el) return;
+
     const rect = anchorEl.getBoundingClientRect();
-    setPos({
-      top: rect.top,
-      left: rect.left,
-      minWidth: rect.width,
-      maxWidth: Math.max(rect.width, 240),
-    });
-  }, [anchorEl, text]);
+    // Width affects wrap height; apply before measuring so prefer-up/flip is accurate.
+    const minWidth = rect.width;
+    const maxWidth = Math.max(rect.width, 240);
+    el.style.left = `${rect.left}px`;
+    el.style.minWidth = `${minWidth}px`;
+    el.style.maxWidth = `${maxWidth}px`;
+    el.style.top = 'auto';
+    el.style.bottom = 'auto';
+    el.style.visibility = 'hidden';
+
+    const height = el.getBoundingClientRect().height;
+    setPos(
+      computeNotePopoverPlacement(
+        { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
+        height,
+        window.innerHeight,
+      ),
+    );
+  }, [anchorEl, text, popoverRef]);
 
   return createPortal(
     <div
@@ -349,12 +369,15 @@ function NotePopover({
       role="dialog"
       aria-label="Annotation note"
       data-testid="note-popover"
+      data-placement={pos?.placement}
       className="fixed z-50 cursor-pointer rounded-md border border-amber-200 bg-white px-2 py-1 text-amber-800 shadow-md dark:border-serika-main/50 dark:bg-serika-surface dark:text-serika-main"
       style={{
-        top: pos.top,
-        left: pos.left,
-        minWidth: pos.minWidth,
-        maxWidth: pos.maxWidth,
+        visibility: pos ? 'visible' : 'hidden',
+        top: pos?.placement === 'down' ? pos.top : 'auto',
+        bottom: pos?.placement === 'up' ? pos.bottom : 'auto',
+        left: pos?.left ?? 0,
+        minWidth: pos?.minWidth ?? 0,
+        maxWidth: pos?.maxWidth ?? 240,
         fontSize: NOTE_FONT_PX,
         lineHeight: `${NOTE_LINE_PX}px`,
         whiteSpace: 'pre-wrap',
@@ -533,6 +556,7 @@ export function AnnotatedText({
 
       {clickableNotes && openNoteId && openNoteAnchorEl && openNoteText && (
         <NotePopover
+          key={openNoteId}
           text={openNoteText}
           anchorEl={openNoteAnchorEl}
           popoverRef={popoverRef}
