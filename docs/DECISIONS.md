@@ -1861,3 +1861,45 @@
     required for this fix.
 - Supersedes / superseded-by: none
 
+---
+
+## ADR-0038 — Note wrap slack raised for line-clamp dead zone (not wrap-model parity)
+- Status: Accepted (2026-08-08)
+- Commit/PR anchor: c2bae94
+- Plain summary (owner reads this): Typing-page note bubbles add a larger
+  safety margin (6px) after the wrap simulator picks a width, because the
+  simulator can be a few pixels tighter than the browser’s two-line clamp.
+  We did not rewrite the simulator to match WebKit exactly.
+- Context: ADR-0016 binary-searches note width with `wrappedLineCount`, then
+  adds `wrapSlackPx`. Mixed IPA + CJK notes (e.g. `kənspaɪə/…`) showed a
+  measured dead zone: sim accepted ~178px while Chromium `-webkit-line-clamp`
+  still overflowed until ~181px (≥3px). Raising slack from 2→6 fixed the
+  observed cases. Aligning sim break rules with WebKit (“option 3”) was
+  deferred.
+- Decision:
+  1. **Default `NOTE_WRAP_SLACK_PX = 6`** — Covers the known ≥3px dead zone
+     with headroom; still capped by hardCap (line edge / next note − 4px).
+  2. **Keep pixel-gap / hardCap / 24px trigger / minGap unchanged** — Slack
+     is independent of overlap protection (verified across slack 2/4/6).
+  3. **Do not adopt per-note hidden-DOM `fits()`** — Would reintroduce
+     linear DOM measurement cost rejected alongside ADR-0016 alternatives.
+  4. **Known limitation** — Slack is a safety margin, not wrap-model parity.
+     A worse dead zone (longer unbreakable mixed tokens, future engine
+     differences) can still truncate under hardCap room. Fix path then is
+     align `wrappedLineCount` with `-webkit-box` breaking, or revisit DOM
+     validation with an explicit cost ADR — not blindly raising slack again
+     without measurement.
+- Rejected alternatives (this change):
+  - Slack = 4 — only ~1px above the one measured sample; fragile.
+  - Hidden DOM `fits()` in production — cost/ADR-0016 direction conflict.
+  - Full sim↔WebKit parity in the same fix — larger scope; deferred.
+- Consequences:
+  - Bubbles may be a few pixels wider when binary search succeeds; hardCap
+    still bounds them.
+  - Unit tests lock slack=6 and a mixed IPA+CJK regression (sim ≤2 lines,
+    ≤ hardCap); they cannot reproduce WebKit overflow in `node:test`.
+  - Future similar truncations: re-measure minSimOk vs minDomOk before
+    changing constants; prefer wrap-model work if dead zones grow.
+- Supersedes / superseded-by: none (narrows ADR-0016 slack semantics;
+  does not replace ADR-0016 extension rules)
+
