@@ -1903,3 +1903,47 @@
 - Supersedes / superseded-by: none (narrows ADR-0016 slack semantics;
   does not replace ADR-0016 extension rules)
 
+---
+
+## ADR-0039 — NotePopover prefer-up placement (vertical only)
+- Status: Accepted (2026-08-08)
+- Commit/PR anchor: 63980ca
+- Plain summary (owner reads this): Typing-page full-note popovers expand
+  upward from the bubble bottom when space allows, so they do not cover the
+  body line under the note slot; near the viewport top they flip downward.
+- Context: Clicking a truncated NoteBox opens `NotePopover` (portal,
+  `position: fixed`). The old placement set `top: rect.top` and grew
+  downward. NoteBoxes already sit in the overlay slot above body text, so
+  downward growth (plus popover padding/border) covered the tops of the
+  anchored body line. NoteBox / `extendNoteWidths` (ADR-0016 / ADR-0038)
+  stay untouched.
+- Decision:
+  1. **Prefer up, bottom-aligned to `anchor.bottom`** — CSS `bottom =
+     viewportHeight - rect.bottom` so the popover replaces the hidden
+     bubble in place and grows upward.
+  2. **Flip down when upward top would be above an 8px viewport margin**
+     (`NOTE_POPOVER_VIEWPORT_MARGIN_PX`) — covers first-line notes and
+     immersive top; flip-down may re-cover body text (accepted fallback).
+  3. **Measure while `visibility: hidden`, then show** — one
+     `useLayoutEffect` applies width, measures height, commits final
+     placement, then becomes visible to avoid a placement flash.
+  4. **Pure `computeNotePopoverPlacement` + unit tests** — layout policy
+     lives outside the React component.
+  5. **Known limitation: no horizontal collision detection** — `left` /
+     `maxWidth: max(anchor.width, 240)` follow the anchor only and may
+     overflow the right edge on narrow viewports; deferred.
+- Rejected alternatives (this change):
+  - Always expand upward with top clamp only — first-line / immersive top
+    still clips or looks cramped without a flip.
+  - Float entirely above `rect.top` — breaks “in-place expand hidden
+    bubble” continuity and leaves a gap.
+  - 0px viewport margin — too flush against browser chrome.
+  - Horizontal collision in the same change — out of scope.
+- Consequences:
+  - Mid-passage opens no longer cover the annotated body line when up
+    fits; top-of-viewport opens keep prior downward behavior.
+  - `shadow-md` may still visually kiss glyph tops across the ~2px slot
+    gap without layout-box overlap.
+  - Future horizontal overflow needs a separate placement pass / ADR.
+- Supersedes / superseded-by: none
+

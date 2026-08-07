@@ -34,7 +34,7 @@ Active capability: Maintenance & polish
 
 ## Now working on (describe ONLY the in-progress item)
 - Goal (one line): Post-launch maintenance — polish and bug fixes as discovered
-- Sub-steps done: Google sign-in capability closed (ADR-0025–0028); typing-session Night mode (ADR-0033); site-wide DocumentDark + tab-memory Night override (ADR-0036); preserve categoryId on course PUT (ADR-0037)
+- Sub-steps done: Google sign-in capability closed (ADR-0025–0028); typing-session Night mode (ADR-0033); site-wide DocumentDark + tab-memory Night override (ADR-0036); preserve categoryId on course PUT (ADR-0037); note wrap slack dead-zone (ADR-0038); NotePopover prefer-up placement (ADR-0039)
 - Next step: ongoing
 - Related decisions: see Known debt table
 
@@ -57,7 +57,7 @@ Active capability: Maintenance & polish
 - Mode list + collections UI: apps/web/src/pages/CourseListPage.tsx, CollectionDetailPage.tsx
 - List sort options + localStorage: apps/web/src/lib/courseListSort.ts
 - Card stats UI: apps/web/src/components/card/CardPracticeStats.tsx
-- Annotation rendering: apps/web/src/components/AnnotatedText.tsx + apps/web/src/components/annotated-text/useTextMeasurement.ts
+- Annotation rendering: apps/web/src/components/AnnotatedText.tsx + apps/web/src/components/annotated-text/useTextMeasurement.ts; NotePopover placement `notePopoverPlacement.ts` (ADR-0039)
 - Editor + review: apps/web/src/components/editor/useCourseEditor.ts, reviewUtils.ts, AnnotatedTextEditor.tsx
 - Deploy: deploy/README.md, .github/workflows/deploy.yml, .github/workflows/deploy-web.yml
 - Sentry (web): apps/web/src/lib/sentry.ts, vite.config.ts (`@sentry/vite-plugin`); probe `apps/web/scripts/ops-sentry-probe.mjs`; SSM `/echotype/SENTRY_DSN_WEB`
