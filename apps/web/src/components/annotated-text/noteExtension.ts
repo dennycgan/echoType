@@ -21,8 +21,12 @@ import { NOTE_MAX_LINES, type Note } from './layoutUtils';
 export const NOTE_EXTEND_THRESHOLD_PX = 24;
 /** Keep at least this many px between an extended bubble and the next one. */
 export const NOTE_MIN_GAP_PX = 4;
-/** Safety margin added to the found minimal width (canvas vs DOM subpixel drift). */
-export const NOTE_WRAP_SLACK_PX = 2;
+/**
+ * Safety margin added to the found minimal width.
+ * Covers sim (`wrappedLineCount`) vs `-webkit-line-clamp` dead zones (measured
+ * ≥3px on mixed IPA+CJK notes, 2026-08); 6px leaves headroom beyond that floor.
+ */
+export const NOTE_WRAP_SLACK_PX = 6;
 
 export type NoteExtensionOptions = {
   extendThresholdPx?: number;

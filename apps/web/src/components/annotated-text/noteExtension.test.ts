@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { extendNoteWidths, wrappedLineCount } from './noteExtension.js';
+import {
+  NOTE_WRAP_SLACK_PX,
+  extendNoteWidths,
+  wrappedLineCount,
+} from './noteExtension.js';
 import type { Note } from './layoutUtils.js';
 
 // Length-proportional stub: every char is `ppc` px wide (spaces included),
@@ -50,11 +54,11 @@ describe('extendNoteWidths', () => {
     // Real data from the On Love (Gibran) debug logs:
     // fullTextPx=159 for 22 chars -> ppc = 159/22; currentWidth=67; left=328;
     // container 830 -> hardCap 502. Minimal 2-line width = "a bird's wing"
-    // = 13 chars = 93.95px -> minimal integer 94, +2 slack = 96.
+    // = 13 chars = 93.95px -> minimal integer 94, + NOTE_WRAP_SLACK_PX (6) = 100.
     const text = "a bird's wing feathers";
     const measure = makeMeasure(159 / 22);
     const out = extendNoteWidths([note('pinions', 328, 67, text)], 830, measure);
-    assert.equal(out[0]!.width, 96);
+    assert.equal(out[0]!.width, 94 + NOTE_WRAP_SLACK_PX);
     assert.ok(wrappedLineCount(text, out[0]!.width, measure) <= 2);
     assert.equal(out[0]!.left, 328);
   });
@@ -62,11 +66,11 @@ describe('extendNoteWidths', () => {
   it('threshes fixture: extends so the real note text fits two lines', () => {
     // fullTextPx=282 for 39 chars -> ppc = 282/39; currentWidth=77; left=29;
     // container 830 -> hardCap 801. Minimal 2-line width =
-    // "beats grain to separate" = 23 chars = 166.31px -> 167, +2 slack = 169.
+    // "beats grain to separate" = 23 chars = 166.31px -> 167, + slack 6 = 173.
     const text = 'beats grain to separate seed from stalk';
     const measure = makeMeasure(282 / 39);
     const out = extendNoteWidths([note('threshes', 29, 77, text)], 830, measure);
-    assert.equal(out[0]!.width, 169);
+    assert.equal(out[0]!.width, 167 + NOTE_WRAP_SLACK_PX);
     assert.ok(wrappedLineCount(text, out[0]!.width, measure) <= 2);
   });
 
@@ -115,7 +119,7 @@ describe('extendNoteWidths', () => {
     );
     assert.equal(out[0]!.width, 50); // gap 0 -> no extension, no forced gap
     assert.equal(out[0]!.left, 0);
-    assert.equal(out[1]!.width, 112); // last note: minimal 110 + 2 slack
+    assert.equal(out[1]!.width, 110 + NOTE_WRAP_SLACK_PX); // last note: min 110 + slack
     assert.equal(out[1]!.left, 50);
   });
 
@@ -126,9 +130,9 @@ describe('extendNoteWidths', () => {
       measure10,
     );
     assert.equal(out[0]!.id, 'b');
-    assert.equal(out[0]!.width, 112); // last note, room available
+    assert.equal(out[0]!.width, 110 + NOTE_WRAP_SLACK_PX); // last note, room available
     assert.equal(out[1]!.id, 'a');
-    assert.equal(out[1]!.width, 112); // gap 100 > 24; cap 196 > 112
+    assert.equal(out[1]!.width, 110 + NOTE_WRAP_SLACK_PX); // gap 100 > 24; cap 196 > result
   });
 
   it('three notes: each capped independently, lefts never move', () => {
@@ -157,9 +161,40 @@ describe('extendNoteWidths', () => {
   });
 
   it('extends CJK notes per-character', () => {
-    // 9 CJK chars at 10px: minimal 2-line width 50 -> +2 slack = 52
+    // 9 CJK chars at 10px: minimal 2-line width 50 -> + slack 6 = 56
     const out = extendNoteWidths([note('a', 0, 30, '十个中文字符的注释')], 400, measure10);
-    assert.equal(out[0]!.width, 52);
+    assert.equal(out[0]!.width, 50 + NOTE_WRAP_SLACK_PX);
+  });
+
+  it('mixed IPA+CJK with long unbreakable token: sim-fits within hardCap (slack regression)', () => {
+    // Regression (2026-08 TypingPage audit): note like
+    // "kənspaɪə/暗中配合（非贬义）/ 原意-共谋；图谋（一般贬义）" extended to
+    // newWidth=180 (slack=2) while Chromium -webkit-line-clamp still needed
+    // ~181px (dead zone ≥3px). Default slack raised 2→6. This suite is
+    // pure-function (no DOM); it cannot reproduce webkit overflow — it locks
+    // that extension still runs, stays ≤ hardCap, sim reports ≤2 lines, and
+    // default slack is 4px wider than an explicit wrapSlackPx:2 pass.
+    const text = 'kənspaɪə/暗中配合（非贬义）/ 原意-共谋；图谋（一般贬义）';
+    const left = 405;
+    const phraseWidth = 87;
+    const containerWidth = 832;
+    const hardCap = containerWidth - left; // 427; single note on the line
+    const withDefault = extendNoteWidths(
+      [note('conspires', left, phraseWidth, text)],
+      containerWidth,
+      measure10,
+    );
+    const withSlack2 = extendNoteWidths(
+      [note('conspires', left, phraseWidth, text)],
+      containerWidth,
+      measure10,
+      { wrapSlackPx: 2 },
+    );
+    assert.ok(withDefault[0]!.width > phraseWidth);
+    assert.ok(withDefault[0]!.width <= hardCap);
+    assert.ok(wrappedLineCount(text, withDefault[0]!.width, measure10) <= 2);
+    assert.equal(withDefault[0]!.width - withSlack2[0]!.width, NOTE_WRAP_SLACK_PX - 2);
+    assert.equal(NOTE_WRAP_SLACK_PX, 6);
   });
 
   it('respects extendThresholdPx override from opts', () => {
