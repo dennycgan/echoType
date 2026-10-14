@@ -1,0 +1,40 @@
+name: CI
+
+# Typecheck + unit tests on every push and PR. No AWS credentials; deploys stay
+# manual (deploy.yml / deploy-web.yml).
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # API typecheck and tests import the generated Prisma client; no postinstall generates it.
+      - name: Generate Prisma client
+        run: pnpm --filter @echotype/api prisma:generate
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Unit tests
+        run: pnpm test
