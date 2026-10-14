@@ -16,7 +16,8 @@
 - [x] Custom domain (echotype.ink — ACM + CloudFront alias + Cognito URLs; unblocks Google sign-in → Auth follow-up; ADR-0022)
 - [x] Ops & safety (Sentry + disclaimer/error states; ADR-0023/0024; CloudWatch/rate limiting deferred)
 - [x] Google sign-in (Cognito Google IdP + account linking; ADR-0025–0028)
-- [~] (maintenance) Polish & UX improvements — ongoing    <-- YOU ARE HERE
+- [~] Link previews & mobile notice    <-- YOU ARE HERE
+- [~] (maintenance) Polish & UX improvements — ongoing
 
 
 > Each line is a capability, not a sub-step. Completed capabilities stay one line
@@ -25,18 +26,20 @@
 > Top-to-bottom = current execution order. Reorder if priorities change; never leave it unordered.
 
 ## Phase Roadmap (active capability only)
-Active capability: Maintenance & polish
-- [~] Ongoing UX improvements and bug fixes (no active phase)
+Active capability: Link previews & mobile notice
+- [~] Phase 1 — Real-device check (owner; no code): mobile Safari / LinkedIn in-app browser / Android / iPad + keyboard; result sets Phase 3 copy and scope, and whether Phase 3 moves ahead of Phase 2
+- [ ] Phase 2 — Share assets: screenshot script, OG/meta tags, `<title>`, favicon; manual deploy-web (blocked on Phase 1)
+- [ ] Phase 3 — Mobile notice: dismissible top banner, dismissal kept in localStorage; manual deploy-web
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Post-launch maintenance — polish and bug fixes as discovered
-- Sub-steps done: Google sign-in capability closed (ADR-0025–0028); typing-session Night mode (ADR-0033); site-wide DocumentDark + tab-memory Night override (ADR-0036); preserve categoryId on course PUT (ADR-0037); note wrap slack dead-zone (ADR-0038); NotePopover prefer-up placement (ADR-0039)
-- Next step: ongoing
-- Related decisions: see Known debt table
+- Goal (one line): Link previews & mobile notice — share cards, favicon, mobile visitor notice
+- Sub-steps done: (none yet)
+- Next step: Phase 1 real-device check (owner)
+- Related decisions: ADR-0041 (lands with Phase 2)
 
 ## Contract pointers (don't memorize, go read the source)
 - Stats metrics (definitions/formulas only): docs/STATS.md
@@ -60,6 +63,7 @@ Active capability: Maintenance & polish
 - Annotation rendering: apps/web/src/components/AnnotatedText.tsx + apps/web/src/components/annotated-text/useTextMeasurement.ts; NotePopover placement `notePopoverPlacement.ts` (ADR-0039)
 - Editor + review: apps/web/src/components/editor/useCourseEditor.ts, reviewUtils.ts, AnnotatedTextEditor.tsx
 - Deploy: deploy/README.md, .github/workflows/deploy.yml, .github/workflows/deploy-web.yml
+- CI: .github/workflows/ci.yml — install, prisma generate, typecheck, test (ADR-0040)
 - Sentry (web): apps/web/src/lib/sentry.ts, vite.config.ts (`@sentry/vite-plugin`); probe `apps/web/scripts/ops-sentry-probe.mjs`; SSM `/echotype/SENTRY_DSN_WEB`
 - Sentry (API): apps/api/src/sentry.ts, `apps/api/src/routes/debug.ts` (`SENTRY_DEBUG=1` only); probe `apps/api/scripts/ops-sentry-probe.mjs`; SSM `/echotype/SENTRY_DSN_API`
 - Privacy + page status (web): apps/web/src/content/legal/privacy.ts, `pages/legal/PrivacyPage.tsx`, `components/page-status/`, `lib/apiErrors.ts`; probe `apps/web/scripts/ops-phase2-probe.mjs`

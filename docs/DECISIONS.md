@@ -1947,3 +1947,61 @@
   - Future horizontal overflow needs a separate placement pass / ADR.
 - Supersedes / superseded-by: none
 
+---
+
+## ADR-0040 — CI runs typecheck + unit tests; deploys stay manual
+- Status: Accepted (2026-10-15)
+- Commit/PR anchor: 1900dc0 (CI workflow + root `pnpm test`); prerequisite
+  37fd666 (shared DOM lib so typecheck passes)
+- Plain summary (owner reads this): Every push and pull request runs the
+  typecheck and all unit tests on GitHub Actions. Deploys are not
+  automated: the API and the web app still deploy only when the owner runs
+  `deploy.yml` / `deploy-web.yml` by hand.
+- Context: `pnpm run typecheck` had been failing in `packages/shared` since
+  `32c8107` (2026-07-10) without being noticed, because `deploy-web.yml`
+  only typechecks `apps/web` and nothing ran the root command. Unit tests
+  were spread across eight per-package scripts with no single entry point.
+  Deploys run via `workflow_dispatch` (OIDC + SSM for the API; S3 sync +
+  CloudFront invalidation for the web).
+- Decision:
+  1. **CI workflow** — `.github/workflows/ci.yml` on `push` and
+     `pull_request`: frozen install → `prisma:generate` →
+     `pnpm run typecheck` → `pnpm test`. `permissions: contents: read`; no
+     AWS credentials; per-ref concurrency cancels superseded runs.
+  2. **Root `pnpm test`** — chains the existing unit test scripts (shared;
+     web typing/layout/auth/sentry/ops-phase2; api auth/sentry): 33 test
+     files, 309 tests, no database or network.
+  3. **Prisma generate is an explicit step** — no postinstall generates the
+     client; without it the API typecheck fails on `@prisma/client`
+     exports (verified in a clean worktree).
+  4. **Playwright probes stay local** — they need a dev server and some
+     need Cognito accounts.
+  5. **Shared typecheck fix** — `packages/shared/tsconfig.json` adds the
+     DOM lib. web (DOM lib) and api (Node types) still typecheck shared
+     through the barrel export, so runtime-specific APIs leaking into
+     shared stay caught by the consumer that cannot run them.
+- Rejected alternatives:
+  - Auto-deploy API and web on push to main — the owner pushes straight to
+    main (docs-only pushes would deploy), the API image builds on the
+    t4g.micro with no rollback, and it bypasses per-phase owner acceptance.
+  - Auto-deploy web only (path-filtered, after CI) — API and web often have
+    to ship together (ADR-0013: "Deploy requires API migrations + web
+    together"); an automatic web deploy could serve a new frontend against
+    the old API until the manual API deploy runs.
+  - `"types": ["node"]` in shared instead of the DOM lib — needs a new
+    `@types/node` devDependency and lockfile change for the same result.
+  - Moving `cognitoOAuth.ts` into `apps/web` — larger change; shared and
+    api test scripts and the Google Phase 1 probe reference its path.
+- Consequences:
+  - Typecheck or unit test regressions surface on the push that introduces
+    them.
+  - CI only runs tests that a chained script matches. Globs cover new files
+    in `packages/shared/src/` (top level), `apps/web/src/auth/`,
+    `apps/web/src/guest/`, and `apps/web/src/components/annotated-text/`;
+    every other location (e.g. `apps/web/src/lib/`, all of `apps/api/src/`,
+    a new workspace package) lists files by name and must be updated by hand.
+  - Revisit auto-deploy once API images are built on the runner and pushed
+    to a registry (deploy/README.md future upgrade) so rollback exists, or
+    once a staging environment exists.
+- Supersedes / superseded-by: none
+
