@@ -412,7 +412,7 @@ function Step1({
           className="mt-1 w-full rounded border px-3 py-2 dark:border-serika-border dark:bg-serika-surface dark:text-serika-text"
           value={ed.title}
           onChange={(e) => ed.setTitle(e.target.value)}
-          placeholder="e.g. Stray Birds - 49"
+          placeholder="e.g. Morning Affirmations"
         />
       </label>
 
@@ -485,7 +485,7 @@ function Step1({
             setImportError(null);
             ed.setContent(e.target.value);
           }}
-          placeholder="Enter the English text to practice…"
+          placeholder="Paste or type the text you want to practice…"
         />
       </div>
 
