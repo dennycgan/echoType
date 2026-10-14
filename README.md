@@ -77,13 +77,9 @@ A subtle UX bug: yellow bands reused Phase 3's "click to edit note text" behavio
 
 ### Frontend
 
-![Frontend architecture](docs/architecture.png)
-
 One shared overlay component and one measurement hook (mirror spans → `offsetTop` line breaks → per-glyph `getBoundingClientRect` / charEdges) power both the typing page and the four-step course editor. Post-layout rules in `buildLineData` / `noteExtension.ts` handle note widening (typing page) and adjacent-band seams. The editor adds a staged state machine; Phase 4's review layer (green/yellow status, review panel, review-state click routing) sits on top without forking the renderer.
 
 ### Deployment
-
-![Deployment architecture](docs/deployment.png)
 
 **Terraform** provisions VPC, EC2, RDS, S3, CloudFront, and Cognito. Production runs at **https://echotype.ink**: a single CloudFront distribution terminates TLS (ACM, us-east-1), serves the Vite build from private S3 via OAC, and proxies `/api/*` to the Fastify container on EC2 (port 80 locked to CloudFront origin-facing ranges). `WEB_ORIGIN` and Cognito callback URLs are driven from Terraform (`custom_domain` → SSM), not hardcoded. **GitHub Actions** deploys the API (OIDC + SSM Run Command) and the SPA (`deploy-web.yml`: build, Sentry source-map upload when configured, S3 sync, CloudFront invalidation). Manual path: `deploy/README.md`.
 
