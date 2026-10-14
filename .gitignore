@@ -167,6 +167,7 @@ infra/.build/
 # IDE
 .vscode/
 .idea/
+.cursor/
 .DS_Store
 
 # Build

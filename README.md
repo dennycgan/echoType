@@ -117,7 +117,7 @@ pnpm --filter @echotype/web probe:night-mode   # needs web :5173
 
 Reset DB: `pnpm --filter @echotype/api prisma:reset` then `SEED_ENV=dev pnpm --filter @echotype/api seed`.
 
-I ship in phases with manual gates (`docs/STATE.md`); overlay/layout changes use unit tests, and dark/night use the local probes above. Some older auth-era probes need Bearer or guest course ids before they are green again (see `BROKEN` headers in those scripts). Project rules in `.cursor/rules/` keep AI-assisted sessions inside phase scope.
+I ship in phases with manual gates (`docs/STATE.md`); overlay/layout changes use unit tests, and dark/night use the local probes above. Some older auth-era probes need Bearer or guest course ids before they are green again (see `BROKEN` headers in those scripts). Development is AI-assisted (Cursor agent); scope and acceptance are gated manually per phase.
 
 ---
 
@@ -144,5 +144,3 @@ I ship in phases with manual gates (`docs/STATE.md`); overlay/layout changes use
 - **`docs/DECISIONS.md`** — Decision log (39 ADRs: anchoring, measurement, stats, auth, Google federation + email identity + password reconstruction, layout + note wrap slack / line-clamp dead zone, NotePopover prefer-up placement, import/export + export-notes footer, content whitespace normalization, forgiving mode, immersive refocus + caret under pinch-zoom, home practice summary, typing-session Night mode, site-wide DocumentDark + tab-memory Night override, custom domain, Sentry, privacy).
 - **`docs/STATS.md`** — Stats field definitions and formulas (the contract).
 - **`deploy/README.md`** — Terraform, SSM access, cloud deploy.
-
-Private portfolio project — contact me for access or demo.
