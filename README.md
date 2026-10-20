@@ -113,7 +113,7 @@ pnpm --filter @echotype/web probe:night-mode   # needs web :5173
 
 Reset DB: `pnpm --filter @echotype/api prisma:reset` then `SEED_ENV=dev pnpm --filter @echotype/api seed`.
 
-I ship in phases with manual gates (`docs/STATE.md`); overlay/layout changes use unit tests, and dark/night use the local probes above. Some older auth-era probes need Bearer or guest course ids before they are green again (see `BROKEN` headers in those scripts). Development is AI-assisted (Cursor agent); scope and acceptance are gated manually per phase.
+I ship in phases with manual gates (`docs/STATE.md`); overlay/layout changes use unit tests, and dark/night use the local probes above. Some older auth-era probes need Bearer or guest course ids before they are green again (see `BROKEN` headers in those scripts). Development is AI-assisted; see [How this project was built](#how-this-project-was-built).
 
 ---
 
@@ -140,3 +140,15 @@ I ship in phases with manual gates (`docs/STATE.md`); overlay/layout changes use
 - **`docs/DECISIONS.md`** — Decision log (39 ADRs: anchoring, measurement, stats, auth, Google federation + email identity + password reconstruction, layout + note wrap slack / line-clamp dead zone, NotePopover prefer-up placement, import/export + export-notes footer, content whitespace normalization, forgiving mode, immersive refocus + caret under pinch-zoom, home practice summary, typing-session Night mode, site-wide DocumentDark + tab-memory Night override, custom domain, Sentry, privacy).
 - **`docs/STATS.md`** — Stats field definitions and formulas (the contract).
 - **`deploy/README.md`** — Terraform, SSM access, cloud deploy.
+
+---
+
+## How this project was built
+
+This is a solo project built with AI tools. I set the scope, made the final call on product and architecture decisions, and accepted or rejected each change.
+
+- **Cursor** (agent mode) wrote most of the code.
+- **Claude** reviewed the work as it progressed. I kept a Claude Project synced with this repository and related documents, so reviews were based on the current code and docs rather than pasted snippets.
+- **ChatGPT** was used occasionally for a second opinion on Claude's reviews.
+
+Product and architecture decisions are recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md).
