@@ -2,9 +2,7 @@ import { useState } from 'react';
 import {
   DESKTOP_NOTICE_COPY,
   readCoarsePointerMedia,
-  readDesktopNoticeDismissed,
   shouldShowDesktopNotice,
-  writeDesktopNoticeDismissed,
 } from '../lib/desktopNotice';
 
 function initialVisible(): boolean {
@@ -12,18 +10,17 @@ function initialVisible(): boolean {
   return shouldShowDesktopNotice({
     hoverNone,
     pointerCoarse,
-    dismissed: readDesktopNoticeDismissed(),
+    dismissed: false,
   });
 }
 
-/** Soft tip for phone-like primary input; dismissible for the browser profile. */
+/** Soft tip for phone-like primary input; dismiss lasts only for this AppLayout mount. */
 export function DesktopNoticeBanner() {
   const [visible, setVisible] = useState(initialVisible);
 
   if (!visible) return null;
 
   function onDismiss() {
-    writeDesktopNoticeDismissed();
     setVisible(false);
   }
 

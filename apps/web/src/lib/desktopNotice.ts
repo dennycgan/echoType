@@ -1,6 +1,4 @@
-/** Dismissible “best on a computer” notice for coarse primary pointers (phones). */
-
-export const DESKTOP_NOTICE_DISMISSED_STORAGE_KEY = 'echotype.desktopNotice.dismissed.v1';
+/** In-session dismissible “best on a computer” notice for coarse primary pointers. */
 
 export const DESKTOP_NOTICE_COPY = 'Best on a computer with a keyboard.';
 
@@ -10,30 +8,9 @@ export type DesktopNoticeInputs = {
   dismissed: boolean;
 };
 
-/** Show when the primary input looks phone-like and the notice was not dismissed. */
+/** Show when the primary input looks phone-like and the notice was not dismissed this mount. */
 export function shouldShowDesktopNotice(input: DesktopNoticeInputs): boolean {
   return input.hoverNone && input.pointerCoarse && !input.dismissed;
-}
-
-/** `true` only when the dismissed flag is present; storage errors → not dismissed. */
-export function readDesktopNoticeDismissed(): boolean {
-  if (typeof localStorage === 'undefined') return false;
-  try {
-    return localStorage.getItem(DESKTOP_NOTICE_DISMISSED_STORAGE_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-/** Persist dismissal; returns whether the write succeeded. */
-export function writeDesktopNoticeDismissed(): boolean {
-  if (typeof localStorage === 'undefined') return false;
-  try {
-    localStorage.setItem(DESKTOP_NOTICE_DISMISSED_STORAGE_KEY, '1');
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export type MatchMediaLike = {

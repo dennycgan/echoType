@@ -1,12 +1,6 @@
 import assert from 'node:assert/strict';
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import {
-  DESKTOP_NOTICE_DISMISSED_STORAGE_KEY,
-  readCoarsePointerMedia,
-  readDesktopNoticeDismissed,
-  shouldShowDesktopNotice,
-  writeDesktopNoticeDismissed,
-} from './desktopNotice.ts';
+import { describe, it } from 'node:test';
+import { readCoarsePointerMedia, shouldShowDesktopNotice } from './desktopNotice.ts';
 
 describe('shouldShowDesktopNotice', () => {
   it('shows only when hover:none, pointer:coarse, and not dismissed', () => {
@@ -60,75 +54,5 @@ describe('readCoarsePointerMedia', () => {
       },
     };
     assert.deepEqual(readCoarsePointerMedia(win), { hoverNone: false, pointerCoarse: false });
-  });
-});
-
-describe('desktop notice localStorage helpers', () => {
-  const original = globalThis.localStorage;
-  let store: Map<string, string>;
-
-  beforeEach(() => {
-    store = new Map();
-    Object.defineProperty(globalThis, 'localStorage', {
-      configurable: true,
-      value: {
-        getItem(key: string) {
-          return store.has(key) ? store.get(key)! : null;
-        },
-        setItem(key: string, value: string) {
-          store.set(key, value);
-        },
-        removeItem(key: string) {
-          store.delete(key);
-        },
-      },
-    });
-  });
-
-  afterEach(() => {
-    Object.defineProperty(globalThis, 'localStorage', {
-      configurable: true,
-      value: original,
-    });
-  });
-
-  it('readDesktopNoticeDismissed is false when unset', () => {
-    assert.equal(readDesktopNoticeDismissed(), false);
-  });
-
-  it('write then read round-trips', () => {
-    assert.equal(writeDesktopNoticeDismissed(), true);
-    assert.equal(store.get(DESKTOP_NOTICE_DISMISSED_STORAGE_KEY), '1');
-    assert.equal(readDesktopNoticeDismissed(), true);
-  });
-
-  it('read returns false when getItem throws (treat as not dismissed)', () => {
-    Object.defineProperty(globalThis, 'localStorage', {
-      configurable: true,
-      value: {
-        getItem() {
-          throw new Error('denied');
-        },
-        setItem() {},
-        removeItem() {},
-      },
-    });
-    assert.equal(readDesktopNoticeDismissed(), false);
-  });
-
-  it('write returns false when setItem throws', () => {
-    Object.defineProperty(globalThis, 'localStorage', {
-      configurable: true,
-      value: {
-        getItem() {
-          return null;
-        },
-        setItem() {
-          throw new Error('denied');
-        },
-        removeItem() {},
-      },
-    });
-    assert.equal(writeDesktopNoticeDismissed(), false);
   });
 });
