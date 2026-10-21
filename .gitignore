@@ -184,6 +184,7 @@ aws-credentials.txt
 
 # Local UI experiment screenshots (not published to the remote repo)
 assets/spacing-experiment/
+/tmp/
 
 # Private local docs (not published to the remote repo)
 docs/project-kickoff.md
