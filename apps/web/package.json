@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:auth": "node --import tsx --test src/auth/*.test.ts src/guest/*.test.ts",
     "test:layout": "node --import tsx --test src/components/annotated-text/*.test.ts",
-    "test:typing": "node --import tsx --test src/lib/typingAlign.test.ts src/lib/nightMode.test.ts",
+    "test:typing": "node --import tsx --test src/lib/typingAlign.test.ts src/lib/nightMode.test.ts src/lib/desktopNotice.test.ts",
     "probe:night-mode": "node scripts/night-mode-probe.mjs",
     "probe:site-dark": "node scripts/site-dark-probe.mjs",
     "probe:auth": "node scripts/auth-phase4-probe.mjs",

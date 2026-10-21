@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './auth/AuthProvider';
 import { useOnboardingSeed } from './auth/useOnboardingSeed';
 import { loginPathWithNext } from './auth/publicPaths';
+import { DesktopNoticeBanner } from './components/DesktopNoticeBanner';
 import { SiteFooter } from './components/SiteFooter';
 import { SiteHeader } from './components/SiteHeader';
 import { logRouteScrollMonitor, scrollRouteToTop } from './lib/routeScroll';
@@ -103,6 +104,7 @@ export function AppLayout() {
             )
           }
         />
+        <DesktopNoticeBanner />
         <main
           className={
             isTypingPage
