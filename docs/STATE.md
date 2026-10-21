@@ -27,19 +27,19 @@
 
 ## Phase Roadmap (active capability only)
 Active capability: Link previews & mobile notice
-- [~] Phase 1 — Real-device check (owner; no code): mobile Safari / LinkedIn in-app browser / Android / iPad + keyboard; result sets Phase 3 copy and scope, and whether Phase 3 moves ahead of Phase 2
-- [ ] Phase 2 — Share assets: screenshot script, OG/meta tags, `<title>`, favicon; manual deploy-web (blocked on Phase 1)
-- [ ] Phase 3 — Mobile notice: dismissible top banner, dismissal kept in localStorage; manual deploy-web
+- [x] Phase 1 — Real-device check (owner; no code): mobile Safari / LinkedIn in-app browser — typing + layout OK (immersive included); Android and iPad+keyboard not tested
+- [x] Phase 2 — Mobile notice: dismissible top banner in AppLayout (in-session dismiss only); manual deploy-web (ADR-0041)
+- [ ] Phase 3 — Share assets: screenshot script, OG/meta tags, `<title>`, favicon; manual deploy-web
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Link previews & mobile notice — share cards, favicon, mobile visitor notice
-- Sub-steps done: (none yet)
-- Next step: Phase 1 real-device check (owner)
-- Related decisions: ADR-0041 (lands with Phase 2)
+- Goal (one line): Phase 3 share assets — OG/meta tags, `<title>`, favicon, screenshot script
+- Sub-steps done: Phase 1 real-device check; Phase 2 desktop-practice notice banner (7a4d32e, in-session dismiss b881ca1)
+- Next step: Phase 3 share assets (not started)
+- Related decisions: ADR-0041
 
 ## Contract pointers (don't memorize, go read the source)
 - Stats metrics (definitions/formulas only): docs/STATS.md
@@ -64,6 +64,7 @@ Active capability: Link previews & mobile notice
 - Editor + review: apps/web/src/components/editor/useCourseEditor.ts, reviewUtils.ts, AnnotatedTextEditor.tsx
 - Deploy: deploy/README.md, .github/workflows/deploy.yml, .github/workflows/deploy-web.yml
 - CI: .github/workflows/ci.yml — install, prisma generate, typecheck, test (ADR-0040)
+- Desktop notice banner: apps/web/src/lib/desktopNotice.ts, apps/web/src/components/DesktopNoticeBanner.tsx (ADR-0041)
 - Sentry (web): apps/web/src/lib/sentry.ts, vite.config.ts (`@sentry/vite-plugin`); probe `apps/web/scripts/ops-sentry-probe.mjs`; SSM `/echotype/SENTRY_DSN_WEB`
 - Sentry (API): apps/api/src/sentry.ts, `apps/api/src/routes/debug.ts` (`SENTRY_DEBUG=1` only); probe `apps/api/scripts/ops-sentry-probe.mjs`; SSM `/echotype/SENTRY_DSN_API`
 - Privacy + page status (web): apps/web/src/content/legal/privacy.ts, `pages/legal/PrivacyPage.tsx`, `components/page-status/`, `lib/apiErrors.ts`; probe `apps/web/scripts/ops-phase2-probe.mjs`

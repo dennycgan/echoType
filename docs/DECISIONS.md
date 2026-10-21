@@ -2005,3 +2005,56 @@
     once a staging environment exists.
 - Supersedes / superseded-by: none
 
+---
+
+## ADR-0041 — Link previews & mobile notice (capability); Phase 2 desktop-practice banner
+- Status: Accepted (2026-10-22)
+- Commit/PR anchor: b881ca1 (in-session dismiss only — accepted semantics); 7a4d32e (banner intro + strong slate styling)
+- Plain summary (owner reads this): On phone-like primary input, AppLayout shows a
+  dismissible top banner: “Best on a computer with a keyboard.” Dismiss lasts only
+  for the current AppLayout mount (refresh / new tab shows it again). Share-card
+  assets (OG/meta/favicon) are Phase 3 of the same capability.
+- Context: The site was already linked from LinkedIn while Phase 1 real-device
+  checks ran. Results (owner): normal and immersive typing worked on mobile
+  Safari and in the LinkedIn in-app browser; no layout breakage. Android and
+  iPad+keyboard were not tested. That ruled out copy that claimed typing was
+  impossible on phones. Mobile visitors were already arriving, so the notice
+  shipped before share assets (phase order swapped vs the original STATE draft).
+- Decision:
+  1. **Capability phases** — (1) real-device check; (2) mobile notice banner;
+     (3) share assets (OG/meta/`<title>`/favicon/screenshot). Phase 2 before
+     Phase 3 after Phase 1.
+  2. **When to show** — `(hover: none) and (pointer: coarse)`; missing
+     `matchMedia` → do not show (desktop-safe default).
+  3. **Where** — `AppLayout` under `SiteHeader`, above `main` (product routes
+     only; not login/OAuth under `RootLayout` alone).
+  4. **Copy** — `Best on a computer with a keyboard.` (informational; does not
+     claim mobile typing fails).
+  5. **Visual** — Neutral slate / serika raised strip with monitor icon and
+     semibold text — not amber (ReviewPanel amber means “needs review”).
+  6. **Dismiss is in-session only** — component memory; no `localStorage` /
+     `sessionStorage`. Full reload and new tabs re-evaluate. SPA navigations
+     inside `AppLayout` keep dismiss so the banner does not reappear on every
+     route change. Product reason: the reminder is important enough to show on
+     each fresh visit; that outweighs mild repeat friction. This is not a
+     remembered preference like course-list sort (`courseListSort.ts`).
+  7. **Sync init** — `useState` initializer reads media synchronously to avoid
+     a flash of missing banner then insert.
+  8. **Tests** — pure helpers in `desktopNotice.ts` + unit tests wired into
+     `test:typing` (ADR-0040: `lib/` paths are name-listed).
+- Rejected alternatives:
+  - Permanent or profile `localStorage` dismiss — hides an important reminder
+    after one close; wrong for this product.
+  - Interstitial / full-screen gate — blocks browsing; Phase 1 showed mobile
+    can type and browse.
+  - Amber ReviewPanel palette — that banner means action-required yellow notes.
+  - Handling bfcache restore on Back (`pageshow` + `persisted`) — rare;
+    accepted that dismiss may stick until a full remount; no repo precedent.
+- Consequences:
+  - Auth routes remount `AppLayout` on return → banner can show again (intended).
+  - `(hover: none) and (pointer: coarse)` on iPad+keyboard remains unverified;
+    dismiss-for-this-mount is the mitigation.
+  - Differs from ADR-0036: that ADR rejected a *permanent* Night pin that
+    diverged from system appearance; this notice is not a theme preference.
+- Supersedes / superseded-by: none
+
