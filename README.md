@@ -113,7 +113,7 @@ pnpm --filter @echotype/web probe:night-mode   # needs web :5173
 
 Reset DB: `pnpm --filter @echotype/api prisma:reset` then `SEED_ENV=dev pnpm --filter @echotype/api seed`.
 
-I ship in phases with manual gates (`docs/STATE.md`); overlay/layout changes use unit tests, and dark/night use the local probes above. Some older auth-era probes need Bearer or guest course ids before they are green again (see `BROKEN` headers in those scripts). Development is AI-assisted; see [How this project was built](#how-this-project-was-built).
+I ship in phases with manual gates (`docs/STATE.md`); overlay/layout changes use unit tests, and dark/night use the local probes above. Some older auth-era probes need Bearer or guest course ids before they are green again (see `BROKEN` headers in those scripts). Development is AI-assisted; see [AI-assisted development](#ai-assisted-development).
 
 ---
 
