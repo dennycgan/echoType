@@ -2007,13 +2007,15 @@
 
 ---
 
-## ADR-0041 — Link previews & mobile notice (capability); Phase 2 desktop-practice banner
-- Status: Accepted (2026-10-22)
-- Commit/PR anchor: b881ca1 (in-session dismiss only — accepted semantics); 7a4d32e (banner intro + strong slate styling)
+## ADR-0041 — Link previews & mobile notice (capability); Phase 2 desktop-practice banner; Phase 3 share assets
+- Status: Accepted (2026-10-22); Phase 3 Accepted (2026-10-31)
+- Commit/PR anchor: b881ca1 (in-session dismiss only — accepted semantics); 7a4d32e (banner intro + strong slate styling); a6b1124 (Phase 3 share assets)
 - Plain summary (owner reads this): On phone-like primary input, AppLayout shows a
   dismissible top banner: “Best on a computer with a keyboard.” Dismiss lasts only
   for the current AppLayout mount (refresh / new tab shows it again). Share-card
-  assets (OG/meta/favicon) are Phase 3 of the same capability.
+  assets shipped Phase 3: static OG PNG + favicon under `public/`; README hero PNG
+  + annotation GIF under `docs/` (not deployed); `index.html` title/description/OG/
+  Twitter tags with no `canonical` / `og:url` (SPA serves one HTML for every route).
 - Context: The site was already linked from LinkedIn while Phase 1 real-device
   checks ran. Results (owner): normal and immersive typing worked on mobile
   Safari and in the LinkedIn in-app browser; no layout breakage. Android and
@@ -2042,6 +2044,14 @@
      a flash of missing banner then insert.
   8. **Tests** — pure helpers in `desktopNotice.ts` + unit tests wired into
      `test:typing` (ADR-0040: `lib/` paths are name-listed).
+  9. **Phase 3 shipped** (`a6b1124`, Phase 3 Accepted 2026-10-31): Share
+     assets — `public/og/echotype-og.png` (2400×1260 letterboxed title→input),
+     `public/favicon.svg` + `favicon-32x32.png` (annotated-e day-mode colors),
+     `docs/echotype-sonnet-18-readme.png` + `docs/echotype-annotations.gif`
+     (README only; not in `public/`), `index.html` meta (absolute
+     `https://echotype.ink/og/echotype-og.png`; width/height 2400/1260; no
+     `canonical` / `og:url`). Local scripts `capture:share-{image,og,gif,favicon}`
+     only; no `test:share` / CI visual gates.
 - Rejected alternatives:
   - Permanent or profile `localStorage` dismiss — hides an important reminder
     after one close; wrong for this product.
@@ -2050,12 +2060,18 @@
   - Amber ReviewPanel palette — that banner means action-required yellow notes.
   - Handling bfcache restore on Back (`pageshow` + `persisted`) — rare;
     accepted that dismiss may stick until a full remount; no repo precedent.
+  - `canonical` / static `og:url` in `index.html` — SPA returns the same HTML
+    for every route; would mis-declare `/privacy` as the home share URL.
+  - Separate ADR-0044 for Phase 3 share layout — follow-on to this capability
+    ADR preferred while constraints stay in one place.
 - Consequences:
   - Auth routes remount `AppLayout` on return → banner can show again (intended).
   - `(hover: none) and (pointer: coarse)` on iPad+keyboard remains unverified;
     dismiss-for-this-mount is the mitigation.
   - Differs from ADR-0036: that ADR rejected a *permanent* Night pin that
     diverged from system appearance; this notice is not a theme preference.
+  - Deployed OG/favicon require `deploy-web`; LinkedIn Add-media UI may lag
+    Post Inspector / other unfurls (cache / UI limitation, not missing assets).
 - Supersedes / superseded-by: none
 
 ---

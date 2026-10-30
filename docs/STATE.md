@@ -16,8 +16,8 @@
 - [x] Custom domain (echotype.ink — ACM + CloudFront alias + Cognito URLs; unblocks Google sign-in → Auth follow-up; ADR-0022)
 - [x] Ops & safety (Sentry + disclaimer/error states; ADR-0023/0024; CloudWatch/rate limiting deferred)
 - [x] Google sign-in (Cognito Google IdP + account linking; ADR-0025–0028)
-- [~] Link previews & mobile notice    <-- YOU ARE HERE
-- [~] (maintenance) Polish & UX improvements — ongoing
+- [x] Link previews & mobile notice (desktop banner + share assets; ADR-0041)
+- [~] (maintenance) Polish & UX improvements — ongoing    <-- YOU ARE HERE
 
 
 > Each line is a capability, not a sub-step. Completed capabilities stay one line
@@ -26,19 +26,17 @@
 > Top-to-bottom = current execution order. Reorder if priorities change; never leave it unordered.
 
 ## Phase Roadmap (active capability only)
-Active capability: Link previews & mobile notice
-- [x] Phase 1 — Real-device check (owner; no code): mobile Safari / LinkedIn in-app browser — typing + layout OK (immersive included); Android and iPad+keyboard not tested
-- [x] Phase 2 — Mobile notice: dismissible top banner in AppLayout (in-session dismiss only); manual deploy-web (ADR-0041)
-- [ ] Phase 3 — Share assets: screenshot script, OG/meta tags, `<title>`, favicon; manual deploy-web
+Active capability: (maintenance) Polish & UX improvements
+- (ongoing) Owner-priority polish from Known debt and real-usage feedback; no gated phase list
 
 > Legend: [x] done  [~] in progress  [ ] todo  (blocked) noted inline
 > When the active capability changes, replace this entire Phase Roadmap with the
 > new capability's phases and move YOU ARE HERE above.
 
 ## Now working on (describe ONLY the in-progress item)
-- Goal (one line): Phase 3 share assets — OG/meta tags, `<title>`, favicon, screenshot script
-- Sub-steps done: Phase 1 real-device check; Phase 2 desktop-practice notice banner (7a4d32e, in-session dismiss b881ca1)
-- Next step: Phase 3 share assets (not started)
+- Goal (one line): maintenance polish (no active gated phase)
+- Sub-steps done: Link previews Phase 1–3 (banner `b881ca1` / `7a4d32e`; share assets `a6b1124`)
+- Next step: owner priority (e.g. textarea padding scroll polish if pursued)
 - Related decisions: ADR-0041
 
 ## Contract pointers (don't memorize, go read the source)
@@ -65,6 +63,7 @@ Active capability: Link previews & mobile notice
 - Deploy: deploy/README.md, .github/workflows/deploy.yml, .github/workflows/deploy-web.yml
 - CI: .github/workflows/ci.yml — install, prisma generate, typecheck, test (ADR-0040)
 - Desktop notice banner: apps/web/src/lib/desktopNotice.ts, apps/web/src/components/DesktopNoticeBanner.tsx (ADR-0041)
+- Share assets (Phase 3): `apps/web/public/og/echotype-og.png`, `favicon.svg`, `favicon-32x32.png`; README `docs/echotype-sonnet-18-readme.png` + `docs/echotype-annotations.gif`; local scripts `apps/web/scripts/share-assets-*.mjs` (`capture:share-{image,og,gif,favicon}`)
 - Sentry (web): apps/web/src/lib/sentry.ts, vite.config.ts (`@sentry/vite-plugin`); probe `apps/web/scripts/ops-sentry-probe.mjs`; SSM `/echotype/SENTRY_DSN_WEB`
 - Sentry (API): apps/api/src/sentry.ts, `apps/api/src/routes/debug.ts` (`SENTRY_DEBUG=1` only); probe `apps/api/scripts/ops-sentry-probe.mjs`; SSM `/echotype/SENTRY_DSN_API`
 - Privacy + page status (web): apps/web/src/content/legal/privacy.ts, `pages/legal/PrivacyPage.tsx`, `components/page-status/`, `lib/apiErrors.ts`; probe `apps/web/scripts/ops-phase2-probe.mjs`
