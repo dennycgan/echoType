@@ -84,6 +84,11 @@ On first start the container runs `prisma migrate deploy`, then starts the
 API on container port 3001, published on host port **80**. Production does not
 run the dev seed (`SEED_ENV=dev` only).
 
+Before a backend deploy that includes a new Prisma migration, create a manual
+RDS snapshot and wait until it is `available`. Keep only the latest
+pre-migration snapshot; delete the previous one after the new snapshot is
+available and the deploy is accepted, so snapshot storage does not accumulate.
+
 Watch logs:
 
 ```bash
