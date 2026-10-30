@@ -2139,3 +2139,44 @@
     informs the $40 budget after Paid.
 - Supersedes / superseded-by: none yet (post-upgrade retention 7 appends here)
 
+---
+
+## ADR-0043 — CloudFront PriceClass_All for Australia / New Zealand edges
+- Status: Accepted (2026-10-30)
+- Commit/PR anchor: 094925a
+- Plain summary (owner reads this): CloudFront uses `PriceClass_All` so
+  Australia and New Zealand edge locations are allowed. Before the change,
+  NZ traffic to `/api/health` was served from Los Angeles (`LAX54-P11`,
+  ~0.6–0.9s). After apply and DNS convergence, the same path hit Auckland
+  (`AKL53-P3`, ~0.18–0.24s). Request volume stays far below CloudFront's
+  Always Free allowance, so no meaningful added cost is expected.
+- Context: The distribution previously used `PriceClass_100` (United States,
+  Canada, Europe, and Israel only). `/api/*` is uncached and proxies to EC2
+  in `ap-southeast-2`, so a remote POP adds round-trip latency on every API
+  call. Measured from the owner's NZ network before the change:
+  `x-amz-cf-pop: LAX54-P11`. `PriceClass_200` still excludes Australia and
+  New Zealand, so only `PriceClass_All` includes local edges.
+- Decision:
+  1. Set `price_class = "PriceClass_All"` on `aws_cloudfront_distribution.web`
+     (`infra/cloudfront.tf`).
+  2. Prefer NZ/AU latency over the theoretical savings of excluding expensive
+     edges; current usage (~11k requests / ~0.033 GiB in Oct 2026) is well
+     under Always Free (1 TB transfer + 10M requests/month for all customers,
+     including Paid accounts).
+  3. Acceptance requires both AWS config (`PriceClass_All`, `Deployed`) and
+     live `x-amz-cf-pop` from NZ (post-apply may briefly remain on a distant
+     POP until DNS/routing converges).
+- Rejected alternatives:
+  - Keep `PriceClass_100` — forbids AKL/SYD edges; forces NZ viewers onto
+    distant POPs for uncached `/api/*`.
+  - `PriceClass_200` — still excludes Australia and New Zealand.
+  - Drop CloudFront for API — would reintroduce mixed-content / dual-origin
+    problems already rejected in ADR-0003.
+- Consequences:
+  - Local NZ edges are eligible; observed post-change POP `AKL53-P3` with
+    roughly 3–4× lower `/api/health` latency than LAX on the same machine.
+  - Edge selection still depends on DNS resolvers and ISP routing; a brief
+    post-deploy LAX window was observed before AKL.
+  - Cost impact expected to remain ~$0 at current traffic under Always Free.
+- Supersedes / superseded-by: none
+
