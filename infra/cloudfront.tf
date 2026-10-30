@@ -28,7 +28,7 @@ resource "aws_cloudfront_distribution" "web" {
   is_ipv6_enabled     = true
   comment             = "${var.project} frontend + /api proxy"
   default_root_object = "index.html"
-  price_class         = "PriceClass_100"
+  price_class         = "PriceClass_All"
   aliases             = [var.custom_domain]
 
   depends_on = [aws_acm_certificate_validation.web]
