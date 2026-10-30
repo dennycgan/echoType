@@ -26,9 +26,10 @@ resource "aws_db_instance" "main" {
   publicly_accessible    = false
   multi_az               = false
 
-  backup_retention_period = 0
+  backup_retention_period = 7
+  backup_window           = "13:13-13:43"
   skip_final_snapshot     = true
-  deletion_protection     = false
+  deletion_protection     = true
   apply_immediately       = true
 
   tags = {

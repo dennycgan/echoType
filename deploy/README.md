@@ -135,7 +135,13 @@ Lived For).
 - **ARM image**: EC2 is Graviton (arm64); Docker pulls arm64 images automatically.
 - **Elastic IP**: the instance has a stable EIP; CloudFront uses its public DNS
   name as the API origin.
-- **Tear down** to avoid charges: `cd infra && terraform destroy`.
+- **Tear down** to avoid charges: `cd infra && terraform destroy`. RDS has
+  `deletion_protection = true`, so destroy fails on the DB until that flag is
+  cleared. Destroy also skips a final snapshot and deletes automated backups
+  (`skip_final_snapshot = true`, `delete_automated_backups` default true). To
+  keep a copy first: create a **manual** snapshot → wait until `available` →
+  set `deletion_protection = false` and apply → then `terraform destroy` (or
+  delete the instance). Manual snapshots keep billing until you delete them.
 
 ## CI/CD (GitHub Actions, OIDC — no SSH)
 
