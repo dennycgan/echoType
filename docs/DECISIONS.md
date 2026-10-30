@@ -2058,3 +2058,84 @@
     diverged from system appearance; this notice is not a theme preference.
 - Supersedes / superseded-by: none
 
+---
+
+## ADR-0042 — RDS deletion protection + one-day backups; seven days after Paid upgrade
+- Status: Accepted (2026-10-30)
+- Commit/PR anchor: 44ce7e0 (retention 1 applied); 8ef90c1 (deletion
+  protection + fixed backup window + README tear-down / pre-migration
+  snapshot notes); 39624d3 (attempted retention 7 — never applied;
+  superseded in repo by 8ef90c1)
+- Plain summary (owner reads this): Production RDS has
+  `deletion_protection = true` and `backup_retention_period = 1`. On this
+  account the AWS Free plan rejected retention 7 and 3
+  (`FreeTierRestrictionError`) and accepted 1 — recorded as this account's
+  measured result, not a claimed universal Free-plan maximum. After the
+  planned Paid upgrade (~2026-11-20), raise retention to 7 (nonzero →
+  nonzero, no outage). Keep-latest manual snapshots remain the
+  migration-deploy safety net (`deploy/README.md`). Year-one billing stays
+  On-Demand; no Reserved Instances or Savings Plans.
+- Context: Live data needed accidental-delete protection and automated
+  backups. First attempt (`39624d3`) set retention 7 + deletion protection;
+  apply failed with `FreeTierRestrictionError` for 7, so neither change
+  landed (ModifyDBInstance is all-or-nothing). Stage A (`8ef90c1`) applied
+  retention 0 + `deletion_protection = true` + fixed
+  `backup_window = "13:13-13:43"`. Retention 3 was then tried and also
+  rejected; retention 1 applied successfully (`44ce7e0`, brief outage on
+  0 → 1). Free plan ends 2026-11-29 (or earlier if credits run out); Cost
+  Explorer (as of 2026-10-30) showed ~$34 gross / 30 days and ~$1.12/day
+  credit burn from ~$29.75 remaining → credits projected ~2026-11-26.
+  Upgrade target ~2026-11-20 for account continuity.
+- Decision:
+  1. **Current live config (shipped, applied)** —
+     `backup_retention_period = 1`, `deletion_protection = true`,
+     `backup_window = "13:13-13:43"`, `skip_final_snapshot = true`,
+     `delete_automated_backups` left at provider default (true). RDS
+     changes used targeted plans for `aws_db_instance.main`.
+  2. **Measured Free-plan retention on this account** — rejected 7 and 3;
+     accepted 1. Do not generalize that limit to all Free-plan accounts.
+  3. **Migration-deploy recovery** — before each backend deploy that
+     includes a new Prisma migration: create a manual snapshot, wait until
+     `available`, keep only the latest after the deploy is accepted
+     (`deploy/README.md`). Tear-down: clear deletion protection only after
+     a keep-copy manual snapshot if a copy is needed.
+  4. **After Paid upgrade** — set Budgets to $40/month (80% / 100% actual,
+     100% forecast) and remove the zero-spend alert (console; not
+     Terraform). Then set `backup_retention_period = 7` (nonzero → nonzero;
+     no retention-change outage expected). Append a numbered follow-up under
+     this ADR (ADR-0015 phased-section pattern) with the implementing
+     commit sha — do not rewrite this decision's reasoning.
+  5. **Year-one cost posture** — On-Demand only. Do not buy EC2/RDS Reserved
+     Instances or Savings Plans while a one-year exit option is required;
+     those commitments generally cannot be cancelled mid-term (limited SP
+     return window / RI Marketplace constraints). No custom alert on Free
+     Tier credit *balance*; rely on the upgrade calendar + Budgets after
+     Paid.
+  6. **Unrelated Terraform drift** — full plan still shows Cognito Google
+     IdP normalization, GitHub OIDC thumbprint refresh, and cascading
+     deploy-role assume-policy recompute. Tracked in STATE Known debt;
+     assess before the next non-targeted apply. Separately,
+     `terraform fmt -check` fails on four pre-existing files
+     (`cognito.tf`, `cognito_presignup.tf`, `iam.tf`, `terraform.tfvars`).
+- Rejected alternatives:
+  - Keep retention 7 in Terraform while Free plan blocks apply — repo/live
+    drift (`39624d3`); corrected by Stage A then retention 1.
+  - Stay at retention 0 until Paid upgrade — forgoes the one-day restore
+    window this account can already use; rejected after 1 succeeded.
+  - Upgrade immediately only to unlock retention 7 — unnecessary while
+    credits remain and a one-day window exists; upgrade timing is driven by
+    account continuity.
+  - Buy RI / Savings Plans for year-one discount — locks exit flexibility
+    against low, uncertain traffic.
+  - Rely on automated backups alone without deletion protection — destroy
+    still removes automated backups with the instance under current
+    `skip_final_snapshot` / default `delete_automated_backups`.
+- Consequences:
+  - Accidental `terraform destroy` fails on the DB until deletion protection
+    is cleared deliberately.
+  - One-day automated backup / restorable window is live; raising to 7 after
+    Paid should not require another 0 → nonzero outage.
+  - Gross monthly baseline ~$34 (2026-10-30 Cost Explorer, credits aside)
+    informs the $40 budget after Paid.
+- Supersedes / superseded-by: none yet (post-upgrade retention 7 appends here)
+
