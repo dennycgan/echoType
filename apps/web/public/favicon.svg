@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="echoType">
+  <title>echoType</title>
+  <rect x="4" y="4" width="24" height="24" rx="2" fill="#fef3c7"/>
+  <rect x="8" y="7.8" width="16" height="2.5" rx="1.25" fill="#b45309"/>
+  <text x="15.82" y="24" text-anchor="middle"
+        font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"
+        font-size="15.5" font-weight="700" fill="#0f172a">e</text>
+</svg>

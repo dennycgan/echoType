@@ -10,7 +10,7 @@ You can add custom annotations to phrases beforehand; the notes stay visible as 
 
 The name comes from echo — a voice returning. I built it because I wanted to revisit texts I actually care about through repetitive typing, until the words and rhythm sink in.
 
-![echoType typing interface in light and night modes](docs/product-screenshot.png)
+![echoType typing Sonnet 18 with phrase annotations above the passage](docs/echotype-sonnet-18-readme.png)
 
 You can pin native-language glosses above unfamiliar words — so the meaning stays in sight while you type. But the heart is the loop: choose a text you want to remember, type it, return to it.
 
@@ -51,6 +51,8 @@ The stack is conventional React/Node/Postgres. The interesting choices are aroun
 ---
 
 ## Core engineering challenge: keeping annotations aligned with text
+
+![Annotations staying aligned while typing Sonnet 18](docs/echotype-annotations.gif)
 
 The product loop is intentionally simple: pick a text, type it, repeat. The engineering depth is in making annotations stay aligned with that text — even as the user edits the source, even across line breaks and CJK/Latin glyph widths.
 
