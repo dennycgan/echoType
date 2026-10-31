@@ -2196,3 +2196,38 @@
   - Cost impact expected to remain ~$0 at current traffic under Always Free.
 - Supersedes / superseded-by: none
 
+---
+
+## ADR-0044 — Minimal executable architecture guards
+- Status: Accepted (2026-10-31)
+- Commit/PR anchor: fa9a7cf
+- Plain summary (owner reads this): Keep a small executable set of high-cost architecture boundaries in the normal full test suite so future maintenance tasks cannot silently cross them.
+- Context: echoType's architecture boundaries previously lived across the local kickoff notes, agent rules, ADRs, and code comments. The repository could typecheck and run unit tests, but it did not execute checks for workspace dependency direction, server-only Prisma ownership, or the single `html.dark` writer. This is especially fragile when small maintenance tasks start in fresh AI-agent chats.
+- Decision:
+  1. Add a root Node `node:test` architecture suite (`.mjs`) with no new runtime or lint dependency.
+  2. Enforce exactly three boundaries: shared does not depend on either app and web/API do not depend on each other; Prisma remains API-only (source imports and package manifests); `DocumentDarkProvider` remains the sole `html.dark` writer (`RootLayout` is mount-only).
+  3. Discover architecture tests with a fail-loud runner that enumerates `test/architecture/*.test.mjs` and exits non-zero when none are found (Node 20 `--test` does not expand globs and exits 0 on missing paths).
+  4. Run the guard as the first segment of the root `pnpm test` chain on every CI push and pull request; keep `pnpm test:architecture` for local iteration only.
+  5. Keep one shared scanner helper. Do not duplicate helpers across test files. Scanner logic is exported as pure functions with string samples that prove both violation detection and non-false-positives (including multiline `import`/`export … from`).
+  6. Agent gate for `apps/` or `packages/` changes: run the full `pnpm test` suite and show the diff only when green. A failing guard is an architecture signal; agents may not weaken assertions, narrow scanner scope, add exclusions, or edit allowlists/baselines to pass the current task.
+- Rejected alternatives:
+  - ESLint `no-restricted-imports`: no lint stack exists today; would not cover the DOM-writer rule without more custom tooling.
+  - dependency-cruiser: stronger dependency graphs do not justify a new dependency/config layer for this small rule set.
+  - Put the suite under `packages/shared/src` for free glob discovery: repo-wide architecture is not a shared-package responsibility.
+  - Enforce all page/component writes through `useCourseCatalog`: false for the current design; that facade owns course CRUD only.
+  - Add a hardcoded-color no-growth guard now: echoType has no semantic color layer yet, so there is no compliant path for ordinary UI work; upcoming night-mode palette tweaks would turn every intentional color change into a baseline-approval event; the correct sequence is introduce semantic tokens first, then add a color guard.
+  - Rely on shell glob alone for `node --test *.test.mjs`: on Node 20, unexpanded globs and missing paths exit 0 with zero tests.
+- Consequences:
+  - The normal full test chain reports these three boundary violations on every push and pull request.
+  - CI only reports a red check. As of 2026-10-31, main has a ruleset that blocks force pushes and deletion but no required status check, so a failing guard does not block pushes or merges to main; the agent gate (full `pnpm test` before diff) is the first line of defence.
+  - Hardcoded UI colors remain unguarded for now because there is no semantic color layer; that debt stays documented in STATE/ADR-0036 and is not claimed as executable.
+  - The typing hot-path rule (comparison stays in frontend state; no per-keystroke backend calls) remains documentation-only and is not claimed as an executable guard.
+  - Scan roots are only `apps/web/src`, `apps/api/src`, `apps/api/prisma`, and `packages/shared/src`. `scripts/`, probe scripts, and config files are not scanned.
+  - `run.mjs` discovers only top-level `*.test.mjs` under `test/architecture/` (no recursion); new guard test files must live at that top level.
+  - Import forms found inside comments are still reported (strict: false positives possible, not silent misses).
+  - Any `classList` write of the exact token `'dark'` on any element in `apps/web` is a violation, not only `document.documentElement`. Intentional under a class-strategy dark root: a subtree `dark` is a second dark root.
+  - Import scanning is regex/specifier based, not AST based. Template-literal dynamic imports, variable/computed specifiers, path aliases beyond `@echotype/*`, and bundler-rewritten imports are not fully covered.
+  - One-time CI red verification on 2026-10-31: temporary branch `chore/architecture-guard-ci-probe`, probe commit `6623642`, CI run #27; typecheck passed; `pnpm test` architecture segment reported `# fail 2` pointing at `apps/web/src/lib/__architecture_ci_probe__.ts`; the probe never reached main and the branch was deleted. Supplemental run URL: https://github.com/dennycgan/echoType/actions/runs/41177452327
+  - No new product-approval workflow is added beyond the existing owner gates; the agent-facing gate is full `pnpm test` before diff for `apps/`/`packages/` changes.
+- Supersedes / superseded-by: none
+
