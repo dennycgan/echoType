@@ -32,7 +32,14 @@ import {
 } from './annotationMessages';
 import { ReviewPanel } from './ReviewPanel';
 import type { AnnotationIssue, ContentIssue, ModeIssue } from '@echotype/shared';
-import { useCourseEditor, type EditorMode } from './useCourseEditor';
+import { useCourseEditor, type EditorMode, type EditorStep } from './useCourseEditor';
+
+const EDITOR_STEP_TITLE: Record<EditorStep, string> = {
+  1: 'Course details',
+  2: 'Whether to annotate',
+  3: 'Annotate text',
+  4: 'Preview',
+};
 
 interface CourseEditorModalProps {
   mode: EditorMode;
@@ -259,24 +266,23 @@ export function CourseEditorModal({
         className="flex max-h-[96vh] w-[min(98vw,1280px)] flex-col overflow-hidden rounded-lg bg-white shadow-xl dark:border dark:border-serika-border dark:bg-serika-surface"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between border-b px-5 py-3 dark:border-serika-border">
-          <h2 className="text-lg font-semibold dark:text-serika-text">
+        <header className="flex items-center justify-between gap-3 border-b px-5 py-3 dark:border-serika-border">
+          <h2 className="min-w-0 text-lg font-semibold dark:text-serika-text">
             {mode === 'create' ? 'New course' : 'Edit course'}
+            {' - '}
+            Step {ed.step} / 4: {EDITOR_STEP_TITLE[ed.step]}
           </h2>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400 dark:text-serika-sub">Step {ed.step} / 4</span>
-            <button
-              type="button"
-              aria-label="Close editor"
-              onClick={handleDismiss}
-              className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-serika-sub dark:hover:bg-serika-raised dark:hover:text-serika-text"
-              data-testid="editor-close"
-            >
-              <span className="block text-xl leading-none" aria-hidden>
-                ×
-              </span>
-            </button>
-          </div>
+          <button
+            type="button"
+            aria-label="Close editor"
+            onClick={handleDismiss}
+            className="shrink-0 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-serika-sub dark:hover:bg-serika-raised dark:hover:text-serika-text"
+            data-testid="editor-close"
+          >
+            <span className="block text-xl leading-none" aria-hidden>
+              ×
+            </span>
+          </button>
         </header>
 
         {toast && (
