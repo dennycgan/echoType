@@ -7,7 +7,7 @@ export { formatContentIssueMessage } from '@echotype/shared';
 
 export const STEP3_NO_ANNOTATION_REQUIRED = 'At least one annotation is required.';
 export const STEP3_NO_ANNOTATION_BACK_HINT =
-  'If you do not need annotations, go back and choose "No".';
+  'If you do not need annotations, click "Back" and choose "No".';
 /** Two-line gate copy; use with `whitespace-pre-line` when rendered as one string. */
 export const STEP3_NO_ANNOTATION_MESSAGE = `${STEP3_NO_ANNOTATION_REQUIRED}\n${STEP3_NO_ANNOTATION_BACK_HINT}`;
 

@@ -602,12 +602,6 @@ function Step3({
           {MSG_REVIEW_COMPLETE}
         </p>
       )}
-      {ed.needAnnotation === true && ed.annotations.length === 0 && (
-        <div className="mb-3 space-y-1" data-testid="step3-no-annotation-hint">
-          <p className="text-sm text-amber-600 dark:text-serika-main">{STEP3_NO_ANNOTATION_REQUIRED}</p>
-          <p className="text-sm text-amber-600 dark:text-serika-main">{STEP3_NO_ANNOTATION_BACK_HINT}</p>
-        </div>
-      )}
       <AnnotatedTextEditor
         content={ed.content}
         annotations={ed.annotations}
@@ -622,6 +616,12 @@ function Step3({
         yellowLocalIds={yellowLocalIds}
         reviewCommand={reviewCommand}
       />
+      {ed.needAnnotation === true && ed.annotations.length === 0 && (
+        <div className="mt-3 space-y-1" data-testid="step3-no-annotation-hint">
+          <p className="text-sm text-amber-600 dark:text-serika-main">{STEP3_NO_ANNOTATION_REQUIRED}</p>
+          <p className="text-sm text-amber-600 dark:text-serika-main">{STEP3_NO_ANNOTATION_BACK_HINT}</p>
+        </div>
+      )}
     </div>
   );
 }
