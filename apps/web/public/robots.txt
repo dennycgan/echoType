@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://echotype.ink/sitemap.xml
