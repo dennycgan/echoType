@@ -23,7 +23,9 @@ import {
   MSG_NETWORK_ERROR,
   MSG_SERIAL_BLOCK,
   MSG_SERVER_ERROR,
+  STEP3_NO_ANNOTATION_BACK_HINT,
   STEP3_NO_ANNOTATION_MESSAGE,
+  STEP3_NO_ANNOTATION_REQUIRED,
   formatPurgedAnnotationsMessage,
   MSG_REVIEW_BLOCK,
   MSG_REVIEW_COMPLETE,
@@ -297,13 +299,13 @@ export function CourseEditorModal({
 
         <footer className="border-t px-5 py-3 dark:border-serika-border">
           {footerHint && (
-            <p className="mb-2 text-sm text-amber-700 dark:text-serika-main" data-testid="editor-footer-hint">
+            <p className="mb-2 whitespace-pre-line text-sm text-amber-700 dark:text-serika-main" data-testid="editor-footer-hint">
               {footerHint}
             </p>
           )}
           {ed.step === 4 && submitError && (
             <p
-              className="mb-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300"
+              className="mb-2 whitespace-pre-line rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300"
               data-testid="editor-submit-error"
             >
               {submitError}
@@ -599,6 +601,12 @@ function Step3({
         >
           {MSG_REVIEW_COMPLETE}
         </p>
+      )}
+      {ed.needAnnotation === true && ed.annotations.length === 0 && (
+        <div className="mb-3 space-y-1" data-testid="step3-no-annotation-hint">
+          <p className="text-sm text-amber-600 dark:text-serika-main">{STEP3_NO_ANNOTATION_REQUIRED}</p>
+          <p className="text-sm text-amber-600 dark:text-serika-main">{STEP3_NO_ANNOTATION_BACK_HINT}</p>
+        </div>
       )}
       <AnnotatedTextEditor
         content={ed.content}

@@ -5,8 +5,11 @@ import type { DraftAnnotation } from './useCourseEditor';
 
 export { formatContentIssueMessage } from '@echotype/shared';
 
-export const STEP3_NO_ANNOTATION_MESSAGE =
-  'You chose to add annotations but have not added any yet. If you do not need annotations, go back and choose "No".';
+export const STEP3_NO_ANNOTATION_REQUIRED = 'At least one annotation is required.';
+export const STEP3_NO_ANNOTATION_BACK_HINT =
+  'If you do not need annotations, go back and choose "No".';
+/** Two-line gate copy; use with `whitespace-pre-line` when rendered as one string. */
+export const STEP3_NO_ANNOTATION_MESSAGE = `${STEP3_NO_ANNOTATION_REQUIRED}\n${STEP3_NO_ANNOTATION_BACK_HINT}`;
 
 export const MSG_ANCHOR_START_WHITESPACE =
   'The start anchor cannot be a space or line break. Pick again.';
