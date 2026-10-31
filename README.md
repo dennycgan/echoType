@@ -4,9 +4,11 @@
 
 **Live:** [echotype.ink](https://echotype.ink)
 
-echoType is a low-pressure typing tool where you load up any text (poems, speeches, quotes, essays) and just type through it on loop. Good for moments when your brain needs something to do without actual thinking.
+echoType is a low-pressure typing practice web app where you load up any text (poems, speeches, quotes, essays) and just type through it on loop. Good for moments when your brain needs something to do without actual thinking.
 
 You can add custom annotations to phrases beforehand; the notes stay visible as you type, so glosses stay in context instead of a separate glossary. Sign in to keep your texts and practice history; or browse and type the sample courses as a guest.
+
+People can use it in their own ways — for example, loading a writing template and typing it until it sticks before a writing exam, or repeating any text they want to remember with their own notes shown as glosses above the line.
 
 The name comes from echo — a voice returning. I built it because I wanted to revisit texts I actually care about through repetitive typing, until the words and rhythm sink in.
 
@@ -139,7 +141,7 @@ I ship in phases with manual gates (`docs/STATE.md`); overlay/layout changes use
 ## Further reading
 
 - **`docs/STATE.md`** — Current engineering snapshot and roadmap.
-- **`docs/DECISIONS.md`** — Decision log (39 ADRs: anchoring, measurement, stats, auth, Google federation + email identity + password reconstruction, layout + note wrap slack / line-clamp dead zone, NotePopover prefer-up placement, import/export + export-notes footer, content whitespace normalization, forgiving mode, immersive refocus + caret under pinch-zoom, home practice summary, typing-session Night mode, site-wide DocumentDark + tab-memory Night override, custom domain, Sentry, privacy).
+- **`docs/DECISIONS.md`** — Decision log (annotation anchoring & measurement, typing/IME grading, stats contract, Cognito/Google identity, same-origin CloudFront + domain, course import/export, ops/privacy).
 - **`docs/STATS.md`** — Stats field definitions and formulas (the contract).
 - **`deploy/README.md`** — Terraform, SSM access, cloud deploy.
 
