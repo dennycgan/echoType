@@ -522,7 +522,9 @@ function Step2({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
           import with valid markers already answered it (needAnnotation = true). */}
       {!ed.skipAnnotationChoice && ed.annotations.length === 0 && (
         <fieldset className="space-y-2">
-          <legend className="text-sm text-slate-600 dark:text-serika-sub">Do you want to add annotations?</legend>
+          <legend className="text-sm text-slate-600 dark:text-serika-sub">
+            Do you want to add annotations? (required)
+          </legend>
           <div className="flex gap-3">
             <button
               onClick={() => ed.setNeedAnnotation(true)}
@@ -545,6 +547,11 @@ function Step2({ ed }: { ed: ReturnType<typeof useCourseEditor> }) {
               No
             </button>
           </div>
+          {ed.needAnnotation === null && (
+            <p className="text-sm text-amber-600 dark:text-serika-main">
+              Whether to add annotations (Yes or No) is required.
+            </p>
+          )}
         </fieldset>
       )}
     </div>

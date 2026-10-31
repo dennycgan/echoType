@@ -445,7 +445,7 @@ export function AnnotatedTextEditor({
         </p>
       )}
 
-      <p className="mb-2 text-xs text-slate-500 dark:text-serika-sub" data-testid="step3-editor-helper">
+      <p className="mb-2 text-xs text-amber-700 dark:text-serika-main" data-testid="step3-editor-helper">
         {reviewPickGate ? STEP3_HELPER_REVIEW : STEP3_HELPER_DEFAULT}
       </p>
 
