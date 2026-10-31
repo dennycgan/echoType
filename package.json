@@ -11,7 +11,8 @@
     "build": "pnpm -r --filter=./apps/* run build",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
-    "test": "pnpm --filter @echotype/shared test && pnpm --filter @echotype/web test:typing && pnpm --filter @echotype/web test:layout && pnpm --filter @echotype/web test:auth && pnpm --filter @echotype/web test:sentry && pnpm --filter @echotype/web test:ops-phase2 && pnpm --filter @echotype/api test:auth && pnpm --filter @echotype/api test:sentry",
+    "test:architecture": "node test/architecture/run.mjs",
+    "test": "pnpm test:architecture && pnpm --filter @echotype/shared test && pnpm --filter @echotype/web test:typing && pnpm --filter @echotype/web test:layout && pnpm --filter @echotype/web test:auth && pnpm --filter @echotype/web test:sentry && pnpm --filter @echotype/web test:ops-phase2 && pnpm --filter @echotype/api test:auth && pnpm --filter @echotype/api test:sentry",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres"
